@@ -13,3 +13,9 @@ node_modules/
 # OS noise
 Thumbs.db
 Desktop.ini
+
+# ruflo/claude-flow runtime state (created by npx swarm/daemon calls)
+.claude-flow/
+.swarm/
+.claude/proven-config.json
+ruvector.db
