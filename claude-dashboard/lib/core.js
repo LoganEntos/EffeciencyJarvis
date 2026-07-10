@@ -12,7 +12,8 @@ const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
 const CLAUDE_HOME = path.join(os.homedir(), '.claude');
 const DOT_CLAUDE = path.join(PROJECT_DIR, '.claude');
-const GRAPHIFY_EXE = 'C:\\Users\\logto\\.local\\bin\\graphify.exe';
+const GRAPHIFY_EXE = process.env.HUB_GRAPHIFY_EXE
+  || path.join(os.homedir(), '.local', 'bin', 'graphify.exe');
 const GRAPH_JSON = path.join(DASH_DIR, 'graphify-out', 'graph.json');
 
 // ---------- data collectors ----------
