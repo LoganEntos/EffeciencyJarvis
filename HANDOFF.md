@@ -42,6 +42,7 @@ lib/util.js              shared helpers (fs, no-shell spawn, body reader)
 lib/core.js              overview / library / sessions / swarm / graph endpoints
 lib/runs.js              run engine: spawn claude CLI, SSE, auto-routing, history, artifacts
 lib/tasks.js             hub-native task queue (feeds prompts to the run engine)
+lib/schedules.js         scheduled runs: hub-native cron → run engine (data/schedules.json)
 lib/files.js             upload inbox (vanilla multipart)
 index.html               markup shell (token injected at serve time)
 assets/app.js            SPA core + Overview/Swarm/Sessions/Library/Config
@@ -56,8 +57,9 @@ Nav order: Run · Tasks · Files · Sessions · Memory · Overview · Swarm · G
 
 `lib/memory.js` = Engram-style semantic memory (SEMANTIC OVER VECTORS): typed
 records, lexical+tag+recency+importance recall, NO embeddings/vector-DB. Captures
-runs automatically; `assets/memory.js` = Memory tab. Next: N3.5 opt-in auto-recall
-into runs (the token payoff).
+runs automatically; `assets/memory.js` = Memory tab. N3.5 SHIPPED: opt-in
+"◇ memory recall" toggle in the Run composer (default OFF) injects top-3
+memories into the prompt; rule-based failure-pattern distillation included.
 
 ## Key decisions already made (don't relitigate)
 - **task-master → NOT an always-on MCP** (per-run tax). Hub-native queue (`lib/tasks.js`) covers it. CLI-only if ever wanted.
@@ -68,13 +70,11 @@ into runs (the token payoff).
 - **ruflo daemons → killed** (were draining tokens in the background); their state is gitignored. `.mcp.json` claude-flow is `autoStart:false` (lazy, no daemon).
 
 ## EXECUTE NEXT — clear list to knock out instantly (detail in docs/roadmap.md)
-Autonomous, no user action, in order:
-1. **N1 Hub restyle** — kill the system font + purple gradient; apply the ui-design skill to `assets/style.css`.
-2. **N2 Mobile polish** — audit all tabs at 375px; touch targets, overflow, composer.
-3. **N3 Scheduled runs** — hub-native cron feeding the run engine (`data/schedules.json`); completes the autonomous loop.
-4. **N4 Routing-accuracy feedback** — compare routed model vs outcome; tune `routeModel()`.
-5. **N5 Dark/light theme toggle** — system detection + header toggle.
-6. **N6 xlsx preview in Files** — zero-dep sheet/dimension preview.
+Autonomous, no user action, in order (N1/N3/N3.5 shipped 2026-07-10 → S16–S18):
+1. **N2 Mobile polish** — audit all tabs at 375px; touch targets, overflow, composer.
+2. **N4 Routing-accuracy feedback** — compare routed model vs outcome; tune `routeModel()`.
+3. **N5 Dark/light theme toggle** — header toggle + persistence (light CSS vars already shipped in S16).
+4. **N6 xlsx preview in Files** — zero-dep sheet/dimension preview.
 
 Needs a dependency install (weigh token cost, get a quick nod):
 7. **Q1 Playwright E2E** (dev-only, no run tax) — recommended first install; regression safety net.
@@ -86,7 +86,10 @@ Needs a dependency install (weigh token cost, get a quick nod):
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
 
 ## Current state
-All S1–S14 shipped and browser-verified (see roadmap table). Latest commits on
-`master`: library restore (`6f3cca6`), task queue + ui-design (`144394a`),
-cookbook adoption + daemon kill (`7fd5bcb`/`285cb1f`). Working tree clean.
-Overview reads: 90 agents · 35 skills · 166 commands · MCP claude-flow+scrapling.
+All S1–S18 shipped and browser-verified (see roadmap table). 2026-07-10 evening:
+N1 terminal-amber restyle (`eae41ba`), N3 scheduled runs (`363246f`), N3.5 memory
+recall (`d60da34`). Working tree clean, smoke script green (29 checks incl.
+schedules). Overview reads: 90 agents · 35 skills · 166 commands · MCP
+claude-flow+scrapling. OPEN QUESTION for the user (asked, unanswered): ISSUE-1
+ruflo decision — retire ruflo (recommended) or integrate it through the run
+engine. Don't build either path until answered.

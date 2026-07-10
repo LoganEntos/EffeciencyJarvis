@@ -32,39 +32,22 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 | S13 | **Full library restored** — 90 agents / 35 skills / 166 commands / claude-flow+scrapling MCP (PBI excluded) | `.claude/`, `.mcp.json` |
 | S14 | **Security + hygiene** — X-Hub-Token CSRF, CSP-sandboxed artifacts, traversal guards, smoke script, ruflo daemons killed + state gitignored | `server.js`, `scripts/` |
 | S15 | **Engram semantic memory (over vectors)** — typed records (episodic/semantic/procedural), lexical+tag+recency+importance recall, NO embeddings/vector-DB/LLM-in-hot-path. Auto-captures runs, backfills history, Memory tab. Verified: search "artifact chart" ranks the chart run first | `lib/memory.js`, `assets/memory.js` |
+| S16 | **N1 Hub restyle** — terminal-amber instrument panel per the aesthetics cookbook: JetBrains Mono (200/800) + IBM Plex Sans via Google Fonts, amber-dominant palette on warm near-black, hairline grid + layered glow background, one staggered load reveal, reduced-motion respected, light-theme CSS vars pre-wired for N5. Purple gradient + Segoe purged from every asset incl. graph canvas. Browser-verified desktop + 375px | `assets/style.css`, `index.html`, all `assets/*.js` |
+| S17 | **N3 Scheduled runs** — hub-native cron: interval/daily/weekly schedules in `data/schedules.json`, 30s ticker fires due prompts through the run engine (inherits routing/streaming/history/spend/Engram), busy-defer + no-stacking guards, CRUD endpoints (token-guarded) + Scheduled section in Tasks tab. Verified: ticker fired a live haiku run 20s after due time, nextDue advanced correctly | `lib/schedules.js`, `server.js`, `assets/tasks.js` |
+| S18 | **N3.5 Memory auto-recall** — opt-in toggle (default OFF) in the Run composer injects top-3 relevant Engram memories (1.2k char cap) into the CLI prompt; injected count streamed to chat + stored as `recallCount`. Rule-based distillation: 3+ failed runs sharing a tag → standing semantic "failure pattern" record. Verified: haiku answered chart values purely from recalled context ($0.036, 1 turn, no tools) | `lib/memory.js`, `lib/runs.js`, `assets/run.js` |
 
 ---
 
 ## 🔜 DO NEXT — autonomous, no user action needed (execute top-down)
 
-### N1. Hub restyle per the aesthetics cookbook  (was P2.5)
-The hub's own chrome violates two cookbook call-outs: **Segoe UI system font**
-and **purple gradient accent**. Restyle: pick one distinctive font (see
-`.claude/skills/ui-design`), a dominant-color palette via CSS variables, a
-layered background, and one staggered page-load reveal. Files: `assets/style.css`.
-Done when: hub looks intentionally designed, still themeable, browser-verified.
+*(N1, N3, N3.5 shipped 2026-07-10 → see S16–S18 above.)*
 
 ### N2. Mobile polish  (was P2)
 Audit every tab at 375px width (the nav already collapses <760px). Fix touch
 targets, composer ergonomics, card wrapping, table overflow. Files:
 `assets/style.css` + per-tab tweaks. Done when: all 11 tabs usable one-handed on
-a phone. (Pairs with the user's Tailscale setup — see 🙋 below.)
-
-### N3. Scheduled runs  (was P4.5, idea from nousresearch/hermes-agent)
-Hub-native cron: recurring prompts (e.g. "every Monday: summarize last week's
-runs + errors into a report artifact") persisted in `data/schedules.json`,
-fired by the run engine with auto-routing. Zero-dep (setInterval + persisted
-schedule). New tab or a section under Tasks. Completes the autonomous loop with
-S11. Do NOT adopt hermes-agent itself (parallel Python agent stack, duplicates
-the claude CLI).
-
-### N3.5 Memory auto-recall into runs  (opt-in, the Engram payoff)
-Inject the top-k relevant memories (from `lib/memory.search`) into a new run's
-prompt as context — so the hub recalls past decisions/errors without you
-re-explaining. This is the token PAYOFF of S15 (ENGRAM reports ~99% fewer tokens
-vs vector-RAG) BUT it spends some tokens per run, so ship it as a **toggle in the
-Run tab, default off**. Also add semantic/procedural distillation (rule-based, no
-LLM) so memory isn't only episodic.
+a phone. (Pairs with the user's Tailscale setup — see 🙋 below.) Spot-check at
+375px during S16 showed no regressions; this item is the full ergonomic pass.
 
 ### N4. Routing-accuracy feedback loop
 Compare each auto-routed model against the run outcome (did haiku succeed, or
@@ -72,8 +55,10 @@ error/retry?). Surface a small stat and tune `routeModel()` thresholds from real
 data. Files: `lib/runs.js`, a metrics view. Sharpens the core token lever.
 
 ### N5. Dark/light theme toggle
-System-preference detection + manual toggle in the header. Files:
-`assets/style.css` (CSS-variable theming already in place), `assets/app.js`.
+System-preference detection + manual toggle in the header. The light-theme
+variable set already exists (`:root[data-theme="light"]` in `assets/style.css`,
+shipped with S16) — remaining work is just the header toggle + persistence in
+`assets/app.js`.
 
 ### N6. xlsx structural preview in Files
 Zero-dep zip/xml parse to show sheet names + dimensions for uploaded `.xlsx`
