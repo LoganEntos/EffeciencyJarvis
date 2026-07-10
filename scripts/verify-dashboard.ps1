@@ -49,6 +49,9 @@ Check "GET /api/runs"          "$base/api/runs"
 Check "GET /api/files"         "$base/api/files"
 Check "GET /api/tasks"         "$base/api/tasks"
 Check "GET /api/schedules"     "$base/api/schedules"
+Check "GET /api/assets"        "$base/api/assets"
+Check "GET /vendor/css/fonts.css" "$base/vendor/css/fonts.css"
+Check "GET vendor traversal blocked" "$base/vendor/..%2Fserver.js" 404
 Check "GET /api/memory"        "$base/api/memory"
 Check "GET /api/memory/search" "$base/api/memory/search?q=test"
 Check "GET /api/run/transcript (bad id 404)" "$base/api/run/transcript?id=nope" 404

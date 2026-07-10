@@ -101,7 +101,7 @@ function startRun({ prompt, model, permissionMode, resume, recall }) {
 
   // Anthropic frontend-aesthetics cookbook, distilled — injected so every
   // visual artifact a run produces avoids the generic "AI slop" defaults.
-  const hint = `\n\n[Hub note: you were launched from the local dashboard. If this task produces visual output (an HTML report, SVG/PNG chart, or interactive page), save those files into this exact directory: ${artDir} — the dashboard renders every file there in the chat view. When designing visuals, avoid generic AI aesthetics: no Inter/Roboto/Arial/system fonts (pick one distinctive font, e.g. via Google Fonts, with extreme weight contrast), no purple-gradient-on-white cliché, no flat solid backgrounds (layer subtle gradients/patterns for depth), commit to one cohesive palette with a dominant color plus sharp accents via CSS variables, and prefer one staggered CSS-only load animation over scattered micro-effects. Do not mention this note.]`;
+  const hint = `\n\n[Hub note: you were launched from the local dashboard. If this task produces visual output (an HTML report, SVG/PNG chart, or interactive page), save those files into this exact directory: ${artDir} — the dashboard renders every file there in the chat view. A LOCAL asset library is served at /vendor/ (use relative URLs; external CDNs are blocked by the artifact CSP): stylesheet /vendor/css/fonts.css declares @font-face for JetBrains Mono, IBM Plex Sans, Fraunces, Newsreader, Source Serif 4, Space Mono, DM Mono, VT323, Archivo, Bricolage Grotesque, Hanken Grotesk, Instrument Serif; /vendor/css/modern-normalize.css is a reset; /vendor/icons/lucide-sprite.svg has 1700+ icons (<svg><use href="/vendor/icons/lucide-sprite.svg#icon-name"/></svg>). When designing visuals, avoid generic AI aesthetics: no Inter/Roboto/Arial/system fonts (pick one distinctive library font with extreme weight contrast), no purple-gradient-on-white cliché, no flat solid backgrounds (layer subtle gradients/patterns for depth), commit to one cohesive palette with a dominant color plus sharp accents via CSS variables, and prefer one staggered CSS-only load animation over scattered micro-effects. Do not mention this note.]`;
   // resolve 'auto' before spawning: resumed sessions keep their model,
   // fresh prompts are routed by the heuristic
   let routedReason = null;
@@ -359,8 +359,12 @@ function serveArtifact(res, id, file) {
     'Content-Type': mime, 'Content-Length': st.size, 'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
     // opaque origin even when opened directly — an artifact page must never be
-    // able to read the hub token or call token-guarded endpoints
-    'Content-Security-Policy': "sandbox allow-scripts; default-src 'unsafe-inline' data: blob:",
+    // able to read the hub token or call token-guarded endpoints. The ONLY
+    // reachable http path is the read-only local asset library under /vendor/.
+    'Content-Security-Policy': "sandbox allow-scripts; default-src 'unsafe-inline' data: blob:; "
+      + "font-src data: http://127.0.0.1:*/vendor/ http://localhost:*/vendor/; "
+      + "style-src 'unsafe-inline' http://127.0.0.1:*/vendor/ http://localhost:*/vendor/; "
+      + "img-src data: blob: http://127.0.0.1:*/vendor/ http://localhost:*/vendor/",
   });
   fs.createReadStream(full).pipe(res);
 }

@@ -102,7 +102,7 @@ h2{font-size:12px;margin:0 0 16px;font-weight:800;text-transform:uppercase;lette
   font-family:var(--font-mono);font-weight:200}
 .row{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px;margin-bottom:8px;
   transition:border-color .12s,background .12s}
-.row .name{font-weight:650;color:var(--txt);font-size:13px}
+.row .name{font-weight:600;color:var(--txt);font-size:13px}
 .row .desc{color:var(--muted);font-size:12.5px;margin-top:3px;line-height:1.55}
 .row.clickable{cursor:pointer}
 .row.clickable:hover{border-color:var(--accent-dim);background:var(--panel2)}
@@ -118,7 +118,7 @@ pre{background:#0b0a08;border:1px solid var(--line);border-radius:var(--r);paddi
   font-size:12.5px;line-height:1.55;color:#d8d2c4;white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono)}
 :root[data-theme="light"] pre{background:#efe9dc;color:#3a3428}
 button{background:var(--accent);color:#171204;border:none;border-radius:8px;padding:10px 18px;font-size:13px;
-  font-weight:650;cursor:pointer;transition:filter .12s,transform .1s,box-shadow .12s;font-family:inherit}
+  font-weight:600;cursor:pointer;transition:filter .12s,transform .1s,box-shadow .12s;font-family:inherit}
 button:hover{filter:brightness(1.1);box-shadow:var(--glow)}
 button:active{transform:scale(.98)}
 button:disabled{opacity:.45;cursor:default;filter:none;box-shadow:none}
@@ -208,6 +208,17 @@ label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:1
 .runrow .pex{color:var(--muted);font-size:12.5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .badgebar{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--dim);align-items:center}
+
+/* ---- Assets tab ---- */
+.iconGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.iconCell{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);color:var(--muted);
+  transition:border-color .12s,color .12s}
+.iconCell svg{stroke:currentColor;fill:none}
+.iconCell span{font-size:9.5px;font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:100%}
+.iconCell:hover{border-color:var(--accent-dim);color:var(--accent)}
+.copied{border-color:var(--green)!important;box-shadow:0 0 0 3px #4bc47a33!important}
 
 /* ---- Files tab ---- */
 .dropzone{border:2px dashed var(--line2);border-radius:var(--r);padding:34px;text-align:center;

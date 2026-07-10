@@ -211,6 +211,14 @@ function graphStats() {
   return { exists: true, nodes: nodes.length, edges: links.length, communities, topNodes };
 }
 
+// Local asset library (vendor/): manifest of vendored fonts/icons/css.
+function assets() {
+  const man = U.safeJson(path.join(DASH_DIR, 'vendor', 'manifest.json'));
+  if (!man) return { exists: false, items: [], iconIndex: [] };
+  const iconIndex = U.safeJson(path.join(DASH_DIR, 'vendor', 'icons', 'lucide-index.json')) || [];
+  return { exists: true, generatedAt: man.generatedAt, items: man.items || [], iconIndex };
+}
+
 // Serve the raw markdown of one agent/skill/command definition (path-traversal safe).
 function detail(type, name) {
   const dirs = { agents: path.join(DOT_CLAUDE, 'agents'), commands: path.join(DOT_CLAUDE, 'commands'), skills: path.join(DOT_CLAUDE, 'skills') };
@@ -257,6 +265,7 @@ async function handle(req, res, url) {
     U.sendJson(res, { code: r.code, output: U.stripAnsi(r.out) });
     return true;
   }
+  if (p === '/api/assets') { U.sendJson(res, assets()); return true; }
   if (p === '/api/graph/stats') { U.sendJson(res, graphStats()); return true; }
   if (p === '/api/graph/data') {
     const g = U.safeJson(GRAPH_JSON);

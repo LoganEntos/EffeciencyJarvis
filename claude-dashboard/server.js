@@ -29,6 +29,11 @@ const TOKEN = crypto.randomBytes(16).toString('hex');
 
 const ASSETS = path.join(__dirname, 'assets');
 const ASSET_MIME = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+const VENDOR = path.join(__dirname, 'vendor');
+const VENDOR_MIME = {
+  '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json',
+};
 
 function badOrigin(req) {
   const o = req.headers.origin;
@@ -60,6 +65,24 @@ const server = http.createServer(async (req, res) => {
       if (body === null) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('not found'); }
       res.writeHead(200, { 'Content-Type': ASSET_MIME[ext], 'Cache-Control': 'no-store' });
       return res.end(body);
+    }
+
+    // local asset library (fonts/icons/css) — read-only, traversal-guarded,
+    // cacheable (files are immutable snapshots; the manifest records origins)
+    if (p.startsWith('/vendor/')) {
+      const rel = p.slice('/vendor/'.length);
+      const ext = path.extname(rel).toLowerCase();
+      if (!/^[a-z0-9._/-]+$/i.test(rel) || rel.includes('..') || !VENDOR_MIME[ext]) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('not found');
+      }
+      const full = path.normalize(path.join(VENDOR, rel));
+      if (!full.startsWith(VENDOR + path.sep)) { res.writeHead(403, { 'Content-Type': 'text/plain' }); return res.end('forbidden'); }
+      let st; try { st = fs.statSync(full); } catch { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('not found'); }
+      if (!st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('not found'); }
+      res.writeHead(200, { 'Content-Type': VENDOR_MIME[ext], 'Content-Length': st.size,
+        'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+      return fs.createReadStream(full).pipe(res);
     }
 
     // every mutating endpoint requires the boot token

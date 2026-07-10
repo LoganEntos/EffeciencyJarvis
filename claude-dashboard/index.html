@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="hub-token" content="__HUB_TOKEN__">
 <title>Claude Code Hub</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;500;800&family=IBM+Plex+Sans:wght@400;650&display=swap">
+<link rel="stylesheet" href="/vendor/css/fonts.css">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -35,6 +33,7 @@
     <a data-tab="agents"><span class="ico">⛬</span><span class="txt">Agents</span><kbd>9</kbd></a>
     <a data-tab="skills"><span class="ico">✦</span><span class="txt">Skills</span><kbd>0</kbd></a>
     <a data-tab="commands"><span class="ico">❯_</span><span class="txt">Commands</span></a>
+    <a data-tab="assets"><span class="ico">◧</span><span class="txt">Assets</span></a>
     <a data-tab="config"><span class="ico">⚙</span><span class="txt">Config</span></a>
   </nav>
   <main>
@@ -49,6 +48,7 @@
     <section id="agents" class="hidden"></section>
     <section id="skills" class="hidden"></section>
     <section id="commands" class="hidden"></section>
+    <section id="assets" class="hidden"></section>
     <section id="config" class="hidden"></section>
   </main>
 </div>
@@ -58,6 +58,7 @@
 <script src="assets/tasks.js"></script>
 <script src="assets/memory.js"></script>
 <script src="assets/files.js"></script>
+<script src="assets/assetlib.js"></script>
 <script>boot();</script>
 </body>
 </html>
