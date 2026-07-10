@@ -1,0 +1,132 @@
+{
+  "communities": {
+    "0": [
+      "server",
+      "server_claude_home",
+      "server_dot_claude",
+      "server_fs",
+      "server_http",
+      "server_node_bin",
+      "server_npx_cli",
+      "server_os",
+      "server_path",
+      "server_port",
+      "server_sendjson",
+      "server_server",
+      "server_spawn",
+      "server_statuscache"
+    ],
+    "1": [
+      "server_agentlist",
+      "server_collectmd",
+      "server_commandlist",
+      "server_frontmatter",
+      "server_listdir",
+      "server_overview",
+      "server_skilllist"
+    ],
+    "2": [
+      "server_config",
+      "server_detail",
+      "server_safejson",
+      "server_saferead"
+    ],
+    "3": [
+      "server_ruflostatus",
+      "server_run",
+      "server_runnpx",
+      "server_stripansi"
+    ],
+    "4": [
+      "server_project_dir",
+      "server_sessions"
+    ]
+  },
+  "cohesion": {
+    "0": 0.14285714285714285,
+    "1": 0.42857142857142855,
+    "2": 0.6666666666666666,
+    "3": 0.5,
+    "4": 1.0
+  },
+  "gods": [
+    {
+      "id": "server_collectmd",
+      "label": "collectMd()",
+      "degree": 6
+    },
+    {
+      "id": "server_saferead",
+      "label": "safeRead()",
+      "degree": 5
+    },
+    {
+      "id": "server_listdir",
+      "label": "listDir()",
+      "degree": 5
+    },
+    {
+      "id": "server_frontmatter",
+      "label": "frontmatter()",
+      "degree": 5
+    },
+    {
+      "id": "server_safejson",
+      "label": "safeJson()",
+      "degree": 4
+    },
+    {
+      "id": "server_overview",
+      "label": "overview()",
+      "degree": 4
+    },
+    {
+      "id": "server_runnpx",
+      "label": "runNpx()",
+      "degree": 3
+    },
+    {
+      "id": "server_agentlist",
+      "label": "agentList()",
+      "degree": 3
+    },
+    {
+      "id": "server_skilllist",
+      "label": "skillList()",
+      "degree": 3
+    },
+    {
+      "id": "server_commandlist",
+      "label": "commandList()",
+      "degree": 3
+    }
+  ],
+  "surprises": [
+    {
+      "source": "frontmatter()",
+      "target": "safeRead()",
+      "source_files": [
+        "server.js",
+        "server.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 2 \u2192 community 1"
+    },
+    {
+      "source": "sessions()",
+      "target": "listDir()",
+      "source_files": [
+        "server.js",
+        "server.js"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 1 \u2192 community 4"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

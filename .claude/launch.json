@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "claude-dashboard",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["claude-dashboard/server.js"],
+      "port": 5757
+    },
+    {
+      "name": "claude-dashboard-alt",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["claude-dashboard/server.js", "5758"],
+      "port": 5758
+    }
+  ]
+}

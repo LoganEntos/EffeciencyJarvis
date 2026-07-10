@@ -1,0 +1,851 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "server.js",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "server",
+      "community": 0,
+      "norm_label": "server.js"
+    },
+    {
+      "label": "http",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "server_http",
+      "community": 0,
+      "norm_label": "http"
+    },
+    {
+      "label": "fs",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "server_fs",
+      "community": 0,
+      "norm_label": "fs"
+    },
+    {
+      "label": "path",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "server_path",
+      "community": 0,
+      "norm_label": "path"
+    },
+    {
+      "label": "os",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "server_os",
+      "community": 0,
+      "norm_label": "os"
+    },
+    {
+      "label": "{ spawn }",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "server_spawn",
+      "community": 0,
+      "norm_label": "{ spawn }"
+    },
+    {
+      "label": "PORT",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "server_port",
+      "community": 0,
+      "norm_label": "port"
+    },
+    {
+      "label": "PROJECT_DIR",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "server_project_dir",
+      "community": 4,
+      "norm_label": "project_dir"
+    },
+    {
+      "label": "CLAUDE_HOME",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "server_claude_home",
+      "community": 0,
+      "norm_label": "claude_home"
+    },
+    {
+      "label": "DOT_CLAUDE",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "server_dot_claude",
+      "community": 0,
+      "norm_label": "dot_claude"
+    },
+    {
+      "label": "NODE_BIN",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "server_node_bin",
+      "community": 0,
+      "norm_label": "node_bin"
+    },
+    {
+      "label": "NPX_CLI",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "server_npx_cli",
+      "community": 0,
+      "norm_label": "npx_cli"
+    },
+    {
+      "label": "safeRead()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L22",
+      "_origin": "ast",
+      "id": "server_saferead",
+      "community": 2,
+      "norm_label": "saferead()"
+    },
+    {
+      "label": "safeJson()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "server_safejson",
+      "community": 2,
+      "norm_label": "safejson()"
+    },
+    {
+      "label": "listDir()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "server_listdir",
+      "community": 1,
+      "norm_label": "listdir()"
+    },
+    {
+      "label": "frontmatter()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L27",
+      "_origin": "ast",
+      "id": "server_frontmatter",
+      "community": 1,
+      "norm_label": "frontmatter()"
+    },
+    {
+      "label": "collectMd()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L41",
+      "_origin": "ast",
+      "id": "server_collectmd",
+      "community": 1,
+      "norm_label": "collectmd()"
+    },
+    {
+      "label": "runNpx()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L55",
+      "_origin": "ast",
+      "id": "server_runnpx",
+      "community": 3,
+      "norm_label": "runnpx()"
+    },
+    {
+      "label": "run()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L61",
+      "_origin": "ast",
+      "id": "server_run",
+      "community": 3,
+      "norm_label": "run()"
+    },
+    {
+      "label": "overview()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L83",
+      "_origin": "ast",
+      "id": "server_overview",
+      "community": 1,
+      "norm_label": "overview()"
+    },
+    {
+      "label": "agentList()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L103",
+      "_origin": "ast",
+      "id": "server_agentlist",
+      "community": 1,
+      "norm_label": "agentlist()"
+    },
+    {
+      "label": "skillList()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L110",
+      "_origin": "ast",
+      "id": "server_skilllist",
+      "community": 1,
+      "norm_label": "skilllist()"
+    },
+    {
+      "label": "commandList()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L118",
+      "_origin": "ast",
+      "id": "server_commandlist",
+      "community": 1,
+      "norm_label": "commandlist()"
+    },
+    {
+      "label": "config()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L125",
+      "_origin": "ast",
+      "id": "server_config",
+      "community": 2,
+      "norm_label": "config()"
+    },
+    {
+      "label": "sessions()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L134",
+      "_origin": "ast",
+      "id": "server_sessions",
+      "community": 4,
+      "norm_label": "sessions()"
+    },
+    {
+      "label": "statusCache",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L150",
+      "_origin": "ast",
+      "id": "server_statuscache",
+      "community": 0,
+      "norm_label": "statuscache"
+    },
+    {
+      "label": "rufloStatus()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L151",
+      "_origin": "ast",
+      "id": "server_ruflostatus",
+      "community": 3,
+      "norm_label": "ruflostatus()"
+    },
+    {
+      "label": "stripAnsi()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L159",
+      "_origin": "ast",
+      "id": "server_stripansi",
+      "community": 3,
+      "norm_label": "stripansi()"
+    },
+    {
+      "label": "detail()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L162",
+      "_origin": "ast",
+      "id": "server_detail",
+      "community": 2,
+      "norm_label": "detail()"
+    },
+    {
+      "label": "sendJson()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L173",
+      "_origin": "ast",
+      "id": "server_sendjson",
+      "community": 0,
+      "norm_label": "sendjson()"
+    },
+    {
+      "label": "server",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L179",
+      "_origin": "ast",
+      "id": "server_server",
+      "community": 0,
+      "norm_label": "server"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L103",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_agentlist",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_claude_home",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_collectmd",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L118",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_commandlist",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L125",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L162",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_detail",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_dot_claude",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_frontmatter",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_fs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_http",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_listdir",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_node_bin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_npx_cli",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_os",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L83",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_overview",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_port",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_project_dir",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L151",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_ruflostatus",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_run",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L55",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_runnpx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_safejson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_saferead",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L173",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_sendjson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L179",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_server",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L134",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_sessions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L110",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_skilllist",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_spawn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L150",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_statuscache",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L159",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_stripansi",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server.js",
+      "source_location": "L136",
+      "weight": 1.0,
+      "source": "server_sessions",
+      "target": "server_project_dir"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L129",
+      "weight": 1.0,
+      "source": "server_config",
+      "target": "server_saferead",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L166",
+      "weight": 1.0,
+      "source": "server_detail",
+      "target": "server_saferead",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "server_frontmatter",
+      "target": "server_saferead",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "server_safejson",
+      "target": "server_saferead",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L127",
+      "weight": 1.0,
+      "source": "server_config",
+      "target": "server_safejson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L87",
+      "weight": 1.0,
+      "source": "server_overview",
+      "target": "server_safejson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "server_collectmd",
+      "target": "server_listdir",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "server_overview",
+      "target": "server_listdir",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L139",
+      "weight": 1.0,
+      "source": "server_sessions",
+      "target": "server_listdir",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L112",
+      "weight": 1.0,
+      "source": "server_skilllist",
+      "target": "server_listdir",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L105",
+      "weight": 1.0,
+      "source": "server_agentlist",
+      "target": "server_frontmatter",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L120",
+      "weight": 1.0,
+      "source": "server_commandlist",
+      "target": "server_frontmatter",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L113",
+      "weight": 1.0,
+      "source": "server_skilllist",
+      "target": "server_frontmatter",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L104",
+      "weight": 1.0,
+      "source": "server_agentlist",
+      "target": "server_collectmd",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L119",
+      "weight": 1.0,
+      "source": "server_commandlist",
+      "target": "server_collectmd",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L168",
+      "weight": 1.0,
+      "source": "server_detail",
+      "target": "server_collectmd",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L84",
+      "weight": 1.0,
+      "source": "server_overview",
+      "target": "server_collectmd",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L153",
+      "weight": 1.0,
+      "source": "server_ruflostatus",
+      "target": "server_runnpx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "server_runnpx",
+      "target": "server_run",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L154",
+      "weight": 1.0,
+      "source": "server_ruflostatus",
+      "target": "server_stripansi",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": []
+}
