@@ -58,6 +58,29 @@ currently violates two call-outs — Segoe UI system font + purple gradient
 accent — so a restyle pass (distinctive font, dominant-color palette,
 staggered load reveal, layered background) is queued; fold into P1/P2 UI work.
 
+## ⬜ P4.5 — Scheduled runs (idea mined from nousresearch/hermes-agent)
+Hub-native cron: define recurring prompts (e.g. "every Monday 9am: summarize
+last week's runs and errors into a report artifact") stored in data/, executed
+by the run engine with auto-routing. Zero-dep (setInterval + persisted
+schedule). Combined with P4's task queue this completes the autonomous
+improvement loop. We do NOT adopt hermes-agent itself: it's a parallel
+Python agent stack (own harness/models/gateway) that duplicates the claude
+CLI and violates the no-trial-install rule.
+
+## ⬜ P5.5 — Markdown export / Obsidian handoff (obsidian.md)
+Runs and session summaries exported as plain .md files into a user-chosen
+folder (an Obsidian vault works out of the box — local, private, no deps;
+writing files is all it takes). Gives run history a durable, searchable,
+linkable knowledge layer outside the hub. AWAITING USER: confirm they use
+(or want) Obsidian and the vault path before building.
+
+## 🔮 Evaluated, no action (2026-07-10)
+- **per-simmons/damon-ade** — agentic dev environment, macOS Apple Silicon
+  ONLY; user is on Windows 10. Reference for UI inspiration at most.
+- **charlie-labs** — commercial autonomous engineering agent (GitHub/Linear/
+  Slack); a product, not an adoptable tool. Their "instructions + daemons
+  catalog" pattern is prior art for P4's task queue design.
+
 ## ⬜ Backlog (earlier ideas, still valid)
 - Routing-accuracy feedback loop: compare auto-routed model vs run outcome,
   tune the heuristic from real data.
