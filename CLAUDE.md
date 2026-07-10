@@ -35,6 +35,25 @@ in this repo. Never invent or reference Power BI/TMDL/semantic-model work here.
 - Smoke test: `scripts/verify-dashboard.ps1 [-Port]` — keep it green and
   extend it with every new endpoint
 
+## Design language (from Anthropic's frontend-aesthetics cookbook — follow for ALL UI work)
+
+Claude converges on generic "AI slop" design without explicit pressure. When
+building or restyling any UI in this repo (the hub itself, artifacts, mockups):
+
+- **Typography**: distinctive fonts, never Inter/Roboto/Arial/Open Sans/Lato/
+  system defaults (and don't reflex-pick Space Grotesk). Pair with high
+  contrast (display + mono, serif + geometric sans). Use extreme weights
+  (100/200 vs 800/900) and 3x+ size jumps, not timid 400-vs-600 steps.
+- **Color**: commit to one cohesive aesthetic; dominant color + sharp accents
+  beats evenly-distributed palettes. CSS variables for everything. Draw from
+  IDE themes / cultural aesthetics. Banned cliché: purple gradient on white.
+- **Motion**: one well-orchestrated page-load with staggered reveals
+  (`animation-delay`) beats scattered micro-interactions. CSS-only.
+- **Backgrounds**: depth and atmosphere (layered gradients, subtle geometric
+  patterns), never flat solid fills.
+- Make context-specific, unexpected choices; state the design intent before
+  coding it.
+
 ## Working style
 
 - The user gives "vibe code" feedback — plain-language impressions of what

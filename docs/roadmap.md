@@ -50,6 +50,14 @@ vanilla rule. Trigger: only if a deliberate React rewrite is ever chosen
 (e.g. Base44-style visual builder direction). Until then: reference for
 visual inspiration only.
 
+## ⬜ P2.5 — Hub restyle per the frontend-aesthetics cookbook
+Anthropic's cookbook (platform.claude.com/cookbook/coding-prompting-for-frontend-aesthetics)
+adopted 2026-07-10: distilled rules live in CLAUDE.md (Design language) and are
+auto-injected into every run's artifact hint (lib/runs.js). The hub's own UI
+currently violates two call-outs — Segoe UI system font + purple gradient
+accent — so a restyle pass (distinctive font, dominant-color palette,
+staggered load reveal, layered background) is queued; fold into P1/P2 UI work.
+
 ## ⬜ Backlog (earlier ideas, still valid)
 - Routing-accuracy feedback loop: compare auto-routed model vs run outcome,
   tune the heuristic from real data.

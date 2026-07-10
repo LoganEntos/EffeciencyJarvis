@@ -1,0 +1,12 @@
+[2026-07-10T21:15:23.725Z] [INFO] Scheduled map (interval: 900s, first run in 0s)
+[2026-07-10T21:15:23.726Z] [INFO] Scheduled audit (interval: 600s, first run in 120s)
+[2026-07-10T21:15:23.726Z] [INFO] Scheduled optimize (interval: 900s, first run in 240s)
+[2026-07-10T21:15:23.726Z] [INFO] Scheduled consolidate (interval: 1800s, first run in 360s)
+[2026-07-10T21:15:23.727Z] [INFO] Scheduled testgaps (interval: 1200s, first run in 480s)
+[2026-07-10T21:15:23.727Z] [INFO] Scheduled backup (interval: 86400s, first run in 600s)
+[2026-07-10T21:15:23.727Z] [INFO] Scheduled harness (interval: 21600s, first run in 720s)
+[2026-07-10T21:15:23.727Z] [INFO] Lifecycle monitor active (ttl=43200s)
+[2026-07-10T21:15:23.729Z] [INFO] Daemon started (PID: 24396, CPUs: 24, workers: 7, maxCpuLoad: 19.200000000000003, minFreeMemoryPercent: 10%)
+[2026-07-10T21:15:23.729Z] [INFO] Claude Code not found - AI workers will run in local fallback mode
+[2026-07-10T21:15:23.730Z] [INFO] Worker map deferred: Memory too low: 5.0% free
+[2026-07-10T21:17:23.741Z] [INFO] Worker audit deferred: Memory too low: 3.7% free

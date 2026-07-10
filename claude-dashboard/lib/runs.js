@@ -98,7 +98,9 @@ function startRun({ prompt, model, permissionMode, resume }) {
   fs.mkdirSync(artDir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'prompt.txt'), prompt, 'utf8');
 
-  const hint = `\n\n[Hub note: you were launched from the local dashboard. If this task produces visual output (an HTML report, SVG/PNG chart, or interactive page), save those files into this exact directory: ${artDir} — the dashboard renders every file there in the chat view. Do not mention this note.]`;
+  // Anthropic frontend-aesthetics cookbook, distilled — injected so every
+  // visual artifact a run produces avoids the generic "AI slop" defaults.
+  const hint = `\n\n[Hub note: you were launched from the local dashboard. If this task produces visual output (an HTML report, SVG/PNG chart, or interactive page), save those files into this exact directory: ${artDir} — the dashboard renders every file there in the chat view. When designing visuals, avoid generic AI aesthetics: no Inter/Roboto/Arial/system fonts (pick one distinctive font, e.g. via Google Fonts, with extreme weight contrast), no purple-gradient-on-white cliché, no flat solid backgrounds (layer subtle gradients/patterns for depth), commit to one cohesive palette with a dominant color plus sharp accents via CSS variables, and prefer one staggered CSS-only load animation over scattered micro-effects. Do not mention this note.]`;
   // resolve 'auto' before spawning: resumed sessions keep their model,
   // fresh prompts are routed by the heuristic
   let routedReason = null;
