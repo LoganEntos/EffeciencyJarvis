@@ -37,23 +37,27 @@ that blocks — start detached or via the Browser preview tooling.
 
 ## Architecture
 ```
-server.js                boot + router + static + X-Hub-Token guard
+server.js                boot + router + static + /vendor/ + X-Hub-Token guard
 lib/util.js              shared helpers (fs, no-shell spawn, body reader)
-lib/core.js              overview / library / sessions / swarm / graph endpoints
+lib/core.js              overview / library / assets / sessions / graph endpoints
 lib/runs.js              run engine: spawn claude CLI, SSE, auto-routing, history, artifacts
 lib/tasks.js             hub-native task queue (feeds prompts to the run engine)
 lib/schedules.js         scheduled runs: hub-native cron → run engine (data/schedules.json)
+lib/agentgraph.js        run stream → persona-named agent crew graph (Graph tab live view)
 lib/files.js             upload inbox (vanilla multipart)
 index.html               markup shell (token injected at serve time)
-assets/app.js            SPA core + Overview/Swarm/Sessions/Library/Config
-assets/run.js  tasks.js  files.js  graph.js  style.css
+assets/app.js            SPA core + Overview/Sessions/Library/Config
+assets/run.js  tasks.js  files.js  graph.js  agentviz.js  assetlib.js  memory.js  style.css
+vendor/                  LOCAL asset library: 18 font faces, Lucide sprite, normalize (manifest.json = sources+licenses)
 .claude/skills/ui-design/  zero-dep design library (consult for UI work)
-data/                    runtime: runs/<id>/, inbox/, tasks.json (gitignored)
+data/                    runtime: runs/<id>/, inbox/, tasks.json, schedules.json, memory.json (gitignored)
 docs/roadmap.md          the prioritized plan (single source of truth)
 scripts/verify-dashboard.ps1   endpoint smoke test
 scripts/install-autostart.ps1  user-run logon task
 ```
-Nav order: Run · Tasks · Files · Sessions · Memory · Overview · Swarm · Graph · Agents · Skills · Commands · Config.
+Nav order: Run · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Config.
+Graph tab = "Agents" live crew view by default (persona names: Maestro/Poet/Dart
+models, Scout/Scribe/Wrench/etc tool crews); codebase map behind a chip.
 
 `lib/memory.js` = Engram-style semantic memory (SEMANTIC OVER VECTORS): typed
 records, lexical+tag+recency+importance recall, NO embeddings/vector-DB. Captures
@@ -62,6 +66,15 @@ runs automatically; `assets/memory.js` = Memory tab. N3.5 SHIPPED: opt-in
 memories into the prompt; rule-based failure-pattern distillation included.
 
 ## Key decisions already made (don't relitigate)
+- **ruflo → RETIRED** (user, 2026-07-10): one agent stack only — the Claude Code
+  native one (run engine + in-run Agent-tool subagents). Swarm tab, /api/swarm/*,
+  and the claude-flow MCP entry are gone. Multi-agent work is visualized in the
+  Graph tab's Agents view instead.
+- **hermes → still liked, still PARKED** (ISSUE-5): when revisited, it's a thin
+  messaging bridge with an on/off toggle, never the full Python stack.
+- **Assets library is a first-class Library tab** (user, 2026-07-10): vendor/
+  fonts+icons+css, locally saved, advertised to every run; prefer /vendor/ over
+  CDNs in all generated UI.
 - **task-master → NOT an always-on MCP** (per-run tax). Hub-native queue (`lib/tasks.js`) covers it. CLI-only if ever wanted.
 - **UI/UX skill → baked in free** as `.claude/skills/ui-design` (the upstream was an npm+Python CLI).
 - **hermes-agent → don't adopt**; harvested its scheduling idea → roadmap N3.
@@ -86,10 +99,11 @@ Needs a dependency install (weigh token cost, get a quick nod):
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
 
 ## Current state
-All S1–S18 shipped and browser-verified (see roadmap table). 2026-07-10 evening:
-N1 terminal-amber restyle (`eae41ba`), N3 scheduled runs (`363246f`), N3.5 memory
-recall (`d60da34`). Working tree clean, smoke script green (29 checks incl.
-schedules). Overview reads: 90 agents · 35 skills · 166 commands · MCP
-claude-flow+scrapling. OPEN QUESTION for the user (asked, unanswered): ISSUE-1
-ruflo decision — retire ruflo (recommended) or integrate it through the run
-engine. Don't build either path until answered.
+All S1–S20 shipped and browser-verified (see roadmap table). 2026-07-10 evening:
+N1 restyle (`eae41ba`), N3 schedules (`363246f`), N3.5 recall (`d60da34`),
+Assets library (`8feb670`), ruflo retired + live agent graph (`3bc872f`).
+Working tree clean, smoke script green (32 checks). Overview reads: 90 agents ·
+35 skills · 166 commands · MCP scrapling only · engram memories counted.
+ISSUE-1 is RESOLVED (ruflo retired, user decision); ISSUE-5 hermes bridge is
+the only parked item. Next up: N2 mobile polish, N4 routing feedback, N5 theme
+toggle, N6 xlsx preview.

@@ -8,7 +8,19 @@ Status: 🔴 open · 🟡 in progress · ✅ resolved
 
 ---
 
-## ISSUE-1 🔴 Ruflo swarm and the hub run engine overlap instead of cooperating
+## ISSUE-1 ✅ RESOLVED 2026-07-10 — ruflo RETIRED (user decision)
+**Resolution.** The user chose to retire ruflo entirely: "I just don't want to
+confuse multiple agentic stacks while trying to build this app up." Removed the
+Swarm tab, `/api/swarm/*` endpoints, the npx bridge, and the claude-flow entry
+in `.mcp.json`. The Claude Code native stack is THE stack: run engine executes,
+and multi-agent work happens *inside* runs via the CLI's own Agent tool + the
+90-agent library. The Graph tab's new "Agents" view (`lib/agentgraph.js`,
+`assets/agentviz.js`) visualizes that crew live with persona names.
+This also resolves ISSUE-2/3/4/6 below by construction.
+
+<details><summary>Original problem (for the record)</summary>
+
+Ruflo swarm and the hub run engine overlapped instead of cooperating:
 **Problem.** Two execution models, two memory systems, two task systems run in
 parallel with only a thin CLI bridge:
 - Execution: `lib/runs.js` spawns one auto-routed `claude -p` per run (streamed,
@@ -43,9 +55,11 @@ It has never spawned an agent (0 ever). If parallel multi-agent isn't a real nee
 the simpler resolution is to RETIRE ruflo and let the run engine + task queue be
 the whole story. Confirm before building either way.
 
+</details>
+
 ---
 
-## ISSUE-2 🔴 Dual memory: Engram (over-vectors) vs ruflo AgentDB/HNSW (vectors)
+## ISSUE-2 ✅ RESOLVED 2026-07-10 — Engram is canonical (ruflo retired with its vector store)
 **Problem.** The hub now has Engram semantic memory (`lib/memory.js`, no vectors,
 the user's chosen direction). Ruflo carries its own AgentDB/HNSW vector memory
 (`memory.db`, copied in with the library). Two silos.
@@ -61,7 +75,7 @@ then stop writing to the vector store. No dual-write.
 
 ---
 
-## ISSUE-3 🔴 Dual task systems: hub task queue vs ruflo task_orchestrate
+## ISSUE-3 ✅ RESOLVED 2026-07-10 — one task surface (queue + schedules), ruflo DAG retired
 **Problem.** Sequential hub queue (`lib/tasks.js`) vs ruflo's parallel task DAG.
 
 **Proposed direction.** Define roles explicitly: task queue = simple sequential
@@ -71,7 +85,7 @@ complex/parallelizable prompt offers "run as swarm"). Depends on ISSUE-1.
 
 ---
 
-## ISSUE-4 🔴 No clear "single run vs swarm" decision rule
+## ISSUE-4 ✅ RESOLVED 2026-07-10 — moot: one execution path (in-run subagents when needed)
 **Problem.** Nothing tells the user (or the auto-router) when a task deserves a
 single auto-routed run vs a multi-agent swarm.
 
@@ -81,7 +95,7 @@ into the auto-allocation logic (`lib/runs.js` routeModel neighbourhood).
 
 ---
 
-## ISSUE-5 🟡 Hermes stack inclusion — PARKED (revisit after ISSUE-1)
+## ISSUE-5 🟡 Hermes stack inclusion — PARKED (ISSUE-1 now resolved; user confirmed 2026-07-10 they still like hermes)
 **User request (2026-07-10):** include BOTH the hub stack and the hermes stack,
 with a **UI toggle to turn hermes on/off** (for mobile / another device). Then
 paused it pending the ruflo↔engine overlap above.
@@ -105,7 +119,7 @@ Claude subscription the hub uses — a second cost model.
 
 ---
 
-## ISSUE-6 🔴 Swarm/agent spend is invisible in the cockpit
+## ISSUE-6 ✅ RESOLVED 2026-07-10 — moot: all agent work flows through the run engine (spend on-book)
 **Problem.** Overview tracks run spend but not ruflo swarm token cost. Any
 multi-agent work is off-book. Resolve as part of ISSUE-1 (route through the run
 engine → spend becomes visible automatically).
