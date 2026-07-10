@@ -1,9 +1,11 @@
 # HANDOFF — Claude Hub  ⭐ START HERE
 
 Read this first, then `docs/roadmap.md` for the plan and `docs/open-issues.md`
-for the deliberate architecture decisions (ruflo↔engine overlap, dual memory,
-parked hermes). Everything you need to continue is here. Work happens in **this repo** (`C:\Users\logto\Documents\claude-hub`) —
-NOT in `bigplans.SemanticModel` (that's the separate Power BI project; leave it alone).
+for the architecture decision log (ISSUE-1..4/6 resolved 2026-07-10 by retiring
+ruflo; only ISSUE-5, the hermes messaging bridge, remains parked). Everything
+you need to continue is here. Work happens in **this repo**
+(`C:\Users\logto\Documents\claude-hub`) — NOT in `bigplans.SemanticModel`
+(that's the separate Power BI project; leave it alone).
 
 ## What this is (30 seconds)
 A zero-dependency Node web app that is the user's front end for working with
@@ -80,7 +82,7 @@ memories into the prompt; rule-based failure-pattern distillation included.
 - **hermes-agent → don't adopt**; harvested its scheduling idea → roadmap N3.
 - **Base44 / 21st.dev / Tavily / damon-ade / charlie-labs → not adopted** (see roadmap deferred table for why + triggers).
 - **Frontend-aesthetics cookbook → adopted**; rules in CLAUDE.md + auto-injected into run artifact hints.
-- **ruflo daemons → killed** (were draining tokens in the background); their state is gitignored. `.mcp.json` claude-flow is `autoStart:false` (lazy, no daemon).
+- **ruflo daemons → killed**, then the whole stack **retired** (see above); the claude-flow entry is fully removed from `.mcp.json` (scrapling is the only MCP left). Leftover ruflo state on disk (`.swarm/`, `.claude-flow/`) is gitignored and inert.
 
 ## EXECUTE NEXT — clear list to knock out instantly (detail in docs/roadmap.md)
 Autonomous, no user action, in order (N1/N3/N3.5 shipped 2026-07-10 → S16–S18):
@@ -99,11 +101,12 @@ Needs a dependency install (weigh token cost, get a quick nod):
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
 
 ## Current state
-All S1–S20 shipped and browser-verified (see roadmap table). 2026-07-10 evening:
-N1 restyle (`eae41ba`), N3 schedules (`363246f`), N3.5 recall (`d60da34`),
-Assets library (`8feb670`), ruflo retired + live agent graph (`3bc872f`).
-Working tree clean, smoke script green (32 checks). Overview reads: 90 agents ·
-41 skills · 166 commands · MCP scrapling only · engram memories counted.
-ISSUE-1 is RESOLVED (ruflo retired, user decision); ISSUE-5 hermes bridge is
-the only parked item. Next up: N2 mobile polish, N4 routing feedback, N5 theme
-toggle, N6 xlsx preview.
+All S1–S21 shipped and browser-verified (see roadmap table). 2026-07-10 evening
+session shipped, in order: N1 restyle (`eae41ba`), N3 schedules (`363246f`),
+N3.5 recall (`d60da34`), Assets library (`8feb670`), ruflo retired + live agent
+graph (`3bc872f`), ui-ux-pro-max skill adoption (`c057624`). Working tree
+clean, smoke script green (32 checks). Overview reads: 90 agents · 41 skills ·
+166 commands · MCP scrapling only · Engram memories counted. ISSUE-5 (hermes
+messaging bridge — user likes it) is the only parked item. Next up: N2 mobile
+polish, N4 routing feedback, N5 theme toggle (CSS vars pre-wired), N6 xlsx
+preview, Q1 Playwright (needs a nod).

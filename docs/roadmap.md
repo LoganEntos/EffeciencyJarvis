@@ -4,10 +4,11 @@ Single source of truth for what to build next. Ordering rule: items that make
 every later item cheaper/better ship first. **Token efficiency is the north
 star** — prefer zero-dep, avoid always-on MCPs (they tax every run).
 
-> **Deliberate architecture decisions live in `docs/open-issues.md`** — the
-> ruflo-swarm ↔ run-engine overlap, dual memory, and the PARKED hermes
-> both-stacks+mobile-toggle idea. Resolve ISSUE-1 before adding any new
-> orchestrator (incl. hermes).
+> **Architecture decision log: `docs/open-issues.md`** — ISSUE-1/2/3/4/6 were
+> RESOLVED 2026-07-10 by retiring ruflo (user decision; one agent stack only).
+> Only ISSUE-5 remains parked: the hermes thin-messaging-bridge with a mobile
+> on/off toggle — the user likes it; build it as ~100 lines on the run engine
+> when asked, never as a parallel stack.
 
 Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred (needs a trigger) · 🙋 needs user action
 
@@ -24,7 +25,7 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 | S5 | **Files inbox** — drag-drop upload, download, delete, Process-with-Claude | `lib/files.js`, `assets/files.js` |
 | S6 | **Overview cockpit** — runs/spend/success/failed/artifacts/inbox cards, recent runs | `assets/app.js` |
 | S7 | **Sessions** — relative times + per-session "Summarize with Claude" | `assets/app.js` |
-| S8 | **Swarm** — ruflo status parsed into cards + honest empty-state | `lib/core.js`, `assets/app.js` |
+| S8 | **Swarm** — ruflo status parsed into cards + honest empty-state *(removed in S20 — ruflo retired)* | — |
 | S9 | **Interactive Graph** — search-highlight, click-to-select inspection panel, neighbor chips | `assets/graph.js` |
 | S10 | **UI design library skill** — zero-dep font pairings/palettes/anti-slop rules | `.claude/skills/ui-design/` |
 | S11 | **Hub-native Task queue** — durable queue the hub runs itself as auto-routed runs (the usage lever) | `lib/tasks.js`, `assets/tasks.js` |
@@ -37,6 +38,7 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 | S18 | **N3.5 Memory auto-recall** — opt-in toggle (default OFF) in the Run composer injects top-3 relevant Engram memories (1.2k char cap) into the CLI prompt; injected count streamed to chat + stored as `recallCount`. Rule-based distillation: 3+ failed runs sharing a tag → standing semantic "failure pattern" record. Verified: haiku answered chart values purely from recalled context ($0.036, 1 turn, no tools) | `lib/memory.js`, `lib/runs.js`, `assets/run.js` |
 | S19 | **Assets library (user request)** — `vendor/` with 18 OFL font faces (all 12 ui-design families, latin woff2), Lucide sprite (1,746 icons, ISC), modern-normalize (MIT); manifest.json records every source+license. Guarded `/vendor/` route, `/api/assets`, fifth Library tab (font specimens + searchable click-to-copy icon grid). Hub fonts now fully local (offline, no CDN); artifact CSP allows `/vendor/` only; run hint advertises the library so generated pages use local assets | `vendor/`, `assets/assetlib.js`, `server.js` |
 | S20 | **Ruflo retired + live Agent Graph (user decision)** — Swarm tab/endpoints/claude-flow MCP removed (open-issues 1/2/3/4/6 resolved). Graph tab's default view is now a live radial map of the current run's crew: persona-named workers (Maestro/Poet/Dart models; Scout, Bloodhound, Scribe, Wrench, Falcon, Foreman, Spellbook, Envoy crews; recruited subagents; Gallery) with pulsing active nodes, animated links, auto-follow of live runs, click-to-inspect, click-center-to-replay. Codebase map kept behind a chip. Zero-token: polls a local disk-read endpoint | `lib/agentgraph.js`, `assets/agentviz.js`, `assets/graph.js` |
+| S21 | **ui-ux-pro-max skills adopted (user request)** — 6 MIT skills from nextlevelbuilder/ui-ux-pro-max-skill copied into `.claude/skills/`: ui-ux-pro-max (1.4MB CSV design DB), design, design-system, brand, banner-design, slides; hub adaptation note (no Python → Grep the CSVs, map fonts to /vendor/, vanilla CSS output); skipped ui-styling (React/Tailwind + duplicate TTFs). Library: 41 skills | `.claude/skills/` |
 
 ---
 

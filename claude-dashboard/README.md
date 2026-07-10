@@ -2,12 +2,15 @@
 
 A zero-dependency, local-only Node.js hub for **working with Claude in this
 project from the browser** — send prompts to the `claude` CLI and watch the
-answer stream in live, browse run history, render run-produced charts/reports
-inline, upload documents for runs to process — plus the original monitoring
-surface: agents, skills, commands, hooks, MCP servers, session transcripts,
-Ruflo swarm status, and the graphify code graph.
+answer stream in live, queue tasks the hub runs itself, schedule recurring
+runs, browse run history, render run-produced charts/reports inline, upload
+documents for runs to process, watch the live agent crew on the Graph tab —
+plus the monitoring surface: Engram memory, agents, skills, commands, the
+local asset library, session transcripts, and the graphify code graph.
 
-No npm install. No build step. Plain Node + static assets.
+No npm install. No build step. Plain Node + static assets. Styled as a
+terminal-amber instrument panel (JetBrains Mono + IBM Plex Sans, served from
+the local `/vendor/` font library — fully offline).
 
 ## Start it
 
@@ -26,17 +29,28 @@ Smoke test a running server: `scripts\verify-dashboard.ps1 [-Port 5757]`.
 ## Layout
 
 ```
-server.js          boot + router + static assets + hub-token guard
-lib/util.js        shared helpers (fs, spawn-without-shell, body reading)
-lib/core.js        monitor/library endpoints (overview, sessions, swarm, graph…)
-lib/runs.js        run engine: spawn claude CLI, SSE streaming, history, artifacts
-lib/files.js       upload inbox (vanilla multipart parser)
-index.html         markup shell (token injected at serve time)
-assets/app.js      SPA core + Overview/Swarm/Sessions/Library/Config tabs
-assets/run.js      Run tab (chat, history, artifact rendering)
-assets/files.js    Files tab
-assets/graph.js    Graph tab + canvas force-directed viz
-data/              runtime, gitignored: runs/<id>/…, inbox/
+server.js            boot + router + static assets + /vendor/ + hub-token guard
+lib/util.js          shared helpers (fs, spawn-without-shell, body reading)
+lib/core.js          overview / library / assets / sessions / graph endpoints
+lib/runs.js          run engine: spawn claude CLI, SSE, auto-routing, history, artifacts
+lib/tasks.js         task queue (durable prompts the hub runs itself)
+lib/schedules.js     scheduled runs: interval/daily/weekly cron → run engine
+lib/memory.js        Engram semantic memory (typed records, no vectors) + recall
+lib/agentgraph.js    run stream → persona-named agent crew graph
+lib/files.js         upload inbox (vanilla multipart parser)
+index.html           markup shell (token injected at serve time)
+assets/app.js        SPA core + Overview/Sessions/Library/Config tabs
+assets/run.js        Run tab (chat, recall toggle, history, artifact rendering)
+assets/tasks.js      Tasks tab (queue + scheduled runs)
+assets/memory.js     Memory tab (browse/search/add typed memories)
+assets/files.js      Files tab
+assets/graph.js      Graph tab dispatcher + codebase canvas viz
+assets/agentviz.js   Graph tab "Agents" live radial crew view
+assets/assetlib.js   Assets tab (font specimens, icon grid)
+vendor/              local asset library: 18 font faces, Lucide sprite (1,746
+                     icons), modern-normalize — manifest.json = sources+licenses
+data/                runtime, gitignored: runs/<id>/…, inbox/, tasks.json,
+                     schedules.json, memory.json
 ```
 
 ## Tabs
@@ -50,32 +64,52 @@ data/              runtime, gitignored: runs/<id>/…, inbox/
   Model selector defaults to **auto**: each prompt is routed to the cheapest
   capable model (haiku for short/simple, sonnet for standard coding, opus for
   complex/architectural work — resumed conversations keep their model), and the
-  decision streams into the chat as `auto → <model> (<reason>)`. Verified
-  saving: trivial prompts $0.037 on haiku vs $0.158 on the default model.
-  Permission mode defaults to `acceptEdits` so runs can write files; Cancel
-  kills the process tree; 2 runs execute concurrently, up to 5 more queue. Every run is
-  persisted under `data/runs/<id>/` (`prompt.txt`, `output.jsonl`, `meta.json`,
-  `artifacts/`) and listed in the history panel — click to replay, and the
-  conversation can be resumed from there. Runs are told (via an appended hint)
-  to write visual outputs into their `artifacts/` folder; the chat renders
+  decision streams into the chat as `auto → <model> (<reason>)`. An optional
+  **◇ memory recall** toggle (default off) injects the top-3 relevant Engram
+  memories into the prompt. Permission mode defaults to `acceptEdits`; Cancel
+  kills the process tree; 2 runs execute concurrently, up to 5 more queue.
+  Every run is persisted under `data/runs/<id>/` (`prompt.txt`, `output.jsonl`,
+  `meta.json`, `artifacts/`) and listed in the history panel — click to replay
+  or resume. Runs are told (via an appended hint) to write visual outputs into
+  `artifacts/` and to use the local `/vendor/` fonts/icons; the chat renders
   each artifact inline — HTML/SVG in a sandboxed iframe, images inline,
   anything else as a download link.
+- **Tasks** — a durable queue of prompts the hub works through as auto-routed
+  runs, plus **Scheduled runs**: interval / daily / weekly prompts persisted in
+  `data/schedules.json` and fired by a 30 s ticker through the run engine
+  (inheriting routing, streaming, history, spend, and memory capture).
 - **Files** — drag-drop upload inbox (`data/inbox/`, 50 MB cap, sanitized
   names, overwrite confirmation). Per file: download, delete, and
   **Process with Claude**, which pre-fills the Run prompt with the file path.
-- **Sessions** — this project's Claude Code transcript files; click a row for
-  the last 50 conversation events.
+- **Sessions** — this project's Claude Code transcript files; peek at raw
+  activity or have Claude summarize a session.
 
 **MONITOR**
-- **Overview** — stat cards, status pills, active hook types, and a live
-  activity feed of the newest session transcript.
-- **Swarm** — Ruflo swarm status + launcher (simple goal box or five-section
-  structured goal builder).
-- **Graph** — graphify stats, query/explain box, and an interactive canvas map.
+- **Memory** — Engram-style semantic memory: typed records (episodic /
+  semantic / procedural) recalled by keyword + tag + recency + importance.
+  Runs are captured automatically; failure patterns distill into standing
+  semantic records; add your own notes.
+- **Overview** — stat cards (runs/spend/success/failures/artifacts/inbox),
+  status pills (Engram count, auth, MCP, library), recent runs, live session
+  feed.
+- **Graph** — two views. **Agents (default)**: a live radial map of the
+  current run's crew — the routed model persona at center (Maestro 🎼 opus,
+  Poet ✒️ sonnet, Dart 🎯 haiku), tool crews orbiting (Scout reads, Bloodhound
+  searches, Scribe writes, Wrench runs commands, Falcon fetches the web,
+  Spellbook invokes skills, Envoy talks to MCP servers), recruited subagents,
+  and a Gallery node for artifacts. Active workers pulse and links flow while
+  a run executes; the view auto-follows new runs; click a node to inspect it,
+  click the center to open the run. Polls a local disk-read endpoint — zero
+  tokens. **Codebase**: graphify stats, query/explain box, force-directed map.
 
 **LIBRARY**
 - **Agents / Skills / Commands** — definitions under `.claude/`, filterable,
-  click for raw markdown. **Config** — `.mcp.json`, `settings.json`, CLAUDE.md.
+  click for raw markdown.
+- **Assets** — the local website-creation library under `vendor/`: font
+  specimens rendered in their real faces (click to copy the CSS), a searchable
+  click-to-copy grid over 1,746 Lucide icons, and CSS foundations. Everything
+  vendored with source + license in `manifest.json`; advertised to every run.
+- **Config** — `.mcp.json`, `settings.json`, CLAUDE.md.
 
 Keyboard: `1–9`/`0` switch tabs (nav order), `R` refreshes, `/` focuses filter,
 `Ctrl+Enter` sends the Run prompt.
@@ -85,18 +119,19 @@ Keyboard: `1–9`/`0` switch tabs (nav order), `R` refreshes, `/` focuses filter
 | Endpoint | Method | Purpose |
 |---|---|---|
 | `/`, `/assets/*` | GET | The SPA (hub token injected into `index.html`) |
-| `/api/run` | POST | `{prompt, model?, permissionMode?, resume?}` → `{id}`; spawns the CLI |
+| `/vendor/*` | GET | Local asset library (fonts/icons/css; traversal-guarded, cacheable) |
+| `/api/run` | POST | `{prompt, model?, permissionMode?, resume?, recall?}` → `{id}`; spawns the CLI |
 | `/api/run/stream?id=` | GET (SSE) | `line` events (stream-json, with ids for reconnect dedupe) + `done` |
-| `/api/run/cancel` | POST | `{id}` → taskkill the run's process tree |
-| `/api/runs` | GET | Run history metas, newest first |
-| `/api/run/transcript?id=` | GET | `{meta, prompt, lines}` for replay |
-| `/api/run/artifacts?id=` | GET | Files under the run's `artifacts/` |
-| `/api/run/artifact?id=&file=` | GET | Serve one artifact (MIME-typed, CSP-sandboxed) |
-| `/api/files` | GET / POST | List inbox / multipart upload (`?overwrite=1` after 409) |
-| `/api/files/download?name=` | GET | Download one inbox file |
-| `/api/files/delete` | POST | `{name}` → remove from inbox |
+| `/api/run/cancel`, `/api/run/delete` | POST | Cancel a live run / delete a finished run |
+| `/api/runs`, `/api/run/transcript?id=`, `/api/run/artifacts?id=`, `/api/run/artifact?id=&file=` | GET | History, replay, artifacts |
+| `/api/tasks` (+`/run`, `/run-all`, `/delete`) | GET/POST | Task queue |
+| `/api/schedules` (+`/toggle`, `/run-now`, `/delete`) | GET/POST | Scheduled runs |
+| `/api/memory` (+`/search`, `/delete`, `/reindex`) | GET/POST | Engram memory |
+| `/api/agentgraph?id=` | GET | Persona-named agent crew graph for a run (no id → newest/live) |
+| `/api/assets` | GET | Vendor library manifest + icon index |
+| `/api/files` (+`/download`, `/delete`) | GET/POST | Upload inbox |
 | `/api/overview`, `/api/agents`, `/api/skills`, `/api/commands`, `/api/config`, `/api/sessions`, `/api/session-tail`, `/api/activity`, `/api/detail` | GET | Monitor/library data |
-| `/api/swarm/status`, `/api/swarm/launch` (POST), `/api/graph/stats`, `/api/graph/data`, `/api/graph/query` (POST) | — | Swarm + graph |
+| `/api/graph/stats`, `/api/graph/data`, `/api/graph/query` (POST) | — | Codebase graph |
 
 Unknown paths return 404. Errors return `{error}` JSON.
 
@@ -110,13 +145,14 @@ Unknown paths return 404. Errors return `{error}` JSON.
 - **Sandboxed artifacts** — run-produced HTML/SVG is embedded with
   `sandbox="allow-scripts"` **and** served with a `Content-Security-Policy:
   sandbox` header, so artifact pages get an opaque origin even when opened
-  directly — they can never read the hub token or call guarded endpoints.
+  directly — they can never read the hub token or call guarded endpoints. The
+  only http source the CSP allows is the read-only `/vendor/` asset library.
 - **No shell spawns** — all child processes use argv arrays with
-  `shell: false`; the claude CLI is spawned via its native `claude.exe`, npx
-  via npm's `npx-cli.js` through Node. User text is never shell-interpreted.
+  `shell: false`; the claude CLI is spawned via its native `claude.exe`.
+  User text is never shell-interpreted.
 - **Path-safe ids** — run ids `^[a-z0-9-]+$`, session ids `^[a-f0-9-]+$`,
-  artifact paths normalized and prefix-checked, inbox filenames sanitized to a
-  safe character set. No request can escape the intended folders.
+  artifact and vendor paths normalized and prefix-checked, inbox filenames
+  sanitized to a safe character set. No request can escape intended folders.
 - **Bounded input** — prompts ≤ 20 k, uploads ≤ 50 MB, JSON bodies capped;
   subprocesses run with timeouts (runs are user-cancellable instead).
 
@@ -127,8 +163,7 @@ Unknown paths return 404. Errors return `{error}` JSON.
   `%APPDATA%\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe`
   (override with `HUB_CLAUDE_EXE`), logged in via subscription or
   `ANTHROPIC_API_KEY`.
-- **Ruflo** (Swarm tab) — fetched on demand via `npx -y ruflo@latest`; first
-  status call can take ~10 s.
-- **graphify** (Graph tab) — binary at `C:\Users\logto\.local\bin\graphify.exe`
-  and a graph at `claude-dashboard/graphify-out/graph.json`
-  (`graphify extract <project> --code-only`). Without it the tab shows a hint.
+- **graphify** (Graph tab, Codebase view) — binary at
+  `C:\Users\logto\.local\bin\graphify.exe` and a graph at
+  `claude-dashboard/graphify-out/graph.json`
+  (`graphify extract <project> --code-only`). Without it the view shows a hint.
