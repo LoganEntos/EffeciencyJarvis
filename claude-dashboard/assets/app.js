@@ -1,6 +1,6 @@
-/* Hub SPA core: api/tab plumbing + Overview, Swarm, Sessions, Library, Config.
-   Run tab lives in run.js, Files tab in files.js, Graph tab in graph.js.
-   Scripts load in order (app → graph → run → files), then boot() runs. */
+/* Hub SPA core: api/tab plumbing + Overview, Sessions, Library, Config.
+   Run tab lives in run.js, Files tab in files.js, Graph tab in graph.js +
+   agentviz.js. Scripts load in order (app → graph → run → files), then boot(). */
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = s => (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -28,7 +28,7 @@ let serverOk = true, reconnectTimer = null;
 function setAuthBadge(d) {
   $('#statusBadge').innerHTML = d.hasApiKey
     ? '<span class="dot ok"></span>server live · exec ready'
-    : '<span class="dot ok"></span>server live · <span title="log in with the claude CLI or set ANTHROPIC_API_KEY for run/swarm execution">no auth</span>';
+    : '<span class="dot ok"></span>server live · <span title="log in with the claude CLI or set ANTHROPIC_API_KEY for run execution">no auth</span>';
 }
 function markServer(ok) {
   if (ok === serverOk) return;
@@ -119,7 +119,7 @@ renderers.overview = async function () {
   const okRate = finished.length ? Math.round(100 * finished.filter(m => m.status === 'done').length / finished.length) : null;
   const artifacts = runs.reduce((s, m) => s + (m.artifactCount || 0), 0);
   const apiPill = d.hasApiKey ? '<span class="pill ok">auth ready</span>' : '<span class="pill warn">no auth — runs can\'t execute</span>';
-  const memPill = d.memoryDb ? '<span class="pill ok">memory.db</span>' : '<span class="pill warn">memory not initialized</span>';
+  const memPill = d.engramCount ? `<span class="pill ok">engram: ${d.engramCount} memories</span>` : '<span class="pill warn">memory empty — runs auto-capture</span>';
   $('#overview').innerHTML = `
     <h2>Overview — product cockpit</h2>
     <div class="cards">
@@ -148,113 +148,6 @@ renderers.overview = async function () {
   $('#overview').querySelectorAll('.card.clickable').forEach(c => c.onclick = () => goTab(c.dataset.goto));
   $('#overview').querySelectorAll('.ovrun').forEach(r => r.onclick = () => { goTab('run'); ensureRunUI(); openRun(r.dataset.id); });
   startFeed();
-};
-
-renderers.swarm = async function () {
-  $('#swarm').innerHTML = `
-    <h2>Ruflo Swarm</h2>
-    <div class="note">Launching a swarm executes agents via an LLM backend. Without an <span class="mono">ANTHROPIC_API_KEY</span>
-      or authenticated <span class="mono">claude</span> CLI, launches will report an error — status viewing works regardless.</div>
-    <div class="flex" style="margin-bottom:10px">
-      <button id="modeBtn" class="ghost">✍ Structured goal builder</button>
-      <button id="refreshBtn" class="ghost">Refresh status</button>
-      <label class="chk"><input type="checkbox" id="autoChk"> auto-refresh 30s</label>
-      <span class="muted" id="lastRef" style="font-size:11px"></span>
-    </div>
-    <div id="simpleMode" class="flex" style="margin-bottom:16px">
-      <input class="search" id="goalIn" placeholder="Describe a goal to launch a swarm…" style="flex:1;margin:0">
-      <button id="launchBtn">Launch</button>
-    </div>
-    <div id="builderMode" class="hidden" style="margin-bottom:16px">
-      <div class="muted" style="font-size:12px;margin-bottom:10px">
-        Five-section autonomous-goal template — role, tools, inputs, loop, output. Well-structured goals produce
-        far more predictable swarm runs than a bare sentence.</div>
-      <input class="search" id="bRole" placeholder="1. Role &amp; autonomy — e.g. 'Act as a data-model QA team; work autonomously, read-only unless stated'">
-      <input class="search" id="bTools" placeholder="2. Tools/constraints — e.g. 'Use file reads and DAX analysis only; no external network calls'">
-      <input class="search" id="bInputs" placeholder="3. Input list (distinct items) — e.g. 'tables: All Values Graph; Savings graph; IRR-Angle Stops List'">
-      <input class="search" id="bLoop" placeholder="4. Loop steps per item — e.g. 'FOR each table: check types → check measures → note issues'">
-      <input class="search" id="bOutput" placeholder="5. Output spec — e.g. 'Markdown report grouped by table, ranked by severity'">
-      <div class="flex">
-        <button id="bLaunch">Launch structured goal</button>
-        <span class="muted" style="font-size:12px">Preview shown below before launch</span>
-      </div>
-    </div>
-    <div id="swarmCards"><div class="muted">Loading status… (npx spin-up can take ~10s)</div></div>
-    <details style="margin-top:14px"><summary class="muted" style="cursor:pointer;font-size:12px">raw CLI output</summary>
-      <pre id="swarmOut" style="margin-top:8px">…</pre></details>`;
-  const drawStatus = (p) => {
-    if (!p) { $('#swarmCards').innerHTML = '<div class="note">Status output could not be parsed — see raw CLI output below.</div>'; return; }
-    const empty = !p.agents.total && !p.tasks.total;
-    const bar = p.progress != null ? `
-      <div style="margin:4px 0 18px">
-        <div class="muted" style="font-size:11px;margin-bottom:5px">SWARM ${esc(p.swarmId || '')} — OVERALL PROGRESS ${p.progress}%</div>
-        <div style="height:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden">
-          <div style="height:100%;width:${Math.min(100, p.progress)}%;background:var(--accent)"></div></div>
-      </div>` : '';
-    $('#swarmCards').innerHTML = bar + (empty
-      ? `<div class="note">This swarm is <b>empty</b> — no agents were ever spawned and no tasks ran (elapsed ${esc(p.metrics.elapsed || '?')}).
-         The progress bar is meaningless until a goal is launched. Use the goal box above to start real work.</div>`
-      : `<div class="cards">
-          <div class="card"><div class="n">${p.agents.active ?? '—'}</div><div class="l">Agents active</div></div>
-          <div class="card"><div class="n">${p.agents.completed ?? '—'}</div><div class="l">Agents completed</div></div>
-          <div class="card"><div class="n">${p.tasks.inProgress ?? '—'}</div><div class="l">Tasks in progress</div></div>
-          <div class="card"><div class="n">${p.tasks.pending ?? '—'}</div><div class="l">Tasks pending</div></div>
-          <div class="card"><div class="n">${p.tasks.completed ?? '—'}</div><div class="l">Tasks completed</div></div>
-        </div>
-        <div class="flex">
-          <span class="pill neutral">tokens: ${esc(p.metrics.tokens || '?')}</span>
-          <span class="pill neutral">success: ${esc(p.metrics.successRate || '?')}</span>
-          <span class="pill neutral">avg response: ${esc(p.metrics.avgResponse || '?')}</span>
-          <span class="pill neutral">elapsed: ${esc(p.metrics.elapsed || '?')}</span>
-        </div>`);
-  };
-  const refresh = async () => {
-    $('#swarmCards').innerHTML = '<div class="muted">Loading status… (npx spin-up can take ~10s)</div>';
-    try {
-      const r = await api('/api/swarm/status', { timeoutMs: 60000 });
-      $('#swarmOut').textContent = r.output || '(no output)';
-      drawStatus(r.parsed);
-      $('#lastRef').textContent = 'updated ' + new Date().toLocaleTimeString();
-    } catch (e) { $('#swarmCards').innerHTML = `<div class="note">Status failed: ${esc(e.name === 'AbortError' ? 'timed out' : (e.message || 'network error'))}</div>`; }
-  };
-  let autoTimer = null;
-  const launch = async (goal) => {
-    if (!goal) return;
-    $('#swarmCards').innerHTML = `<div class="muted">Launching…</div><pre style="margin-top:10px">${esc(goal)}</pre>`;
-    try {
-      const r = await api('/api/swarm/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal }), timeoutMs: 90000 });
-      $('#swarmOut').textContent = r.output || r.error || '(no output)';
-      $('#swarmCards').innerHTML = `<div class="note">Launch finished — output in "raw CLI output" below. Refreshing status…</div>`;
-      refresh();
-    } catch (e) { $('#swarmCards').innerHTML = `<div class="note">Launch failed: ${esc(e.name === 'AbortError' ? 'timed out after 90s' : (e.message || 'network error'))}</div>`; }
-  };
-  $('#refreshBtn').onclick = refresh;
-  $('#autoChk').onchange = e => {
-    if (e.target.checked) { autoTimer = setInterval(refresh, 30000); }
-    else { clearInterval(autoTimer); autoTimer = null; }
-  };
-  $('#modeBtn').onclick = () => {
-    const b = $('#builderMode'), s = $('#simpleMode');
-    const showBuilder = b.classList.contains('hidden');
-    b.classList.toggle('hidden', !showBuilder); s.classList.toggle('hidden', showBuilder);
-    $('#modeBtn').textContent = showBuilder ? '— Simple goal box' : '✍ Structured goal builder';
-  };
-  $('#launchBtn').onclick = () => launch($('#goalIn').value.trim());
-  const compose = () => {
-    const v = id => $(id).value.trim();
-    const parts = [];
-    if (v('#bRole')) parts.push('ROLE & AUTONOMY: ' + v('#bRole'));
-    if (v('#bTools')) parts.push('TOOLS & CONSTRAINTS: ' + v('#bTools'));
-    if (v('#bInputs')) parts.push('INPUTS: ' + v('#bInputs'));
-    if (v('#bLoop')) parts.push('PROCESS: ' + v('#bLoop'));
-    if (v('#bOutput')) parts.push('OUTPUT: ' + v('#bOutput'));
-    return parts.join(' | ');
-  };
-  ['#bRole', '#bTools', '#bInputs', '#bLoop', '#bOutput'].forEach(id => {
-    $(id).oninput = () => { const g = compose(); if (g) $('#swarmCards').innerHTML = `<div class="muted" style="font-size:11px;margin-bottom:6px">GOAL PREVIEW</div><pre>${esc(g)}</pre>`; };
-  });
-  $('#bLaunch').onclick = () => launch(compose());
-  refresh();
 };
 
 renderers.agents = function () { return listView('#agents', 'Agents', '/api/agents', 'agents'); };

@@ -1,15 +1,36 @@
-/* Graph tab: graphify stats/query + zero-dependency force-directed canvas viz. */
+/* Graph tab: two views — Agents (live crew of the current run, agentviz.js)
+   and Codebase (graphify force-directed map). Agents is the default view. */
 'use strict';
 
 renderers.graph = async function () {
+  $('#graph').innerHTML = `
+    <h2>Graph</h2>
+    <div class="flex" style="margin-bottom:14px">
+      <span class="pill modeChip" data-m="agents" style="cursor:pointer">⚡ Agents — live run crew</span>
+      <span class="pill modeChip" data-m="code" style="cursor:pointer">⌬ Codebase map</span>
+    </div>
+    <div id="graphBody"></div>`;
+  const setMode = async (m) => {
+    try { localStorage.setItem('hub.graphmode', m); } catch {}
+    document.querySelectorAll('.modeChip').forEach(c => {
+      c.className = 'pill modeChip ' + (c.dataset.m === m ? 'neutral' : '');
+      c.style.cursor = 'pointer';
+    });
+    if (m === 'agents') await renderAgentViz($('#graphBody'));
+    else { stopAgentViz(); await renderCodeGraph($('#graphBody')); }
+  };
+  document.querySelectorAll('.modeChip').forEach(c => c.onclick = () => setMode(c.dataset.m));
+  await setMode(localStorage.getItem('hub.graphmode') || 'agents');
+};
+renderers.graph.noSkeleton = true;
+
+async function renderCodeGraph(body) {
   const d = await api('/api/graph/stats');
   if (!d.exists) {
-    $('#graph').innerHTML = `<h2>Code Graph</h2>
-      <div class="note">${esc(d.error || 'graph.json not found')} — expected at <span class="mono">claude-dashboard/graphify-out/graph.json</span></div>`;
+    body.innerHTML = `<div class="note">${esc(d.error || 'graph.json not found')} — expected at <span class="mono">claude-dashboard/graphify-out/graph.json</span></div>`;
     return;
   }
-  $('#graph').innerHTML = `
-    <h2>Code Graph <span class="muted" style="font-weight:400">(graphify-out/graph.json)</span></h2>
+  body.innerHTML = `
     <div class="cards">
       <div class="card"><div class="n">${d.nodes}</div><div class="l">Nodes</div></div>
       <div class="card"><div class="n">${d.edges}</div><div class="l">Edges</div></div>

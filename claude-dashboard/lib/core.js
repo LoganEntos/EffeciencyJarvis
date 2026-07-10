@@ -1,6 +1,6 @@
 /*
- * Core hub routes: overview, library (agents/skills/commands), config,
- * session transcripts, ruflo swarm status/launch, graphify graph endpoints.
+ * Core hub routes: overview, library (agents/skills/commands/assets), config,
+ * session transcripts, graphify graph endpoints.
  */
 'use strict';
 const fs = require('fs');
@@ -24,14 +24,14 @@ function overview() {
   const mcp = U.safeJson(path.join(PROJECT_DIR, '.mcp.json')) || {};
   const settings = U.safeJson(path.join(DOT_CLAUDE, 'settings.json')) || {};
   const hookTypes = settings.hooks ? Object.keys(settings.hooks) : [];
-  const memDb = fs.existsSync(path.join(PROJECT_DIR, '.swarm', 'memory.db'));
+  const engram = U.safeJson(path.join(DASH_DIR, 'data', 'memory.json')) || [];
   return {
     project: PROJECT_DIR,
     nodeVersion: process.version,
     counts: { agents, skills, commands },
     mcpServers: Object.keys(mcp.mcpServers || {}),
     hookTypes,
-    memoryDb: memDb,
+    engramCount: engram.length,
     hasApiKey: !!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
       || fs.existsSync(path.join(CLAUDE_HOME, '.credentials.json'))),
     time: new Date().toISOString(),
@@ -147,46 +147,6 @@ function activity() {
   return { sessionId: id, events: sessionTail(id, 12) || [] };
 }
 
-// Ruflo status (cached — npx is slow to spin up).
-let statusCache = { at: 0, data: null };
-async function rufloStatus() {
-  if (Date.now() - statusCache.at < 12000 && statusCache.data) return statusCache.data;
-  const r = await U.runNpx(['-y', 'ruflo@latest', 'swarm', 'status'], 45000, PROJECT_DIR);
-  statusCache = { at: Date.now(), data: U.stripAnsi(r.out) };
-  return statusCache.data;
-}
-
-// Parse ruflo's ASCII status tables into structured data the UI can render
-// as cards (the CLI has no --json mode). Returns null if the text doesn't
-// look like a status report (e.g. an npx error).
-function parseSwarmStatus(txt) {
-  if (!txt) return null;
-  const tableVal = (section, label) => {
-    const sec = txt.split(section)[1] || '';
-    const m = sec.match(new RegExp('\\|\\s*' + label + '\\s*\\|\\s*(\\d+)'));
-    return m ? parseInt(m[1], 10) : null;
-  };
-  const line = (re) => { const m = txt.match(re); return m ? m[1].trim() : null; };
-  const prog = txt.match(/Overall Progress:.*?([\d.]+)%/);
-  const out = {
-    swarmId: line(/Swarm Status:\s*(\S+)/),
-    progress: prog ? parseFloat(prog[1]) : null,
-    agents: {
-      active: tableVal('Agents', 'Active'), idle: tableVal('Agents', 'Idle'),
-      completed: tableVal('Agents', 'Completed'), total: tableVal('Agents', 'Total'),
-    },
-    tasks: {
-      completed: tableVal('Tasks', 'Completed'), inProgress: tableVal('Tasks', 'In Progress'),
-      pending: tableVal('Tasks', 'Pending'), total: tableVal('Tasks', 'Total'),
-    },
-    metrics: {
-      tokens: line(/Tokens Used:\s*(.+)/), avgResponse: line(/Avg Response Time:\s*(.+)/),
-      successRate: line(/Success Rate:\s*(.+)/), elapsed: line(/Elapsed Time:\s*(.+)/),
-    },
-  };
-  return (out.swarmId || out.progress !== null) ? out : null;
-}
-
 // Stats straight from graphify-out/graph.json (node-link format; nodes/links
 // are arrays, but tolerate object-keyed maps from other graphify versions).
 function graphStats() {
@@ -246,23 +206,9 @@ async function handle(req, res, url) {
     return true;
   }
   if (p === '/api/activity') { U.sendJson(res, activity()); return true; }
-  if (p === '/api/swarm/status') {
-    const raw = await rufloStatus();
-    U.sendJson(res, { output: raw, parsed: parseSwarmStatus(raw) });
-    return true;
-  }
   if (p === '/api/detail') {
     const md = detail(url.searchParams.get('type'), url.searchParams.get('name'));
     md === null ? U.sendJson(res, { error: 'not found' }, 404) : U.sendJson(res, { content: md });
-    return true;
-  }
-  if (p === '/api/swarm/launch' && req.method === 'POST') {
-    let goal = '';
-    try { goal = (JSON.parse(await U.readBody(req, 4000) || '{}').goal || '').toString().slice(0, 500); } catch {}
-    if (!goal.trim()) { U.sendJson(res, { error: 'goal required' }, 400); return true; }
-    // goal is passed as a single argv element (no shell) — safe from injection.
-    const r = await U.runNpx(['-y', 'ruflo@latest', 'swarm', goal], 60000, PROJECT_DIR);
-    U.sendJson(res, { code: r.code, output: U.stripAnsi(r.out) });
     return true;
   }
   if (p === '/api/assets') { U.sendJson(res, assets()); return true; }

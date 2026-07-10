@@ -1,5 +1,5 @@
 /*
- * Claude Code + Ruflo — Local Management Hub
+ * Claude Code Hub — Local Management Hub
  * Zero-dependency Node HTTP server. Binds to 127.0.0.1 only (personal/local tool).
  * Start:  node server.js   (optionally PORT=5757)
  *
@@ -18,6 +18,7 @@ const files = require('./lib/files');
 const tasks = require('./lib/tasks');
 const memory = require('./lib/memory');
 const schedules = require('./lib/schedules');
+const agentgraph = require('./lib/agentgraph');
 
 const PORT = parseInt(process.argv[2] || process.env.PORT || '5757', 10);
 const HOST = '127.0.0.1';
@@ -93,6 +94,7 @@ const server = http.createServer(async (req, res) => {
     if (await runs.handle(req, res, url)) return;
     if (await tasks.handle(req, res, url)) return;
     if (await schedules.handle(req, res, url)) return;
+    if (await agentgraph.handle(req, res, url)) return;
     if (await memory.handle(req, res, url)) return;
     if (await files.handle(req, res, url)) return;
     if (await core.handle(req, res, url)) return;
@@ -106,7 +108,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   schedules.startTicker(); // scheduled runs fire only while the hub is up
-  console.log(`\n  Claude Code + Ruflo Hub running at  http://${HOST}:${PORT}`
+  console.log(`\n  Claude Code Hub running at  http://${HOST}:${PORT}`
     + `\n  Project: ${core.PROJECT_DIR}`
     + `\n  Hub token (auto-injected into the page): ${TOKEN}`
     + `\n  (Ctrl+C to stop)\n`);

@@ -50,6 +50,7 @@ Check "GET /api/files"         "$base/api/files"
 Check "GET /api/tasks"         "$base/api/tasks"
 Check "GET /api/schedules"     "$base/api/schedules"
 Check "GET /api/assets"        "$base/api/assets"
+Check "GET /api/agentgraph"    "$base/api/agentgraph"
 Check "GET /vendor/css/fonts.css" "$base/vendor/css/fonts.css"
 Check "GET vendor traversal blocked" "$base/vendor/..%2Fserver.js" 404
 Check "GET /api/memory"        "$base/api/memory"
@@ -59,7 +60,6 @@ Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2F
 CheckPost "POST /api/run w/o token (403)"        "$base/api/run"        '{"prompt":"x"}' 403
 CheckPost "POST /api/run/delete w/o token (403)" "$base/api/run/delete" '{"id":"x"}' 403
 CheckPost "POST /api/files/delete w/o token (403)" "$base/api/files/delete" '{"name":"x"}' 403
-CheckPost "POST /api/swarm/launch w/o token (403)" "$base/api/swarm/launch" '{"goal":"x"}' 403
 CheckPost "POST /api/tasks w/o token (403)"       "$base/api/tasks"       '{"prompt":"x"}' 403
 CheckPost "POST /api/memory w/o token (403)"      "$base/api/memory"      '{"text":"x"}' 403
 CheckPost "POST /api/schedules w/o token (403)"   "$base/api/schedules"   '{"prompt":"x","kind":"daily","at":"08:00"}' 403
