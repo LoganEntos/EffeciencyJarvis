@@ -29,10 +29,11 @@ in this repo. Never invent or reference Power BI/TMDL/semantic-model work here.
 
 ## Architecture (see claude-dashboard/README.md for detail)
 
-- `server.js` — boot + router + static + token guard
-- `lib/util.js` `lib/core.js` `lib/runs.js` `lib/files.js` `lib/tasks.js` — server modules
-- `assets/app.js` `run.js` `tasks.js` `files.js` `graph.js` `style.css` — SPA modules
-- `data/` — runtime (runs history, inbox, tasks.json), gitignored
+- `server.js` — boot + router + static + /vendor/ + token guard
+- `lib/util.js` `core.js` `runs.js` `files.js` `tasks.js` `schedules.js` `memory.js` `agentgraph.js` — server modules
+- `assets/app.js` `run.js` `tasks.js` `files.js` `graph.js` `agentviz.js` `assetlib.js` `memory.js` `style.css` — SPA modules
+- `vendor/` — LOCAL asset library (fonts/icons/css + manifest.json); prefer `/vendor/` over CDNs in all generated UI
+- `data/` — runtime (runs history, inbox, tasks.json, schedules.json, memory.json), gitignored
 - `.claude/skills/ui-design/` — zero-dep design library; consult it for any UI
   work (font pairings, palettes, anti-slop rules)
 - Start: `node claude-dashboard/server.js [port]` (5757 default; launch.json
