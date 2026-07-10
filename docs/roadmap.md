@@ -109,7 +109,7 @@ Claude Code; never put it in `.mcp.json`.
 | **per-simmons/damon-ade** | Agentic dev env, macOS Apple-Silicon only; user is on Windows. | N/A — reference for UI inspiration only |
 | **charlie-labs** | Commercial autonomous eng agent (GitHub/Linear/Slack); a product, not a tool. Their instructions/daemons catalog is prior art for the task queue. | N/A |
 | **nousresearch/hermes-agent** | Parallel Python agent stack; duplicates the claude CLI. Idea harvested → N3 (shipped as S17). User confirmed (2026-07-10) they still like hermes → keep ISSUE-5's thin-messaging-bridge shape, PARKED. ISSUE-1 is resolved (ruflo retired), so this is now unblocked when wanted. | User says go |
-| **nextlevelbuilder/ui-ux-pro-max** | npm+Python CLI, not a free skill. Value baked into `.claude/skills/ui-design` instead. | N/A — done the zero-dep way |
+| **nextlevelbuilder/ui-ux-pro-max** | ✅ ADOPTED 2026-07-10 (user re-sent link; upstream now ships real Claude skills). Copied 6 skills into `.claude/skills/`: **ui-ux-pro-max** (1.4MB CSV design DB: 50+ styles, 161 palettes, 57 font pairings, 161 product types, 99 UX rules, per-stack guides), design, design-system, brand, banner-design, slides. Hub adaptation note added (no Python → Grep the CSVs; map fonts to /vendor/). Skipped **ui-styling** (React/shadcn/Tailwind stack + 5.6MB TTFs — conflicts with zero-dep rule, fonts already vendored). MIT, LICENSE kept. | done |
 | **Base44** | Cloud app-builder; can't reach a localhost server that spawns the CLI without exposing it publicly (bad). The hub already IS the web app. | N/A — don't link |
 
 ---

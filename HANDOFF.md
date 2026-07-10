@@ -76,7 +76,7 @@ memories into the prompt; rule-based failure-pattern distillation included.
   fonts+icons+css, locally saved, advertised to every run; prefer /vendor/ over
   CDNs in all generated UI.
 - **task-master → NOT an always-on MCP** (per-run tax). Hub-native queue (`lib/tasks.js`) covers it. CLI-only if ever wanted.
-- **UI/UX skill → baked in free** as `.claude/skills/ui-design` (the upstream was an npm+Python CLI).
+- **UI/UX skill → both layers now local**: `.claude/skills/ui-design` (fast anti-slop rules, written here) + 6 skills adopted 2026-07-10 from nextlevelbuilder/ui-ux-pro-max-skill (MIT) — `ui-ux-pro-max` CSV design database (Grep it; no Python on this machine), design, design-system, brand, banner-design, slides. Skipped upstream `ui-styling` (React/Tailwind stack + duplicate fonts).
 - **hermes-agent → don't adopt**; harvested its scheduling idea → roadmap N3.
 - **Base44 / 21st.dev / Tavily / damon-ade / charlie-labs → not adopted** (see roadmap deferred table for why + triggers).
 - **Frontend-aesthetics cookbook → adopted**; rules in CLAUDE.md + auto-injected into run artifact hints.
@@ -103,7 +103,7 @@ All S1–S20 shipped and browser-verified (see roadmap table). 2026-07-10 evenin
 N1 restyle (`eae41ba`), N3 schedules (`363246f`), N3.5 recall (`d60da34`),
 Assets library (`8feb670`), ruflo retired + live agent graph (`3bc872f`).
 Working tree clean, smoke script green (32 checks). Overview reads: 90 agents ·
-35 skills · 166 commands · MCP scrapling only · engram memories counted.
+41 skills · 166 commands · MCP scrapling only · engram memories counted.
 ISSUE-1 is RESOLVED (ruflo retired, user decision); ISSUE-5 hermes bridge is
 the only parked item. Next up: N2 mobile polish, N4 routing feedback, N5 theme
 toggle, N6 xlsx preview.
