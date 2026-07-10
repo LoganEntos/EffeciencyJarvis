@@ -8,7 +8,7 @@ let taskPoll = null;
 
 renderers.tasks = async function () {
   ensureTasksUI();
-  await refreshTasks();
+  await Promise.all([refreshTasks(), refreshSchedules()]);
 };
 renderers.tasks.noSkeleton = true;
 
@@ -33,10 +33,112 @@ function ensureTasksUI() {
         <span class="muted" id="taskCount" style="font-size:11.5px"></span>
       </div>
     </div>
-    <div id="taskList"><div class="muted">Loading…</div></div>`;
+    <div id="taskList"><div class="muted">Loading…</div></div>
+    <h2 style="margin-top:34px">Scheduled runs <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— recurring prompts the hub fires on its own (while the server is up)</span></h2>
+    <div style="margin-bottom:18px">
+      <input class="search" id="schTitle" placeholder="Short title (optional)" style="margin-bottom:8px">
+      <textarea id="schPrompt" placeholder="The recurring prompt… (e.g. 'Summarize the last week of run history + errors into a report artifact')" style="min-height:56px"></textarea>
+      <div class="flex">
+        <select id="schKind" style="margin:0">
+          <option value="daily">daily at</option>
+          <option value="weekly">weekly on</option>
+          <option value="interval">every N minutes</option>
+        </select>
+        <select id="schDow" class="hidden" style="margin:0">
+          <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option>
+          <option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option><option value="0">Sun</option>
+        </select>
+        <input id="schAt" type="time" value="08:00" style="width:auto;margin:0;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);color:var(--txt);font-family:inherit">
+        <input id="schMin" type="number" min="15" step="15" value="60" class="hidden" style="width:90px;margin:0;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);color:var(--txt);font-family:inherit">
+        <select id="schModel" style="margin:0">
+          <option value="auto">model: auto (routed)</option>
+          <option value="haiku">haiku</option>
+          <option value="sonnet">sonnet</option>
+          <option value="opus">opus</option>
+        </select>
+        <button id="schAdd">＋ Schedule</button>
+      </div>
+    </div>
+    <div id="schList"><div class="muted">Loading…</div></div>`;
   $('#taskAdd').onclick = addTask;
   $('#taskRunAll').onclick = runAllTasks;
   $('#taskPrompt').onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addTask(); } };
+  $('#schKind').onchange = () => {
+    const k = $('#schKind').value;
+    $('#schDow').classList.toggle('hidden', k !== 'weekly');
+    $('#schAt').classList.toggle('hidden', k === 'interval');
+    $('#schMin').classList.toggle('hidden', k !== 'interval');
+  };
+  $('#schAdd').onclick = addSchedule;
+}
+
+// ---- scheduled runs (N3) ----
+function relFuture(t) {
+  if (!t) return '';
+  const s = (new Date(t).getTime() - Date.now()) / 1000;
+  if (s <= 0) return 'due now';
+  if (s < 3600) return 'in ' + Math.max(1, Math.round(s / 60)) + 'm';
+  if (s < 86400) return 'in ' + Math.round(s / 3600) + 'h';
+  return 'in ' + Math.round(s / 86400) + 'd';
+}
+
+async function addSchedule() {
+  const prompt = $('#schPrompt').value.trim();
+  if (!prompt) return;
+  const kind = $('#schKind').value;
+  const body = { title: $('#schTitle').value.trim(), prompt, model: $('#schModel').value, kind,
+    at: $('#schAt').value, dow: $('#schDow').value, minutes: $('#schMin').value };
+  try {
+    const r = await api('/api/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.error) { alert(r.error); return; }
+  } catch (e) { alert('Failed to schedule: ' + (e.message || 'network error')); return; }
+  $('#schTitle').value = ''; $('#schPrompt').value = '';
+  refreshSchedules();
+}
+
+async function refreshSchedules() {
+  const el = $('#schList');
+  if (!el) return;
+  let list;
+  try { list = await api('/api/schedules'); } catch { el.innerHTML = '<div class="muted">Schedules unavailable.</div>'; return; }
+  if (!Array.isArray(list)) list = [];
+  el.innerHTML = list.length ? list.map(s => {
+    const st = s.lastRunStatus;
+    const pill = st === 'done' ? 'ok' : (st === 'error' ? 'err' : 'warn');
+    const meta = [s.cadence, s.enabled ? 'next ' + relFuture(s.nextDue) : 'paused',
+      s.runCount ? s.runCount + ' fired' : 'never fired',
+      s.lastRunCost != null ? '$' + s.lastRunCost.toFixed(3) : ''].filter(Boolean).join(' · ');
+    return `<div class="row" style="${s.enabled ? '' : 'opacity:.55'}">
+      <div class="flex" style="justify-content:space-between">
+        <span class="name">◷ ${esc(s.title)}</span>
+        <span>${st ? `<span class="pill ${pill}">last: ${esc(st)}</span>` : ''}<span class="pill ${s.enabled ? 'neutral' : 'warn'}">${s.enabled ? esc(s.cadence) : 'paused'}</span></span>
+      </div>
+      <div class="pex">${esc(s.prompt.slice(0, 160))}</div>
+      <div class="flex" style="margin-top:8px">
+        <span class="muted" style="font-size:11px">${esc(meta)}</span>
+        <span class="spacer" style="flex:1"></span>
+        ${s.lastRunId ? `<button class="ghost sOpen" data-run="${esc(s.lastRunId)}" style="padding:5px 11px;font-size:11px">last run</button>` : ''}
+        <button class="ghost sNow" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">▶ run now</button>
+        <button class="ghost sTog" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">${s.enabled ? '⏸ pause' : '▶ resume'}</button>
+        <button class="danger sDel" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">✕</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="muted">No schedules yet — create one above (e.g. a Monday-morning report of last week\'s runs).</div>';
+  const post = (url, id) => api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+  el.querySelectorAll('.sNow').forEach(b => b.onclick = async () => {
+    try { const r = await post('/api/schedules/run-now', b.dataset.id); if (r.error) alert(r.error); } catch {}
+    refreshSchedules();
+  });
+  el.querySelectorAll('.sTog').forEach(b => b.onclick = async () => {
+    try { await post('/api/schedules/toggle', b.dataset.id); } catch {}
+    refreshSchedules();
+  });
+  el.querySelectorAll('.sDel').forEach(b => b.onclick = async () => {
+    if (!confirm('Delete this schedule?')) return;
+    try { await post('/api/schedules/delete', b.dataset.id); } catch {}
+    refreshSchedules();
+  });
+  el.querySelectorAll('.sOpen').forEach(b => b.onclick = () => { goTab('run'); ensureRunUI(); openRun(b.dataset.run); });
 }
 
 async function addTask() {
