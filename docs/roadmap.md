@@ -4,6 +4,11 @@ Single source of truth for what to build next. Ordering rule: items that make
 every later item cheaper/better ship first. **Token efficiency is the north
 star** — prefer zero-dep, avoid always-on MCPs (they tax every run).
 
+> **Deliberate architecture decisions live in `docs/open-issues.md`** — the
+> ruflo-swarm ↔ run-engine overlap, dual memory, and the PARKED hermes
+> both-stacks+mobile-toggle idea. Resolve ISSUE-1 before adding any new
+> orchestrator (incl. hermes).
+
 Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred (needs a trigger) · 🙋 needs user action
 
 ---
@@ -116,7 +121,7 @@ Claude Code; never put it in `.mcp.json`.
 | **21st.dev** | React/Tailwind component marketplace — conflicts with the zero-dep vanilla rule. | Only if a deliberate React rewrite is chosen |
 | **per-simmons/damon-ade** | Agentic dev env, macOS Apple-Silicon only; user is on Windows. | N/A — reference for UI inspiration only |
 | **charlie-labs** | Commercial autonomous eng agent (GitHub/Linear/Slack); a product, not a tool. Their instructions/daemons catalog is prior art for the task queue. | N/A |
-| **nousresearch/hermes-agent** | Parallel Python agent stack; duplicates the claude CLI. Idea harvested → N3 (scheduled runs). | N/A — don't adopt the stack |
+| **nousresearch/hermes-agent** | Parallel Python agent stack; duplicates the claude CLI. Idea harvested → N3. User wants both-stacks + a mobile on/off toggle → PARKED as ISSUE-5 in open-issues.md (harvest messaging via a thin bridge, don't stack; resolve ISSUE-1 first). | After ISSUE-1 |
 | **nextlevelbuilder/ui-ux-pro-max** | npm+Python CLI, not a free skill. Value baked into `.claude/skills/ui-design` instead. | N/A — done the zero-dep way |
 | **Base44** | Cloud app-builder; can't reach a localhost server that spawns the CLI without exposing it publicly (bad). The hub already IS the web app. | N/A — don't link |
 

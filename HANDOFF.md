@@ -1,7 +1,8 @@
 # HANDOFF — Claude Hub  ⭐ START HERE
 
-Read this first, then `docs/roadmap.md` for the full plan. Everything you need
-to continue is here. Work happens in **this repo** (`C:\Users\logto\Documents\claude-hub`) —
+Read this first, then `docs/roadmap.md` for the plan and `docs/open-issues.md`
+for the deliberate architecture decisions (ruflo↔engine overlap, dual memory,
+parked hermes). Everything you need to continue is here. Work happens in **this repo** (`C:\Users\logto\Documents\claude-hub`) —
 NOT in `bigplans.SemanticModel` (that's the separate Power BI project; leave it alone).
 
 ## What this is (30 seconds)
