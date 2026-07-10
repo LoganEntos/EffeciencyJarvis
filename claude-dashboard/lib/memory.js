@@ -56,6 +56,7 @@ function captureRun(meta, promptText) {
     fields: { status: meta.status, model: meta.model, costUsd: meta.costUsd, artifactCount: meta.artifactCount || 0, error: meta.errorExcerpt || null },
   });
   save(list.slice(0, 2000));
+  if (meta.status === 'error') distill(); // failures may complete a pattern
 }
 
 // Backfill episodic memory from every run already on disk (free, no LLM).
@@ -83,6 +84,7 @@ function reindexRuns() {
   }
   list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   save(list.slice(0, 2000));
+  distill();
   return { added, total: list.length };
 }
 
@@ -128,6 +130,54 @@ function search(q, opts = {}) {
     .filter(m => m._score > 0)
     .sort((a, b) => b._score - a._score)
     .slice(0, opts.limit || 20);
+}
+
+// ---------- recall into runs (N3.5, opt-in) ----------
+// Compact context block for prompt injection: top-k relevant memories, hard
+// character cap so the token cost stays small and predictable.
+function recall(prompt, k = 3, capChars = 1200) {
+  const hits = search(prompt, { limit: k }).filter(m => m._score > 1);
+  if (!hits.length) return null;
+  const lines = [];
+  let used = 0;
+  for (const m of hits) {
+    const line = `- [${m.type}] ${m.title}: ${m.text}`.slice(0, 400);
+    if (used + line.length > capChars) break;
+    lines.push(line);
+    used += line.length;
+  }
+  if (!lines.length) return null;
+  return { count: lines.length, block: `[Hub memory recall — relevant past context, use if helpful:\n${lines.join('\n')}]` };
+}
+
+// ---------- distillation (rule-based, no LLM) ----------
+// Episodic → semantic: a tag that shows up in 3+ FAILED runs becomes one
+// standing "watch out" fact (updated in place, never duplicated).
+function distill() {
+  const list = load();
+  const failTag = {};
+  for (const m of list) {
+    if (m.type !== 'episodic' || !m.fields || m.fields.status !== 'error') continue;
+    for (const t of (m.tags || [])) {
+      failTag[t] = failTag[t] || { n: 0, lastError: null };
+      failTag[t].n++;
+      if (!failTag[t].lastError) failTag[t].lastError = m.fields.error || '';
+    }
+  }
+  let changed = false;
+  for (const [tag, info] of Object.entries(failTag)) {
+    if (info.n < 3) continue;
+    const title = `failure pattern: ${tag}`;
+    const text = `${info.n} runs mentioning "${tag}" have failed. Most recent error: ${(info.lastError || 'unknown').slice(0, 200)}`;
+    const existing = list.find(m => m.type === 'semantic' && m.title === title);
+    if (existing) { if (existing.text !== text) { existing.text = text; changed = true; } }
+    else {
+      list.unshift({ id: newId(), type: 'semantic', title, text, tags: [tag, 'failure-pattern'],
+        importance: 0.9, createdAt: new Date().toISOString(), sourceRunId: null, fields: {} });
+      changed = true;
+    }
+  }
+  if (changed) save(list);
 }
 
 function addNote(type, title, text, tags, importance) {
@@ -188,4 +238,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, captureRun, reindexRuns, search };
+module.exports = { handle, captureRun, reindexRuns, search, recall, distill };

@@ -85,7 +85,7 @@ function pushLine(st, line) {
   broadcast(st, 'line', line, st.lines.length - 1);
 }
 
-function startRun({ prompt, model, permissionMode, resume }) {
+function startRun({ prompt, model, permissionMode, resume, recall }) {
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
   if (runningCount() >= MAX_ACTIVE && queue.length >= MAX_QUEUE) {
@@ -110,7 +110,12 @@ function startRun({ prompt, model, permissionMode, resume }) {
     if (prior) { model = prior; routedReason = 'kept the conversation’s model'; }
     else { const r = routeModel(prompt); model = r.model; routedReason = r.reason; }
   }
-  const args = ['-p', prompt + hint, '--output-format', 'stream-json', '--verbose'];
+  // N3.5 opt-in memory recall: prepend top-k relevant Engram memories to the
+  // CLI prompt (never to prompt.txt — that stays the user's words). Costs a
+  // few hundred prompt tokens, so it only happens when the caller asked.
+  let recalled = null;
+  if (recall) { try { recalled = memory.recall(prompt); } catch {} }
+  const args = ['-p', (recalled ? recalled.block + '\n\n' : '') + prompt + hint, '--output-format', 'stream-json', '--verbose'];
   if (MODELS.includes(model) && model && model !== 'auto') args.push('--model', model);
   const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'acceptEdits';
   if (perm !== 'default') args.push('--permission-mode', perm);
@@ -120,12 +125,13 @@ function startRun({ prompt, model, permissionMode, resume }) {
     id, status: 'queued', queuedAt: new Date().toISOString(), startedAt: null, endedAt: null,
     exitCode: null, sessionId: null, model: model || '', permissionMode: perm,
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
-    costUsd: null, durationMs: null, routedReason,
+    costUsd: null, durationMs: null, routedReason, recallCount: recalled ? recalled.count : 0,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, dir, out: null };
   active.set(id, st);
   writeMeta(st);
   if (routedReason) pushLine(st, JSON.stringify({ type: 'hub_status', text: `auto → ${model} (${routedReason})` }));
+  if (recalled) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◇ memory recall: ${recalled.count} relevant memor${recalled.count === 1 ? 'y' : 'ies'} injected` }));
   if (runningCount() < MAX_ACTIVE) launch(st);
   else {
     queue.push(id);
@@ -370,6 +376,7 @@ async function handle(req, res, url) {
       model: (b.model || '').toString(),
       permissionMode: (b.permissionMode || '').toString(),
       resume: (b.resume || '').toString(),
+      recall: b.recall === true,
     });
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;

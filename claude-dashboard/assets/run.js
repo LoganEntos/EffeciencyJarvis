@@ -23,6 +23,8 @@ function ensureRunUI() {
         <option value="bypassPermissions">perms: bypassPermissions</option>
         <option value="plan">perms: plan</option>
       </select>
+      <label class="chk" title="inject the top 3 relevant hub memories into the prompt (costs a few hundred prompt tokens — off by default)">
+        <input type="checkbox" id="runRecall"> ◇ memory recall</label>
       <button id="newChatBtn" class="ghost">＋ New chat</button>
       <span class="pill neutral hidden" id="chatSession" title="follow-up prompts resume this CLI session"></span>
       <span class="pill neutral hidden" id="spendBadge" title="sum of run costs started today"></span>
@@ -50,9 +52,11 @@ function ensureRunUI() {
     const m = localStorage.getItem('hub.model'), p = localStorage.getItem('hub.perm');
     if (m !== null) $('#runModel').value = m;
     if (p !== null) $('#runPerm').value = p;
+    $('#runRecall').checked = localStorage.getItem('hub.recall') === '1'; // default OFF
   } catch {}
   $('#runModel').onchange = e => { try { localStorage.setItem('hub.model', e.target.value); } catch {} };
   $('#runPerm').onchange = e => { try { localStorage.setItem('hub.perm', e.target.value); } catch {} };
+  $('#runRecall').onchange = e => { try { localStorage.setItem('hub.recall', e.target.checked ? '1' : '0'); } catch {} };
 }
 
 // Minimal safe markdown for assistant bubbles: escape everything first, then
@@ -158,7 +162,7 @@ async function sendPrompt() {
   let r;
   try {
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, model: $('#runModel').value, permissionMode: $('#runPerm').value, resume: chat.sessionId || '' }) });
+      body: JSON.stringify({ prompt, model: $('#runModel').value, permissionMode: $('#runPerm').value, resume: chat.sessionId || '', recall: $('#runRecall').checked }) });
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
   if (r.error) { addMsg(r.error, 'errmsg'); return; }
   ta.value = '';
