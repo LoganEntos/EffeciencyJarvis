@@ -9,10 +9,25 @@ CLAUDE.md so hub runs never inherit PBI/swarm context (was the hallucination
 source). Old project left intact at `bigplans.SemanticModel` for the user to
 archive when ready.
 
-## 🔜 P1 — UI/UX skill pack (github.com/nextlevelbuilder/ui-ux-pro-max-skill)
-Install as a Claude skill (markdown only, zero deps, free). Every future UI
-iteration — including vibe-code fixes — gets professional design guidance
-baked in. Highest leverage per unit effort; improves everything after it.
+## ✅ P1 — UI design library skill (2026-07-10)
+The upstream ui-ux-pro-max repo turned out to be an npm+Python CLI, not a free
+skill. Instead authored a zero-dep design library at `.claude/skills/ui-design/`
+(font pairings, palette formulas, style catalog, anti-slop rules, selection
+heuristic) — agent-usable, no install, no per-run token cost. Referenced from
+CLAUDE.md so hub runs consult it. Every future UI iteration gets design
+guidance for free.
+
+## ✅ P4 — Hub-native task queue (2026-07-10)
+Tasks tab + `lib/tasks.js`: a durable queue of prompts the hub works through as
+auto-routed runs (verified: queue→run→haiku→done $0.022). Zero per-run cost —
+tasks reuse the run engine, so no MCP/schema tax. `data/tasks.json`, GET/POST
+/api/tasks, run, run-all, delete; status derived live from linked run meta.
+This is the usage lever: offload building onto cheap runs instead of driving
+every change by hand in an expensive interactive session.
+DECISION: task-master MCP NOT adopted — an always-on MCP taxes every run's
+context (fights the token goal); hub-native queue captures the value at zero
+per-run cost. If task-master's PRD-decomposition is ever wanted, install it
+CLI-only (invoke on demand in Claude Code), never in `.mcp.json`.
 
 ## 🔜 P2 — Mobile polish + Tailscale access
 User will access the hub from a phone via their own Tailscale

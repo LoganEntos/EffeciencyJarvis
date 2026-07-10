@@ -405,4 +405,13 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle };
+// live-or-disk meta for one run (used by the task queue to track task status)
+function getRunMeta(id) {
+  if (!okId(id)) return null;
+  const live = active.get(id);
+  const meta = live ? live.meta : U.safeJson(path.join(RUNS_DIR, id, 'meta.json'));
+  if (!meta) return null;
+  return Object.assign({ artifactCount: countArtifacts(id) }, meta);
+}
+
+module.exports = { handle, startRun, getRunMeta };

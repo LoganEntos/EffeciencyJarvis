@@ -20,20 +20,22 @@
   <nav>
     <div class="navlabel">Work</div>
     <a data-tab="run" class="active"><span class="ico">▷</span><span class="txt">Run</span><kbd>1</kbd></a>
-    <a data-tab="files"><span class="ico">⇪</span><span class="txt">Files</span><kbd>2</kbd></a>
-    <a data-tab="sessions"><span class="ico">≣</span><span class="txt">Sessions</span><kbd>3</kbd></a>
+    <a data-tab="tasks"><span class="ico">☰</span><span class="txt">Tasks</span><kbd>2</kbd></a>
+    <a data-tab="files"><span class="ico">⇪</span><span class="txt">Files</span><kbd>3</kbd></a>
+    <a data-tab="sessions"><span class="ico">≣</span><span class="txt">Sessions</span><kbd>4</kbd></a>
     <div class="navlabel" style="margin-top:14px">Monitor</div>
-    <a data-tab="overview"><span class="ico">◈</span><span class="txt">Overview</span><kbd>4</kbd></a>
-    <a data-tab="swarm"><span class="ico">⬡</span><span class="txt">Swarm</span><kbd>5</kbd></a>
-    <a data-tab="graph"><span class="ico">⌬</span><span class="txt">Graph</span><kbd>6</kbd></a>
+    <a data-tab="overview"><span class="ico">◈</span><span class="txt">Overview</span><kbd>5</kbd></a>
+    <a data-tab="swarm"><span class="ico">⬡</span><span class="txt">Swarm</span><kbd>6</kbd></a>
+    <a data-tab="graph"><span class="ico">⌬</span><span class="txt">Graph</span><kbd>7</kbd></a>
     <div class="navlabel" style="margin-top:14px">Library</div>
-    <a data-tab="agents"><span class="ico">⛬</span><span class="txt">Agents</span><kbd>7</kbd></a>
-    <a data-tab="skills"><span class="ico">✦</span><span class="txt">Skills</span><kbd>8</kbd></a>
-    <a data-tab="commands"><span class="ico">❯_</span><span class="txt">Commands</span><kbd>9</kbd></a>
-    <a data-tab="config"><span class="ico">⚙</span><span class="txt">Config</span><kbd>0</kbd></a>
+    <a data-tab="agents"><span class="ico">⛬</span><span class="txt">Agents</span><kbd>8</kbd></a>
+    <a data-tab="skills"><span class="ico">✦</span><span class="txt">Skills</span><kbd>9</kbd></a>
+    <a data-tab="commands"><span class="ico">❯_</span><span class="txt">Commands</span><kbd>0</kbd></a>
+    <a data-tab="config"><span class="ico">⚙</span><span class="txt">Config</span></a>
   </nav>
   <main>
     <section id="run"></section>
+    <section id="tasks" class="hidden"></section>
     <section id="files" class="hidden"></section>
     <section id="sessions" class="hidden"></section>
     <section id="overview" class="hidden"></section>
@@ -48,6 +50,7 @@
 <script src="assets/app.js"></script>
 <script src="assets/graph.js"></script>
 <script src="assets/run.js"></script>
+<script src="assets/tasks.js"></script>
 <script src="assets/files.js"></script>
 <script>boot();</script>
 </body>
