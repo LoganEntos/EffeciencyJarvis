@@ -1,106 +1,119 @@
-# Claude Hub — Roadmap (prioritized for snowball value)
+# Claude Hub — Roadmap
 
-Ordering rule: items that make every LATER item cheaper/better ship first.
-Statuses: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred (needs trigger/user OK)
+Single source of truth for what to build next. Ordering rule: items that make
+every later item cheaper/better ship first. **Token efficiency is the north
+star** — prefer zero-dep, avoid always-on MCPs (they tax every run).
 
-## ✅ P0 — Standalone repo (2026-07-10)
-App extracted from the Power BI project into this clean repo. App-only
-CLAUDE.md so hub runs never inherit PBI/swarm context (was the hallucination
-source). Old project left intact at `bigplans.SemanticModel` for the user to
-archive when ready.
+Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred (needs a trigger) · 🙋 needs user action
 
-## ✅ P1 — UI design library skill (2026-07-10)
-The upstream ui-ux-pro-max repo turned out to be an npm+Python CLI, not a free
-skill. Instead authored a zero-dep design library at `.claude/skills/ui-design/`
-(font pairings, palette formulas, style catalog, anti-slop rules, selection
-heuristic) — agent-usable, no install, no per-run token cost. Referenced from
-CLAUDE.md so hub runs consult it. Every future UI iteration gets design
-guidance for free.
+---
 
-## ✅ P4 — Hub-native task queue (2026-07-10)
-Tasks tab + `lib/tasks.js`: a durable queue of prompts the hub works through as
-auto-routed runs (verified: queue→run→haiku→done $0.022). Zero per-run cost —
-tasks reuse the run engine, so no MCP/schema tax. `data/tasks.json`, GET/POST
-/api/tasks, run, run-all, delete; status derived live from linked run meta.
-This is the usage lever: offload building onto cheap runs instead of driving
-every change by hand in an expensive interactive session.
-DECISION: task-master MCP NOT adopted — an always-on MCP taxes every run's
-context (fights the token goal); hub-native queue captures the value at zero
-per-run cost. If task-master's PRD-decomposition is ever wanted, install it
-CLI-only (invoke on demand in Claude Code), never in `.mcp.json`.
+## ✅ Shipped (2026-07-10)
 
-## 🔜 P2 — Mobile polish + Tailscale access
-User will access the hub from a phone via their own Tailscale
-(`tailscale serve --bg 5757`). App work: audit every tab at 375px, touch
-targets, composer ergonomics. Cheap now, multiplies daily usefulness.
-USER ACTION: install Tailscale on PC + phone (agent never touches VPN/network).
+| # | Item | Where |
+|---|------|-------|
+| S1 | **Standalone repo** — app extracted from the Power BI project into `claude-hub`; app-only CLAUDE.md so runs never inherit PBI context | whole repo |
+| S2 | **Run tab** — chat with the claude CLI over SSE, `--resume` continuity, cancel, 2-active+5-queued limiter | `assets/run.js`, `lib/runs.js` |
+| S3 | **Auto model allocation** — every prompt routed haiku/sonnet/opus by complexity; resumed sessions keep their model; decision streamed to chat. Verified $0.037 haiku vs $0.158 default | `lib/runs.js` routeModel() |
+| S4 | **Run history** — metrics chips, error excerpts, filter, per-run delete, inline artifact rendering (sandboxed) | `assets/run.js` |
+| S5 | **Files inbox** — drag-drop upload, download, delete, Process-with-Claude | `lib/files.js`, `assets/files.js` |
+| S6 | **Overview cockpit** — runs/spend/success/failed/artifacts/inbox cards, recent runs | `assets/app.js` |
+| S7 | **Sessions** — relative times + per-session "Summarize with Claude" | `assets/app.js` |
+| S8 | **Swarm** — ruflo status parsed into cards + honest empty-state | `lib/core.js`, `assets/app.js` |
+| S9 | **Interactive Graph** — search-highlight, click-to-select inspection panel, neighbor chips | `assets/graph.js` |
+| S10 | **UI design library skill** — zero-dep font pairings/palettes/anti-slop rules | `.claude/skills/ui-design/` |
+| S11 | **Hub-native Task queue** — durable queue the hub runs itself as auto-routed runs (the usage lever) | `lib/tasks.js`, `assets/tasks.js` |
+| S12 | **Frontend-aesthetics cookbook adopted** — rules in CLAUDE.md + auto-injected into run artifact hints | `CLAUDE.md`, `lib/runs.js` |
+| S13 | **Full library restored** — 90 agents / 35 skills / 166 commands / claude-flow+scrapling MCP (PBI excluded) | `.claude/`, `.mcp.json` |
+| S14 | **Security + hygiene** — X-Hub-Token CSRF, CSP-sandboxed artifacts, traversal guards, 24-check smoke script, ruflo daemons killed + state gitignored | `server.js`, `scripts/` |
 
-## ⬜ P3 — Playwright E2E suite (playwright.dev)
-Now possible because the repo is standalone. Dev-only dependency (NEEDS USER
-OK — app runtime stays zero-dep): drive real browser flows (send prompt →
-bubble renders; upload → process; artifact renders) in CI-able form. Locks in
-every future change against regressions → permanent velocity gain. Replaces
-nothing: extends scripts/verify-dashboard.ps1 (endpoint smoke) with UI truth.
+---
 
-## ⬜ P4 — Task queue for autonomous improvement loops
-Option A (zero-dep, preferred first): hub-native "Tasks" tab — a queue of
-improvement items the Run tab works through one per run, with status/history.
-Option B: claude-task-master (github.com/eyaltoledano/claude-task-master) as
-MCP — mature PRD→tasks breakdown, but adds an npm global + MCP schema token
-cost to every run (NEEDS USER OK). Decide after A proves the workflow.
+## 🔜 DO NEXT — autonomous, no user action needed (execute top-down)
 
-## ⬜ P5 — Document→markdown intake (github.com/zcaceres/markdownify-mcp)
-Upgrades the Files inbox: convert uploaded PDF/DOCX/XLSX/images to markdown
-before a run processes them → dramatically fewer tokens per document task.
-Needs pnpm + uv deps (NEEDS USER OK). Pairs with P4 for batch document jobs.
+### N1. Hub restyle per the aesthetics cookbook  (was P2.5)
+The hub's own chrome violates two cookbook call-outs: **Segoe UI system font**
+and **purple gradient accent**. Restyle: pick one distinctive font (see
+`.claude/skills/ui-design`), a dominant-color palette via CSS variables, a
+layered background, and one staggered page-load reveal. Files: `assets/style.css`.
+Done when: hub looks intentionally designed, still themeable, browser-verified.
 
-## 🔮 P6 — Tavily search API (tavily.com)
-Web search for hub runs. DEFERRED: the claude CLI already ships WebSearch and
-this project has Scrapling available; Tavily adds an API key + per-call cost
-for marginal gain. Trigger: research-heavy runs start failing on search quality.
+### N2. Mobile polish  (was P2)
+Audit every tab at 375px width (the nav already collapses <760px). Fix touch
+targets, composer ergonomics, card wrapping, table overflow. Files:
+`assets/style.css` + per-tab tweaks. Done when: all 11 tabs usable one-handed on
+a phone. (Pairs with the user's Tailscale setup — see 🙋 below.)
 
-## 🔮 P7 — 21st.dev component library
-React/Tailwind component marketplace — conflicts with the zero-dependency
-vanilla rule. Trigger: only if a deliberate React rewrite is ever chosen
-(e.g. Base44-style visual builder direction). Until then: reference for
-visual inspiration only.
+### N3. Scheduled runs  (was P4.5, idea from nousresearch/hermes-agent)
+Hub-native cron: recurring prompts (e.g. "every Monday: summarize last week's
+runs + errors into a report artifact") persisted in `data/schedules.json`,
+fired by the run engine with auto-routing. Zero-dep (setInterval + persisted
+schedule). New tab or a section under Tasks. Completes the autonomous loop with
+S11. Do NOT adopt hermes-agent itself (parallel Python agent stack, duplicates
+the claude CLI).
 
-## ⬜ P2.5 — Hub restyle per the frontend-aesthetics cookbook
-Anthropic's cookbook (platform.claude.com/cookbook/coding-prompting-for-frontend-aesthetics)
-adopted 2026-07-10: distilled rules live in CLAUDE.md (Design language) and are
-auto-injected into every run's artifact hint (lib/runs.js). The hub's own UI
-currently violates two call-outs — Segoe UI system font + purple gradient
-accent — so a restyle pass (distinctive font, dominant-color palette,
-staggered load reveal, layered background) is queued; fold into P1/P2 UI work.
+### N4. Routing-accuracy feedback loop
+Compare each auto-routed model against the run outcome (did haiku succeed, or
+error/retry?). Surface a small stat and tune `routeModel()` thresholds from real
+data. Files: `lib/runs.js`, a metrics view. Sharpens the core token lever.
 
-## ⬜ P4.5 — Scheduled runs (idea mined from nousresearch/hermes-agent)
-Hub-native cron: define recurring prompts (e.g. "every Monday 9am: summarize
-last week's runs and errors into a report artifact") stored in data/, executed
-by the run engine with auto-routing. Zero-dep (setInterval + persisted
-schedule). Combined with P4's task queue this completes the autonomous
-improvement loop. We do NOT adopt hermes-agent itself: it's a parallel
-Python agent stack (own harness/models/gateway) that duplicates the claude
-CLI and violates the no-trial-install rule.
+### N5. Dark/light theme toggle
+System-preference detection + manual toggle in the header. Files:
+`assets/style.css` (CSS-variable theming already in place), `assets/app.js`.
 
-## ⬜ P5.5 — Markdown export / Obsidian handoff (obsidian.md)
-Runs and session summaries exported as plain .md files into a user-chosen
-folder (an Obsidian vault works out of the box — local, private, no deps;
-writing files is all it takes). Gives run history a durable, searchable,
-linkable knowledge layer outside the hub. AWAITING USER: confirm they use
-(or want) Obsidian and the vault path before building.
+### N6. xlsx structural preview in Files
+Zero-dep zip/xml parse to show sheet names + dimensions for uploaded `.xlsx`
+before a run reads them. Files: `lib/files.js`, `assets/files.js`.
 
-## 🔮 Evaluated, no action (2026-07-10)
-- **per-simmons/damon-ade** — agentic dev environment, macOS Apple Silicon
-  ONLY; user is on Windows 10. Reference for UI inspiration at most.
-- **charlie-labs** — commercial autonomous engineering agent (GitHub/Linear/
-  Slack); a product, not an adoptable tool. Their "instructions + daemons
-  catalog" pattern is prior art for P4's task queue design.
+---
 
-## ⬜ Backlog (earlier ideas, still valid)
-- Routing-accuracy feedback loop: compare auto-routed model vs run outcome,
-  tune the heuristic from real data.
-- xlsx structural preview in the Files tab (zero-dep zip/xml parse).
-- Dark/light theme with system preference detection.
-- Interactive permission approvals (bidirectional `--input-format
-  stream-json` runs) — big; unlocks mid-run questions from Claude.
-- Library tab polish (user: fine for now).
+## ⬜ Queued — needs a dependency install (no-install rule LIFTED; still weigh token cost)
+
+### Q1. Playwright E2E suite  (playwright.dev)
+Dev-only dependency (app runtime stays zero-dep, **no per-run token tax**). Drive
+real browser flows (send→render, upload→process, artifact renders) as repeatable
+tests. Extends `scripts/verify-dashboard.ps1` (endpoints) with UI truth. Highest-
+value install: locks in every future change against regressions. **Recommended
+first install.**
+
+### Q2. markdownify-MCP  (github.com/zcaceres/markdownify-mcp)
+Convert uploaded PDF/DOCX/XLSX/images to markdown before a run reads them →
+far fewer tokens per document task (usage-POSITIVE for document work). Needs
+pnpm + uv. **Caveat:** it's an MCP → schemas load into every run. Add only when
+document workflows are actually active; consider scoping it out of lean runs.
+
+### Q3. task-master  (github.com/eyaltoledano/claude-task-master)
+PRD→task breakdown. **Decision made: NOT as an always-on MCP** (taxes every run,
+fights the token goal — the hub-native queue S11 covers the need). If its
+PRD-decomposition is ever wanted, install CLI-only and invoke on demand in
+Claude Code; never put it in `.mcp.json`.
+
+---
+
+## 🙋 Pending USER actions (agent will not do these — system/network/installs)
+
+- **Autostart:** `cd claude-hub; powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1` — hub starts at logon so the bookmark always works.
+- **Mobile access:** install Tailscale on PC + phone, then `tailscale serve --bg 5757`; bookmark the private HTTPS URL on the phone. (Agent never touches VPN/network.)
+- **Obsidian (for Q-Obsidian below):** confirm you use/want Obsidian and give a vault path.
+
+---
+
+## 🔮 Deferred — evaluated, parked with a clear trigger
+
+| Ref | Verdict | Trigger to revisit |
+|-----|---------|--------------------|
+| **obsidian.md** | Q-Obsidian: export runs/summaries as `.md` into a vault folder (local, zero-dep — writing files is all it takes). Good fit. | Awaiting user's yes + vault path |
+| **tavily.com** | Web search API. Redundant now — claude CLI ships WebSearch + Scrapling is available; Tavily adds an API key + per-call cost. | Research-heavy runs fail on search quality |
+| **21st.dev** | React/Tailwind component marketplace — conflicts with the zero-dep vanilla rule. | Only if a deliberate React rewrite is chosen |
+| **per-simmons/damon-ade** | Agentic dev env, macOS Apple-Silicon only; user is on Windows. | N/A — reference for UI inspiration only |
+| **charlie-labs** | Commercial autonomous eng agent (GitHub/Linear/Slack); a product, not a tool. Their instructions/daemons catalog is prior art for the task queue. | N/A |
+| **nousresearch/hermes-agent** | Parallel Python agent stack; duplicates the claude CLI. Idea harvested → N3 (scheduled runs). | N/A — don't adopt the stack |
+| **nextlevelbuilder/ui-ux-pro-max** | npm+Python CLI, not a free skill. Value baked into `.claude/skills/ui-design` instead. | N/A — done the zero-dep way |
+| **Base44** | Cloud app-builder; can't reach a localhost server that spawns the CLI without exposing it publicly (bad). The hub already IS the web app. | N/A — don't link |
+
+---
+
+## Interactive-permission approvals (big, deferred)
+Bidirectional `--input-format stream-json` runs so Claude can ask mid-run
+questions in the hub. Large; unlocks true interactivity but reworks the run
+engine. Revisit once the autonomous loop (S11 + N3) is proven.

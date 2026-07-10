@@ -1,5 +1,8 @@
 # Claude Code Hub — Project Instructions
 
+> **New session? Read `HANDOFF.md` first** — current state, ground rules, and the
+> ordered list of what to build next. `docs/roadmap.md` has the full plan.
+
 This repo is ONE thing: a zero-dependency local web app (`claude-dashboard/`)
 that is the user's front end for working with Claude — prompt runs with
 automatic model allocation (haiku/sonnet/opus by task complexity), live SSE
