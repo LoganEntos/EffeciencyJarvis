@@ -61,7 +61,7 @@ async function loadMemory() {
   } catch { el.innerHTML = '<div class="muted">Memory unavailable.</div>'; return; }
   // type filter chips (with counts from stats when browsing)
   const st = data ? data.stats : null;
-  const chip = (label, val) => `<span class="pill ${memType === val ? 'neutral' : ''}" data-t="${val}" style="cursor:pointer;${memType === val ? 'outline:2px solid #8b6cff88' : 'background:#ffffff08;color:var(--muted);border:1px solid var(--line)'}">${label}${st ? '' : ''}</span>`;
+  const chip = (label, val) => `<span class="pill ${memType === val ? 'neutral' : ''}" data-t="${val}" style="cursor:pointer;${memType === val ? 'outline:2px solid var(--accent-dim)' : 'background:#ffffff08;color:var(--muted);border:1px solid var(--line)'}">${label}${st ? '' : ''}</span>`;
   $('#memChips').innerHTML =
     chip(st ? `all ${st.total}` : 'all', '') +
     chip(st ? `⏱ episodic ${st.byType.episodic}` : '⏱ episodic', 'episodic') +

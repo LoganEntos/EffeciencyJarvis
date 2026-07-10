@@ -126,7 +126,7 @@ renderers.overview = async function () {
       <div class="card clickable" data-goto="run"><div class="n">${tRuns.length}</div><div class="l">Runs today</div></div>
       <div class="card clickable" data-goto="run"><div class="n">$${spend.toFixed(2)}</div><div class="l">Spend today</div></div>
       <div class="card"><div class="n">${okRate === null ? '—' : okRate + '%'}</div><div class="l">Success rate (all runs)</div></div>
-      <div class="card clickable" data-goto="run"><div class="n" ${errors.length ? 'style="background:none;-webkit-text-fill-color:#f0908f;color:#f0908f"' : ''}>${errors.length}</div><div class="l">Failed runs</div></div>
+      <div class="card clickable" data-goto="run"><div class="n" ${errors.length ? 'style="color:var(--red);text-shadow:none"' : ''}>${errors.length}</div><div class="l">Failed runs</div></div>
       <div class="card clickable" data-goto="run"><div class="n">${artifacts}</div><div class="l">Artifacts produced</div></div>
       <div class="card clickable" data-goto="files"><div class="n">${files.length || 0}</div><div class="l">Inbox files</div></div>
     </div>
@@ -156,8 +156,8 @@ renderers.swarm = async function () {
     <div class="note">Launching a swarm executes agents via an LLM backend. Without an <span class="mono">ANTHROPIC_API_KEY</span>
       or authenticated <span class="mono">claude</span> CLI, launches will report an error — status viewing works regardless.</div>
     <div class="flex" style="margin-bottom:10px">
-      <button id="modeBtn" style="background:#333350">✍ Structured goal builder</button>
-      <button id="refreshBtn" style="background:#333350">Refresh status</button>
+      <button id="modeBtn" class="ghost">✍ Structured goal builder</button>
+      <button id="refreshBtn" class="ghost">Refresh status</button>
       <label class="chk"><input type="checkbox" id="autoChk"> auto-refresh 30s</label>
       <span class="muted" id="lastRef" style="font-size:11px"></span>
     </div>
@@ -188,8 +188,8 @@ renderers.swarm = async function () {
     const bar = p.progress != null ? `
       <div style="margin:4px 0 18px">
         <div class="muted" style="font-size:11px;margin-bottom:5px">SWARM ${esc(p.swarmId || '')} — OVERALL PROGRESS ${p.progress}%</div>
-        <div style="height:8px;background:#12121c;border:1px solid var(--line);border-radius:6px;overflow:hidden">
-          <div style="height:100%;width:${Math.min(100, p.progress)}%;background:var(--grad)"></div></div>
+        <div style="height:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden">
+          <div style="height:100%;width:${Math.min(100, p.progress)}%;background:var(--accent)"></div></div>
       </div>` : '';
     $('#swarmCards').innerHTML = bar + (empty
       ? `<div class="note">This swarm is <b>empty</b> — no agents were ever spawned and no tasks ran (elapsed ${esc(p.metrics.elapsed || '?')}).
@@ -349,10 +349,10 @@ async function showSessionTail(id) {
   pre.scrollTop = pre.scrollHeight; // newest last — jump to bottom
 }
 
-const KIND_COLOR = { user: '#4bd07f', assistant: '#b7a4ff', tool: '#e6b45a' };
+const KIND_COLOR = { user: 'var(--green)', assistant: 'var(--accent)', tool: '#e6b45a' };
 function fmtEvent(e) {
   const t = e.time ? new Date(e.time).toLocaleTimeString() : '——:——:——';
-  return `<span class="muted">${esc(t)}</span> <span style="color:${KIND_COLOR[e.kind] || '#cfcfe0'};font-weight:600">${esc((e.kind + '     ').slice(0, 9))}</span> ${esc(e.text)}`;
+  return `<span class="muted">${esc(t)}</span> <span style="color:${KIND_COLOR[e.kind] || 'var(--muted)'};font-weight:600">${esc((e.kind + '     ').slice(0, 9))}</span> ${esc(e.text)}`;
 }
 
 // ---- live activity feed (Overview tab) ----

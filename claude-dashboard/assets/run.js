@@ -290,7 +290,7 @@ function renderHistStats() {
     models[k] = models[k] || { n: 0, cost: 0 };
     models[k].n++; models[k].cost += m.costUsd || 0;
   }
-  const chip = (label, cls, filter) => `<span class="pill ${cls}" data-f="${filter}" style="cursor:pointer${histStatusFilter === filter && filter ? ';outline:2px solid #8b6cff88' : ''}">${label}</span>`;
+  const chip = (label, cls, filter) => `<span class="pill ${cls}" data-f="${filter}" style="cursor:pointer${histStatusFilter === filter && filter ? ';outline:2px solid var(--accent-dim)' : ''}">${label}</span>`;
   el.innerHTML =
     chip(`all ${histRuns.length} · $${total.toFixed(2)}`, 'neutral', '') +
     chip(`✓ ${by('done').length} done`, 'ok', 'done') +

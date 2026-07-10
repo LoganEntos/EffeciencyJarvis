@@ -61,9 +61,11 @@ renderers.graph = async function () {
 function drawGraphViz(container, data) {
   const W = container.clientWidth || 800, H = 520, DPR = window.devicePixelRatio || 1;
   const rootCss = getComputedStyle(document.documentElement);
-  const BG = (rootCss.getPropertyValue('--bg') || '#14141f').trim();
-  const LINE = (rootCss.getPropertyValue('--line') || '#333350').trim();
-  const MUTED = (rootCss.getPropertyValue('--muted') || '#a0a0b0').trim();
+  const BG = (rootCss.getPropertyValue('--bg') || '#0e0d0b').trim();
+  const LINE = (rootCss.getPropertyValue('--line') || '#2a251d').trim();
+  const MUTED = (rootCss.getPropertyValue('--muted') || '#a89e8a').trim();
+  const ACCENT = (rootCss.getPropertyValue('--accent') || '#e8a33d').trim();
+  const TXT = (rootCss.getPropertyValue('--txt') || '#ece7dc').trim();
   container.innerHTML = '';
   document.querySelectorAll('.gtip').forEach(t => t.remove()); // re-render safety
   const canvas = document.createElement('canvas');
@@ -131,7 +133,7 @@ function drawGraphViz(container, data) {
     const focus = hover || selected;
     for (const l of links) {
       const lit = focus && (l.s === focus || l.t === focus);
-      ctx.strokeStyle = lit ? '#b7a4ff' : '#3a3a58';
+      ctx.strokeStyle = lit ? ACCENT : LINE;
       ctx.lineWidth = lit ? 1.4 : 0.7;
       ctx.globalAlpha = matches.size ? .25 : 1;
       ctx.beginPath(); ctx.moveTo(l.s.x, l.s.y); ctx.lineTo(l.t.x, l.t.y); ctx.stroke();
@@ -140,14 +142,14 @@ function drawGraphViz(container, data) {
       ctx.globalAlpha = emphasis(n);
       ctx.beginPath(); ctx.arc(n.x, n.y, rad(n) + (n === hover || n === selected ? 2 : 0), 0, 6.2832);
       ctx.fillStyle = hue(n.community); ctx.fill();
-      if (n === hover) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke(); }
-      if (n === selected) { ctx.strokeStyle = '#8b6cff'; ctx.lineWidth = 2.2; ctx.stroke(); }
+      if (n === hover) { ctx.strokeStyle = TXT; ctx.lineWidth = 1.5; ctx.stroke(); }
+      if (n === selected) { ctx.strokeStyle = ACCENT; ctx.lineWidth = 2.2; ctx.stroke(); }
       if (matches.has(n.id)) { ctx.strokeStyle = '#e0a63f'; ctx.lineWidth = 1.8; ctx.stroke(); }
     }
-    ctx.font = '10px Segoe UI,sans-serif'; ctx.textAlign = 'center';
+    ctx.font = '10px "JetBrains Mono",Consolas,monospace'; ctx.textAlign = 'center';
     for (const n of nodes) {
       ctx.globalAlpha = emphasis(n);
-      ctx.fillStyle = (n === hover || n === selected) ? '#fff' : MUTED;
+      ctx.fillStyle = (n === hover || n === selected) ? TXT : MUTED;
       ctx.fillText(n.label.slice(0, 24), n.x, n.y - rad(n) - 5);
     }
     ctx.globalAlpha = 1;
