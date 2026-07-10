@@ -16,6 +16,7 @@ const core = require('./lib/core');
 const runs = require('./lib/runs');
 const files = require('./lib/files');
 const tasks = require('./lib/tasks');
+const memory = require('./lib/memory');
 
 const PORT = parseInt(process.argv[2] || process.env.PORT || '5757', 10);
 const HOST = '127.0.0.1';
@@ -67,6 +68,7 @@ const server = http.createServer(async (req, res) => {
 
     if (await runs.handle(req, res, url)) return;
     if (await tasks.handle(req, res, url)) return;
+    if (await memory.handle(req, res, url)) return;
     if (await files.handle(req, res, url)) return;
     if (await core.handle(req, res, url)) return;
 

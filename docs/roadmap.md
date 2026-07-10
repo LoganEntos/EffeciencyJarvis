@@ -25,7 +25,8 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 | S11 | **Hub-native Task queue** — durable queue the hub runs itself as auto-routed runs (the usage lever) | `lib/tasks.js`, `assets/tasks.js` |
 | S12 | **Frontend-aesthetics cookbook adopted** — rules in CLAUDE.md + auto-injected into run artifact hints | `CLAUDE.md`, `lib/runs.js` |
 | S13 | **Full library restored** — 90 agents / 35 skills / 166 commands / claude-flow+scrapling MCP (PBI excluded) | `.claude/`, `.mcp.json` |
-| S14 | **Security + hygiene** — X-Hub-Token CSRF, CSP-sandboxed artifacts, traversal guards, 24-check smoke script, ruflo daemons killed + state gitignored | `server.js`, `scripts/` |
+| S14 | **Security + hygiene** — X-Hub-Token CSRF, CSP-sandboxed artifacts, traversal guards, smoke script, ruflo daemons killed + state gitignored | `server.js`, `scripts/` |
+| S15 | **Engram semantic memory (over vectors)** — typed records (episodic/semantic/procedural), lexical+tag+recency+importance recall, NO embeddings/vector-DB/LLM-in-hot-path. Auto-captures runs, backfills history, Memory tab. Verified: search "artifact chart" ranks the chart run first | `lib/memory.js`, `assets/memory.js` |
 
 ---
 
@@ -51,6 +52,14 @@ fired by the run engine with auto-routing. Zero-dep (setInterval + persisted
 schedule). New tab or a section under Tasks. Completes the autonomous loop with
 S11. Do NOT adopt hermes-agent itself (parallel Python agent stack, duplicates
 the claude CLI).
+
+### N3.5 Memory auto-recall into runs  (opt-in, the Engram payoff)
+Inject the top-k relevant memories (from `lib/memory.search`) into a new run's
+prompt as context — so the hub recalls past decisions/errors without you
+re-explaining. This is the token PAYOFF of S15 (ENGRAM reports ~99% fewer tokens
+vs vector-RAG) BUT it spends some tokens per run, so ship it as a **toggle in the
+Run tab, default off**. Also add semantic/procedural distillation (rule-based, no
+LLM) so memory isn't only episodic.
 
 ### N4. Routing-accuracy feedback loop
 Compare each auto-routed model against the run outcome (did haiku succeed, or

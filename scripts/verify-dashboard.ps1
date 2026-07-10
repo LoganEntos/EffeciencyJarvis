@@ -48,6 +48,8 @@ Check "GET /api/graph/stats"   "$base/api/graph/stats"
 Check "GET /api/runs"          "$base/api/runs"
 Check "GET /api/files"         "$base/api/files"
 Check "GET /api/tasks"         "$base/api/tasks"
+Check "GET /api/memory"        "$base/api/memory"
+Check "GET /api/memory/search" "$base/api/memory/search?q=test"
 Check "GET /api/run/transcript (bad id 404)" "$base/api/run/transcript?id=nope" 404
 Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2Fserver.js" 403
 CheckPost "POST /api/run w/o token (403)"        "$base/api/run"        '{"prompt":"x"}' 403
@@ -55,6 +57,7 @@ CheckPost "POST /api/run/delete w/o token (403)" "$base/api/run/delete" '{"id":"
 CheckPost "POST /api/files/delete w/o token (403)" "$base/api/files/delete" '{"name":"x"}' 403
 CheckPost "POST /api/swarm/launch w/o token (403)" "$base/api/swarm/launch" '{"goal":"x"}' 403
 CheckPost "POST /api/tasks w/o token (403)"       "$base/api/tasks"       '{"prompt":"x"}' 403
+CheckPost "POST /api/memory w/o token (403)"      "$base/api/memory"      '{"text":"x"}' 403
 
 if ($fails -eq 0) { Write-Host "`nAll checks passed." -ForegroundColor Green; exit 0 }
 Write-Host "`n$fails check(s) failed." -ForegroundColor Red

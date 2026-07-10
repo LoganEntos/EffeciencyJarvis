@@ -51,7 +51,12 @@ docs/roadmap.md          the prioritized plan (single source of truth)
 scripts/verify-dashboard.ps1   endpoint smoke test
 scripts/install-autostart.ps1  user-run logon task
 ```
-Nav order (keyboard 1-9,0): Run · Tasks · Files · Sessions · Overview · Swarm · Graph · Agents · Skills · Commands · Config.
+Nav order: Run · Tasks · Files · Sessions · Memory · Overview · Swarm · Graph · Agents · Skills · Commands · Config.
+
+`lib/memory.js` = Engram-style semantic memory (SEMANTIC OVER VECTORS): typed
+records, lexical+tag+recency+importance recall, NO embeddings/vector-DB. Captures
+runs automatically; `assets/memory.js` = Memory tab. Next: N3.5 opt-in auto-recall
+into runs (the token payoff).
 
 ## Key decisions already made (don't relitigate)
 - **task-master → NOT an always-on MCP** (per-run tax). Hub-native queue (`lib/tasks.js`) covers it. CLI-only if ever wanted.

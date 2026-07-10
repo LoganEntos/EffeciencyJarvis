@@ -10,6 +10,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const U = require('./util');
+const memory = require('./memory');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
@@ -193,6 +194,7 @@ function launch(st) {
     }
     if (st.out) st.out.end();
     writeMeta(st);
+    try { memory.captureRun(st.meta); } catch {} // engram-style episodic capture (rule-based, no LLM)
     broadcast(st, 'done', JSON.stringify(st.meta));
     for (const res of st.listeners) { try { res.end(); } catch {} }
     st.listeners.clear();
