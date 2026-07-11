@@ -125,8 +125,10 @@ specialists (every one with explicit model frontmatter; tier chips on rows;
 never restore bulk libraries). Codebase graph defaults to the module-level
 view (warm palette, weighted links; symbols behind a chip). Voice plan:
 `docs/voice-plan.md` (Track A hub zero-dep loop = N9, Track B hermes gateway
-voice notes = H4). Next up: N9 Track A voice module → H2 hermes engine in the
-Run composer → H3 hermes in the agent graph → H4 gateway toggle + Track B, N2
-mobile polish, N4 routing feedback, N5 theme toggle, N6 xlsx preview, N7
-SharePoint Breakdown (queued, don't build until asked), N8 iPhone
+voice notes = H4). **N9 Track A voice module SHIPPED** (`assets/voice.js` — header mic orb, Web
+Speech API → auto-routed run, speechSynthesis talk-back, Config settings both
+default OFF; smoke 34 checks). Next up: H2 hermes engine in the Run composer →
+H3 hermes in the agent graph → H4 gateway toggle + N9 Track B (hermes voice
+notes), N2 mobile polish, N4 routing feedback, N5 theme toggle, N6 xlsx
+preview, N7 SharePoint Breakdown (queued, don't build until asked), N8 iPhone
 incorporation (queued), Q1 Playwright (needs a nod).

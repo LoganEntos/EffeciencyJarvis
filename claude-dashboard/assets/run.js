@@ -119,7 +119,7 @@ function renderLine(o) {
   if (o.type === 'assistant' && o.message && Array.isArray(o.message.content)) {
     for (const b of o.message.content) {
       if (!b) continue;
-      if (b.type === 'text' && b.text && b.text.trim()) addEl(mdToHtml(b.text.trim()), 'msg assistant');
+      if (b.type === 'text' && b.text && b.text.trim()) { chat.lastText = b.text.trim(); addEl(mdToHtml(b.text.trim()), 'msg assistant'); }
       else if (b.type === 'tool_use') {
         const el = addEl(`<details><summary>⚒ ${esc(b.name || 'tool')} <span class="muted">${esc(excerpt(b.input || {}, 90))}</span></summary>
           <pre>${esc(JSON.stringify(b.input || {}, null, 2))}</pre></details>`, 'toolblk');
@@ -176,6 +176,7 @@ async function sendPrompt() {
     $('#runStatus').innerHTML = `<span class="pill warn">${label}</span><span class="muted mono">${esc(chat.runId)}</span>`;
   }, 1000);
   attachStream(r.id);
+  if (window.HubVoice) HubVoice.onRunStart();
 }
 
 function attachStream(id) {
@@ -210,6 +211,7 @@ function finishRun(meta) {
   const cls = s === 'done' ? 'ok' : (s === 'cancelled' ? 'warn' : 'err');
   $('#runStatus').innerHTML = `<span class="pill ${cls}">${esc(s)}</span><span class="muted mono">${esc(meta.id || '')}</span>`;
   $('#promptIn').focus();
+  if (window.HubVoice) HubVoice.onRunDone(s === 'done' ? chat.lastText : '', meta);
 }
 
 async function cancelRun() {

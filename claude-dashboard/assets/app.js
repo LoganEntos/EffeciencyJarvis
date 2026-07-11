@@ -176,7 +176,9 @@ renderers.config = async function () {
     <h2 style="font-size:12px">.mcp.json</h2><pre>${esc(JSON.stringify(d.mcp, null, 2))}</pre>
     <h2 style="font-size:12px;margin-top:22px">.claude/settings.json (hooks &amp; more)</h2>
     <pre>${esc(JSON.stringify(d.settings, null, 2))}</pre>
-    <h2 style="font-size:12px;margin-top:22px">CLAUDE.md (first 4k)</h2><pre>${esc(d.projectClaudeMd)}</pre>`;
+    <h2 style="font-size:12px;margin-top:22px">CLAUDE.md (first 4k)</h2><pre>${esc(d.projectClaudeMd)}</pre>
+    <div id="voiceSettings"></div>`;
+  if (window.HubVoice) HubVoice.renderSettings($('#voiceSettings'));
 };
 
 renderers.sessions = async function () {

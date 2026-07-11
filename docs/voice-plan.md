@@ -7,9 +7,19 @@ config: `stt:` (local faster-whisper, enabled by default, free) and `tts:`
 tool in every platform toolset, and voice-message transcription on all
 gateway platforms. Voice is native to the stack — we mostly wire surfaces.
 
-## Track A — hub voice loop (N9, ships FIRST, zero-dep)
+## Track A — hub voice loop (N9) — ✅ SHIPPED 2026-07-10 late eve
 
-The browser already has everything; no server changes beyond a settings flag.
+Built as `assets/voice.js` (self-contained, ~230 lines, zero server cost).
+Browser-verified: voice.js served 200; no console errors; SpeechRecognition +
+speechSynthesis both available (7 voices); mic orb injects into the header and
+toggles from Config; run-lifecycle hooks drive orb state (onRunStart→thinking,
+onRunDone+talkback→speaking, no-talkback→idle); talk-back confirmed speaking=
+true on a fake reply; `sendPrompt` global present so a final transcript
+auto-sends. LIVE mic capture (actual speech → text) needs a real microphone +
+user gesture and is the one manual check — the whole pipeline around it is
+verified. Settings persist in localStorage; both toggles default OFF.
+
+Original design (as built):
 
 1. **Mic in**: amber orb button in the hub header. Click (or hotkey `V`) →
    `webkitSpeechRecognition` (Chrome/Edge desktop) → live transcript into the
