@@ -63,6 +63,27 @@ more efficient at the initial sweep), then hand maintenance to Opus 4.8.
 Shape TBD: likely `data/breakdown.json` + a Library tab section; refresh via a
 scheduled run (S17). **User said: to-do list only for now.**
 
+### N9. Jarvis voice layer — talk back and forth with the hub (researched 2026-07-10 eve)
+External research done (see sources in HANDOFF session notes / this entry).
+Studied: isair/jarvis (offline, MCP tools), ethanplusai/jarvis (voice →
+`[ACTION:BUILD]` → spawns Claude Code sessions; Chrome Web Speech API + Fish
+Audio TTS + Three.js orb), rezaulhreza/jarvis (dashboard + 4-state orb:
+idle/listening/speaking/thinking; Whisper/Edge-TTS/browser TTS options),
+Julian-Ivanov/jarvis-voice-assistant (web UI + WebSocket + Claude Vision).
+Conclusion: the hub already has their entire server side (run engine = action
+dispatch, SSE = their WebSocket, Engram = their SQLite memory). The gap is
+ONLY the voice loop, and it's achievable **zero-dep, browser-native**:
+1. Mic button in the Run composer → `webkitSpeechRecognition` (Chrome/Edge)
+   → live transcript → send as a normal auto-routed run.
+2. Talk-back toggle: stream the run's final text → `speechSynthesis` (pick a
+   good local voice, rate/pitch tuned) — the hub literally answers out loud.
+3. A canvas **orb** in the header reflecting state (idle / listening /
+   run-active / speaking) in the hub's amber aesthetic — small, always
+   visible, doubles as the mic button. (Orb state machine harvested from
+   rezaulhreza; skip Three.js.)
+Upgrade path later (not now): local Whisper or Edge-TTS for nicer voices.
+Pairs with N8 (voice on the phone over Tailscale = true pocket Jarvis).
+
 ### N8. iPhone incorporation (user request 2026-07-10 — QUEUED, evaluate options)
 Get the hub properly usable from an iPhone — possibly via Base44 or another
 app-builder, possibly without one. Options to weigh when picked up:
