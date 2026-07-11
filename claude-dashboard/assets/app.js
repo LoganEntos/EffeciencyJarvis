@@ -312,6 +312,16 @@ function boot() {
     $('#nodeBadge').textContent = 'Node ' + d.nodeVersion;
     setAuthBadge(d);
   }).catch(() => {});
+  // N5: theme toggle — the light-theme variable set ships in style.css under
+  // :root[data-theme="light"]; flipping the attribute + persisting is all we do.
+  try { if (localStorage.getItem('hub.theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch {}
+  const tt = $('#themeTab');
+  if (tt) tt.onclick = () => {
+    const light = document.documentElement.getAttribute('data-theme') !== 'light';
+    if (light) document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('hub.theme', light ? 'light' : 'dark'); } catch {}
+  };
   let bootTab = 'run';
   try { const t = localStorage.getItem('hub.tab'); if (t && TABS.includes(t) && renderers[t]) bootTab = t; } catch {}
   goTab(bootTab);

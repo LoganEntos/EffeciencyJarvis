@@ -60,6 +60,8 @@ Check "GET /api/memory"        "$base/api/memory"
 Check "GET /api/memory/search" "$base/api/memory/search?q=test"
 Check "GET /api/voice/tts (404)"  "$base/api/voice/tts" 404
 Check "GET /api/voice/status"  "$base/api/voice/status"
+Check "GET /api/routing"       "$base/api/routing"
+Check "GET /api/files/xlsx (bad name 404)" "$base/api/files/xlsx?name=nope.xlsx" 404
 Check "GET /api/run/transcript (bad id 404)" "$base/api/run/transcript?id=nope" 404
 Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2Fserver.js" 403
 CheckPost "POST /api/run w/o token (403)"        "$base/api/run"        '{"prompt":"x"}' 403

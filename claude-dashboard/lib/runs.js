@@ -19,6 +19,13 @@ const RUNS_DIR = path.join(DASH_DIR, 'data', 'runs');
 const CLAUDE_EXE = process.env.HUB_CLAUDE_EXE || path.join(
   process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming'),
   'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+// H2: second engine — hermes-agent one-shot mode (-z prints only the final
+// text; --usage-file writes cost/model accounting). Hermes does its own model
+// tiering + tool approvals, so the hub's model/permission selectors are
+// claude-only. Same spawn invariants: argv array, no shell.
+const HERMES_EXE = process.env.HUB_HERMES_EXE || path.join(
+  require('os').homedir(), '.hermes', 'venvs', 'hermes', 'Scripts', 'hermes.exe');
+const ENGINES = ['claude', 'hermes'];
 const MAX_ACTIVE = 2;
 const MAX_QUEUE = 5;
 // Selectable models: 'auto' (hub-routed), '' (CLI default), the three tier
@@ -96,13 +103,15 @@ function pushLine(st, line) {
   broadcast(st, 'line', line, st.lines.length - 1);
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall }) {
+function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
+  engine = ENGINES.includes(engine) ? engine : 'claude';
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
   if (runningCount() >= MAX_ACTIVE && queue.length >= MAX_QUEUE) {
     return { error: `busy: ${MAX_ACTIVE} running + ${queue.length} queued — wait or cancel one` };
   }
-  if (!fs.existsSync(CLAUDE_EXE)) return { error: 'claude CLI not found at ' + CLAUDE_EXE };
+  if (engine === 'claude' && !fs.existsSync(CLAUDE_EXE)) return { error: 'claude CLI not found at ' + CLAUDE_EXE };
+  if (engine === 'hermes' && !fs.existsSync(HERMES_EXE)) return { error: 'hermes not installed at ' + HERMES_EXE + ' — see docs/hermes-adoption.md' };
 
   const id = newId();
   const dir = path.join(RUNS_DIR, id);
@@ -114,9 +123,10 @@ function startRun({ prompt, model, permissionMode, resume, recall }) {
   // visual artifact a run produces avoids the generic "AI slop" defaults.
   const hint = `\n\n[Hub note: you were launched from the local dashboard. If this task produces visual output (an HTML report, SVG/PNG chart, or interactive page), save those files into this exact directory: ${artDir} — the dashboard renders every file there in the chat view. A LOCAL asset library is served at /vendor/ (use relative URLs; external CDNs are blocked by the artifact CSP): stylesheet /vendor/css/fonts.css declares @font-face for JetBrains Mono, IBM Plex Sans, Fraunces, Newsreader, Source Serif 4, Space Mono, DM Mono, VT323, Archivo, Bricolage Grotesque, Hanken Grotesk, Instrument Serif; /vendor/css/modern-normalize.css is a reset; /vendor/icons/lucide-sprite.svg has 1700+ icons (<svg><use href="/vendor/icons/lucide-sprite.svg#icon-name"/></svg>). When designing visuals, avoid generic AI aesthetics: no Inter/Roboto/Arial/system fonts (pick one distinctive library font with extreme weight contrast), no purple-gradient-on-white cliché, no flat solid backgrounds (layer subtle gradients/patterns for depth), commit to one cohesive palette with a dominant color plus sharp accents via CSS variables, and prefer one staggered CSS-only load animation over scattered micro-effects. Do not mention this note.]`;
   // resolve 'auto' before spawning: resumed sessions keep their model,
-  // fresh prompts are routed by the heuristic
+  // fresh prompts are routed by the heuristic (claude engine only — hermes
+  // does its own tiering: main/aux/subagent models from its config.yaml)
   let routedReason = null;
-  if (model === 'auto') {
+  if (engine === 'claude' && model === 'auto') {
     const prior = resume ? sessionModel(resume) : null;
     if (prior) { model = prior; routedReason = 'kept the conversation’s model'; }
     else { const r = routeModel(prompt); model = r.model; routedReason = r.reason; }
@@ -126,14 +136,23 @@ function startRun({ prompt, model, permissionMode, resume, recall }) {
   // few hundred prompt tokens, so it only happens when the caller asked.
   let recalled = null;
   if (recall) { try { recalled = memory.recall(prompt); } catch {} }
-  const args = ['-p', (recalled ? recalled.block + '\n\n' : '') + prompt + hint, '--output-format', 'stream-json', '--verbose'];
-  if (MODELS.includes(model) && model && model !== 'auto') args.push('--model', model);
+  const fullPrompt = (recalled ? recalled.block + '\n\n' : '') + prompt + hint;
+  let args;
   const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'acceptEdits';
-  if (perm !== 'default') args.push('--permission-mode', perm);
-  if (resume && /^[a-f0-9-]{8,}$/.test(resume)) args.push('--resume', resume);
+  if (engine === 'hermes') {
+    // one-shot headless: final text only on stdout; approvals auto-bypassed
+    // by -z itself (no permission modes); usage.json = cost/model accounting.
+    args = ['-z', fullPrompt, '--usage-file', path.join(dir, 'usage.json')];
+    model = ''; resume = ''; // hermes -z exposes no session id to resume
+  } else {
+    args = ['-p', fullPrompt, '--output-format', 'stream-json', '--verbose'];
+    if (MODELS.includes(model) && model && model !== 'auto') args.push('--model', model);
+    if (perm !== 'default') args.push('--permission-mode', perm);
+    if (resume && /^[a-f0-9-]{8,}$/.test(resume)) args.push('--resume', resume);
+  }
 
   const meta = {
-    id, status: 'queued', queuedAt: new Date().toISOString(), startedAt: null, endedAt: null,
+    id, engine, status: 'queued', queuedAt: new Date().toISOString(), startedAt: null, endedAt: null,
     exitCode: null, sessionId: null, model: model || '', permissionMode: perm,
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
     costUsd: null, durationMs: null, routedReason, recallCount: recalled ? recalled.count : 0,
@@ -153,8 +172,9 @@ function startRun({ prompt, model, permissionMode, resume, recall }) {
 
 function launch(st) {
   let child;
+  const exe = st.meta.engine === 'hermes' ? HERMES_EXE : CLAUDE_EXE;
   try {
-    child = spawn(CLAUDE_EXE, st.args, { cwd: PROJECT_DIR, windowsHide: true });
+    child = spawn(exe, st.args, { cwd: PROJECT_DIR, windowsHide: true });
   } catch (e) {
     st.meta.status = 'error';
     st.meta.endedAt = new Date().toISOString();
@@ -176,6 +196,12 @@ function launch(st) {
       const line = buf.slice(0, nl).replace(/\r$/, '');
       buf = buf.slice(nl + 1);
       if (!line.trim()) continue;
+      if (st.meta.engine === 'hermes') {
+        // hermes -z streams plain final text, not stream-json — wrap each
+        // line as a JSON event so the same SSE/history path carries it
+        pushLine(st, JSON.stringify({ type: 'hermes_out', text: U.stripAnsi(line) }));
+        continue;
+      }
       if (line.includes('"type":"result"')) {
         try {
           const r = JSON.parse(line);
@@ -195,6 +221,20 @@ function launch(st) {
     st.meta.endedAt = new Date().toISOString();
     st.meta.exitCode = code;
     st.meta.status = st.cancelled ? 'cancelled' : (code === 0 ? 'done' : 'error');
+    if (st.meta.engine === 'hermes') {
+      // --usage-file is written even on failure; keys are defensive-read
+      // (estimated cost / token counts / model / api_calls per hermes docs)
+      const u = U.safeJson(path.join(st.dir, 'usage.json')) || {};
+      const cost = [u.estimated_cost_usd, u.estimated_cost, u.cost_usd, u.cost]
+        .find(v => typeof v === 'number');
+      if (cost !== undefined) st.meta.costUsd = cost;
+      if (u.model) st.meta.model = String(u.model);
+      if (st.meta.startedAt) st.meta.durationMs = Date.parse(st.meta.endedAt) - Date.parse(st.meta.startedAt);
+      pushLine(st, JSON.stringify({
+        type: 'hub_status',
+        text: `hermes done · ${st.meta.model || 'config default'}${st.meta.costUsd != null ? ' · ~$' + st.meta.costUsd.toFixed(4) : ''}`,
+      }));
+    }
     if (st.meta.status === 'error' && st.stderr.trim()) {
       pushLine(st, JSON.stringify({ type: 'hub_stderr', text: st.stderr.trim().slice(0, 4000) }));
     }
@@ -320,6 +360,32 @@ function listRuns() {
   return rows.sort((a, b) => (b.queuedAt || b.startedAt || '').localeCompare(a.queuedAt || a.startedAt || '')).slice(0, 200);
 }
 
+// N4: routing-accuracy feedback — how routeModel()'s auto picks are working
+// out, from run outcomes already on disk (zero-cost heuristics, no LLM):
+//   miss     = auto-routed run errored
+//   over?    = opus pick that finished fast + cheap (didn't need the big gun)
+//   under?   = haiku pick that errored, or ground for >90s
+function routingStats() {
+  const rows = listRuns().filter(m => m.routedReason && m.engine !== 'hermes');
+  const byModel = {};
+  const suspects = [];
+  for (const m of rows) {
+    const k = m.model || '?';
+    const b = byModel[k] = byModel[k] || { n: 0, done: 0, error: 0, cost: 0 };
+    b.n++; if (m.status === 'done') b.done++; if (m.status === 'error') b.error++;
+    b.cost = +(b.cost + (m.costUsd || 0)).toFixed(4);
+    if (k === 'haiku' && m.status === 'error') {
+      suspects.push({ id: m.id, model: k, why: 'haiku pick errored — likely under-routed', prompt: m.promptExcerpt });
+    } else if (k === 'haiku' && m.status === 'done' && (m.durationMs || 0) > 90000) {
+      suspects.push({ id: m.id, model: k, why: 'haiku pick ground for >90s — maybe under-routed', prompt: m.promptExcerpt });
+    } else if (k === 'opus' && m.status === 'done' && (m.durationMs || 0) < 12000 && (m.costUsd || 0) < 0.05) {
+      suspects.push({ id: m.id, model: k, why: 'opus pick finished fast + cheap — maybe over-routed', prompt: m.promptExcerpt });
+    }
+  }
+  const ok = rows.filter(m => m.status === 'done').length;
+  return { total: rows.length, ok, suspects: suspects.slice(0, 20), byModel };
+}
+
 function transcript(id) {
   if (!okId(id)) return null;
   const dir = path.join(RUNS_DIR, id);
@@ -392,6 +458,7 @@ async function handle(req, res, url) {
       permissionMode: (b.permissionMode || '').toString(),
       resume: (b.resume || '').toString(),
       recall: b.recall === true,
+      engine: (b.engine || '').toString(),
     });
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;
@@ -412,6 +479,7 @@ async function handle(req, res, url) {
   }
   if (p === '/api/run/stream') { streamRun(req, res, url.searchParams.get('id') || ''); return true; }
   if (p === '/api/runs') { U.sendJson(res, listRuns()); return true; }
+  if (p === '/api/routing') { U.sendJson(res, routingStats()); return true; }
   if (p === '/api/run/transcript') {
     const t = transcript(url.searchParams.get('id') || '');
     t === null ? U.sendJson(res, { error: 'not found' }, 404) : U.sendJson(res, t);

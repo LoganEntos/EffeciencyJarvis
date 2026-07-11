@@ -10,6 +10,10 @@ function ensureRunUI() {
   $('#run').innerHTML = `
     <h2>Run — work with Claude in this project</h2>
     <div class="runbar">
+      <select id="runEngine" title="engine — claude (this CLI, model+perms below) or hermes (its own model tiering + tool approvals; no resume yet)">
+        <option value="claude">engine: claude</option>
+        <option value="hermes">engine: hermes</option>
+      </select>
       <select id="runModel" title="model — auto routes each prompt to the cheapest capable model; or pin a specific Claude">
         <option value="auto">model: auto (routed)</option>
         <option value="">CLI default</option>
@@ -57,16 +61,29 @@ function ensureRunUI() {
   $('#newChatBtn').onclick = newChat;
   $('#promptIn').onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendPrompt(); } };
   $('#histFilter').oninput = renderHistory;
-  // model/permission choices survive reloads
+  // engine/model/permission choices survive reloads
   try {
     const m = localStorage.getItem('hub.model'), p = localStorage.getItem('hub.perm');
     if (m !== null) $('#runModel').value = m;
     if (p !== null) $('#runPerm').value = p;
+    $('#runEngine').value = localStorage.getItem('hub.engine') === 'hermes' ? 'hermes' : 'claude';
     $('#runRecall').checked = localStorage.getItem('hub.recall') === '1'; // default OFF
   } catch {}
+  applyEngineUI();
+  $('#runEngine').onchange = e => { try { localStorage.setItem('hub.engine', e.target.value); } catch {} applyEngineUI(); };
   $('#runModel').onchange = e => { try { localStorage.setItem('hub.model', e.target.value); } catch {} };
   $('#runPerm').onchange = e => { try { localStorage.setItem('hub.perm', e.target.value); } catch {} };
   $('#runRecall').onchange = e => { try { localStorage.setItem('hub.recall', e.target.checked ? '1' : '0'); } catch {} };
+}
+
+// hermes governs its own model + tool approvals; grey those controls out so
+// it's obvious they don't apply. Memory recall works for both engines.
+function applyEngineUI() {
+  const hermes = $('#runEngine') && $('#runEngine').value === 'hermes';
+  ['#runModel', '#runPerm'].forEach(sel => {
+    const el = $(sel);
+    if (el) { el.disabled = hermes; el.style.opacity = hermes ? 0.45 : 1; }
+  });
 }
 
 // Minimal safe markdown for assistant bubbles: escape everything first, then
@@ -161,6 +178,14 @@ function renderLine(o) {
   }
   if (o.type === 'hub_stderr') { addMsg('CLI stderr: ' + o.text, 'errmsg'); return null; }
   if (o.type === 'hub_status') { addMsg(o.text, 'sys'); return null; }
+  if (o.type === 'hermes_out') {
+    // hermes -z streams plain text lines — grow them into ONE assistant bubble
+    if (!chat.hermesEl || !chat.hermesEl.isConnected) { chat.hermesEl = addEl('', 'msg assistant'); chat.hermesText = ''; }
+    chat.hermesText += (chat.hermesText ? '\n' : '') + o.text;
+    chat.hermesEl.innerHTML = mdToHtml(chat.hermesText);
+    chat.lastText = chat.hermesText.trim(); // feeds voice talk-back like claude runs
+    return null;
+  }
   return null;
 }
 
@@ -169,14 +194,17 @@ async function sendPrompt() {
   const ta = $('#promptIn');
   const prompt = ta.value.trim();
   if (!prompt || chat.running) return;
+  const engine = $('#runEngine') ? $('#runEngine').value : 'claude';
   let r;
   try {
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, model: $('#runModel').value, permissionMode: $('#runPerm').value, resume: chat.sessionId || '', recall: $('#runRecall').checked }) });
+      body: JSON.stringify({ prompt, engine, model: $('#runModel').value, permissionMode: $('#runPerm').value,
+        resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked }) });
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
   if (r.error) { addMsg(r.error, 'errmsg'); return; }
   ta.value = '';
   addMsg(prompt, 'user');
+  chat.hermesEl = null; chat.hermesText = ''; // fresh bubble per hermes reply
   chat.runId = r.id; chat.running = true; chat.seen = -1; chat.t0 = Date.now();
   chat.queued = !!r.queued;
   $('#sendBtn').disabled = true;
@@ -241,6 +269,7 @@ function newChat() {
   if (chat.es) { chat.es.close(); chat.es = null; }
   clearInterval(chat.timer); chat.timer = null;
   chat.sessionId = null; chat.runId = null; chat.running = false; chat.seen = -1;
+  chat.hermesEl = null; chat.hermesText = '';
   $('#chatSession').classList.add('hidden');
   $('#runStatus').innerHTML = '';
   $('#sendBtn').disabled = false;
@@ -288,9 +317,12 @@ async function refreshHistory() {
   }
   const sb = $('#spendBadge');
   if (sb && n) { sb.textContent = `today: ${n} runs · $${spend.toFixed(2)}`; sb.classList.remove('hidden'); }
+  // N4: routing-accuracy chip (auto-routed runs only; suspects in the tooltip)
+  try { routing = await api('/api/routing'); } catch { routing = null; }
   renderHistStats();
   renderHistory();
 }
+let routing = null;
 
 // clickable stat chips: totals + outcome breakdown + per-model spend; clicking
 // an outcome chip filters the list to it
@@ -312,7 +344,8 @@ function renderHistStats() {
     chip(`✓ ${by('done').length} done`, 'ok', 'done') +
     chip(`✗ ${by('error').length} failed`, 'err', 'error') +
     chip(`◌ ${by('cancelled').length} cancelled`, 'warn', 'cancelled') +
-    Object.entries(models).map(([k, v]) => `<span class="pill neutral">${esc(k)}: ${v.n} · $${v.cost.toFixed(2)}</span>`).join('');
+    Object.entries(models).map(([k, v]) => `<span class="pill neutral">${esc(k)}: ${v.n} · $${v.cost.toFixed(2)}</span>`).join('') +
+    (routing && routing.total ? `<span class="pill ${routing.suspects.length ? 'warn' : 'ok'}" title="${esc(routing.suspects.map(s => `${s.model}: ${s.why} — "${(s.prompt || '').slice(0, 60)}"`).join('\n') || 'every auto-routed pick looks right')}">⚖ auto-routing: ${Math.round(100 * routing.ok / routing.total)}% ok · ${routing.suspects.length} suspect${routing.suspects.length === 1 ? '' : 's'}</span>` : '');
   el.querySelectorAll('[data-f]').forEach(c => c.onclick = () => {
     histStatusFilter = histStatusFilter === c.dataset.f ? '' : c.dataset.f;
     renderHistStats(); renderHistory();
@@ -333,7 +366,7 @@ function renderHistory() {
       <div class="flex" style="justify-content:space-between">
         <span><span class="pill ${pill(m.status)}">${esc(m.status)}</span>
           <span class="muted" style="font-size:11.5px">${new Date(m.startedAt || m.queuedAt || 0).toLocaleString()}</span></span>
-        <span class="muted" style="font-size:11.5px">${m.model ? esc(m.model) + (m.routedReason ? ' (auto)' : '') + ' · ' : ''}${m.durationMs ? (m.durationMs / 1000).toFixed(1) + 's' : ''}${m.costUsd != null ? ' · $' + m.costUsd.toFixed(4) : ''}${m.resumedFrom ? ' · ⟲ resumed' : ''}${m.artifactCount ? ' · ◫ ' + m.artifactCount : ''}
+        <span class="muted" style="font-size:11.5px">${m.engine === 'hermes' ? '⬡ hermes · ' : ''}${m.model ? esc(m.model) + (m.routedReason ? ' (auto)' : '') + ' · ' : ''}${m.durationMs ? (m.durationMs / 1000).toFixed(1) + 's' : ''}${m.costUsd != null ? ' · $' + m.costUsd.toFixed(4) : ''}${m.resumedFrom ? ' · ⟲ resumed' : ''}${m.artifactCount ? ' · ◫ ' + m.artifactCount : ''}
           <button class="danger delRunBtn" data-id="${esc(m.id)}" title="delete this run from history" style="padding:2px 9px;font-size:10.5px;margin-left:8px">✕</button></span>
       </div>
       <div class="pex">${esc(m.promptExcerpt || '')}</div>

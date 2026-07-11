@@ -60,12 +60,29 @@ async function refreshFiles() {
       </div>
       <div class="flex" style="margin-top:8px">
         <button class="ghost procBtn" data-path="${esc(f.path)}" data-name="${esc(f.name)}">▷ Process with Claude</button>
+        ${/\.(xlsx|xlsm|xltx)$/i.test(f.name) ? `<button class="ghost xlsxBtn" data-name="${esc(f.name)}" style="padding:6px 12px;font-size:11.5px">▦ Sheets</button>` : ''}
         <a class="link" style="font-size:12px" href="/api/files/download?name=${encodeURIComponent(f.name)}">download</a>
         <button class="danger delBtn" data-name="${esc(f.name)}" style="padding:6px 12px;font-size:11.5px">delete</button>
       </div>
+      <div class="xlsxInfo" data-for="${esc(f.name)}"></div>
     </div>`).join('');
   el.querySelectorAll('.procBtn').forEach(b => b.onclick = () =>
     prefillRun(`Process the uploaded file at ${b.dataset.path} — `));
+  // N6: zero-dep workbook preview — sheet names + grid dimensions, no values
+  el.querySelectorAll('.xlsxBtn').forEach(b => b.onclick = async () => {
+    const box = el.querySelector(`.xlsxInfo[data-for="${CSS.escape(b.dataset.name)}"]`);
+    if (!box) return;
+    if (box.innerHTML) { box.innerHTML = ''; return; } // toggle closed
+    box.innerHTML = '<span class="muted" style="font-size:11.5px">reading workbook…</span>';
+    let r;
+    try { r = await api('/api/files/xlsx?name=' + encodeURIComponent(b.dataset.name)); }
+    catch (e) { box.innerHTML = `<span class="pill err">preview failed: ${esc(e.message || 'error')}</span>`; return; }
+    if (r.error) { box.innerHTML = `<span class="pill err">${esc(r.error)}</span>`; return; }
+    box.innerHTML = `<div class="badgebar" style="margin-top:8px">
+      <span class="pill neutral">${r.sheetCount} sheet${r.sheetCount === 1 ? '' : 's'}</span>
+      ${(r.sheets || []).map(s => `<span class="pill ok" title="${esc(s.ref || '')}">${esc(s.name)}${s.rows ? ` · ${s.rows}×${s.cols || '?'}` : ''}${s.note ? ' · ' + esc(s.note) : ''}</span>`).join('')}
+    </div>`;
+  });
   el.querySelectorAll('.delBtn').forEach(b => b.onclick = async () => {
     if (!confirm(`Delete ${b.dataset.name} from the inbox?`)) return;
     try { await api('/api/files/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: b.dataset.name }) }); }

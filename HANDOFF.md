@@ -106,21 +106,18 @@ memories into the prompt; rule-based failure-pattern distillation included.
 - **ruflo daemons → killed**, then the whole stack **retired** (see above); the claude-flow entry is fully removed from `.mcp.json` (scrapling is the only MCP left). Leftover ruflo state on disk (`.swarm/`, `.claude-flow/`) is gitignored and inert.
 
 ## EXECUTE NEXT — the path to "where it needs to be" (detail in docs/roadmap.md)
-Ordered; H2→H4 and voice are the load-bearing items. Autonomous unless marked 🙋.
-1. **H2 Hermes engine in the Run composer** — "engine: claude | hermes"
-   selector; hermes runs via argv arrays (keep security invariants), into the
-   same run history + Engram. THE next build.
-2. **H3 Hermes runs in the live agent graph** — Maestro/Crew personas light up
-   for hermes runs like claude runs already do.
-3. **H4 Hermes gateway toggle + N9 Track B** — `hermes gateway` on/off in the
+✅ DONE 2026-07-11 (S25/S26): CSM-1B voice engine (installed+verified), H2
+hermes engine in the Run composer (live-verified, $0.06 test run), H3 hermes
+in the agent graph, N5 theme toggle, N4 routing-accuracy chip (/api/routing),
+N6 xlsx preview (/api/files/xlsx), ECC skills (Q4: 278 library / 18 active).
+Remaining, in order (autonomous unless marked 🙋):
+1. **H4 Hermes gateway toggle + N9 Track B** — `hermes gateway` on/off in the
    hub = the mobile voice/text bridge. 🙋 needs a Telegram bot token.
-4. **N2 Mobile polish** — audit all tabs at 375px; touch targets, overflow,
-   composer, and the new voice orb on a phone.
-5. **N5 Dark/light theme toggle** — header toggle + persistence (light CSS vars
-   already shipped in S16).
-6. **N4 Routing-accuracy feedback** — routed model vs outcome; tune `routeModel()`.
-7. **N6 xlsx preview in Files** — zero-dep sheet/dimension preview.
-8. **Q1 Playwright E2E** (dev-only, no run tax) — regression net; recommended
+2. **N2 Mobile polish** — audit all tabs at 375px; touch targets, overflow,
+   composer, and the voice orb on a phone.
+3. **H2.5 hermes resume** (new, optional) — usage.json exposes session_id;
+   `--resume` could give hermes chats continuity like claude runs.
+4. **Q1 Playwright E2E** (dev-only, no run tax) — regression net; recommended
    install. 🙋 quick nod to install.
 
 Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**

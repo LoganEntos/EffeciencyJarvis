@@ -5,6 +5,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const U = require('./util');
 
 const DASH_DIR = path.resolve(__dirname, '..');
@@ -72,7 +73,83 @@ function inboxFile(name) {
   return { safe, full, exists: fs.existsSync(full) };
 }
 
+// ---- N6: zero-dep xlsx preview -------------------------------------------
+// An .xlsx is a ZIP; we read just the central directory + the two XML kinds
+// needed for a structural preview: workbook.xml (sheet names) and each
+// worksheet's <dimension> tag (grid size). No cell values are parsed.
+
+// ZIP central directory → [{ name, method, csize, usize, offset }]
+function zipEntries(buf) {
+  // EOCD signature 0x06054b50, scan the last 64KB
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65558); i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) return null;
+  const count = buf.readUInt16LE(eocd + 10);
+  let pos = buf.readUInt32LE(eocd + 16);
+  const out = [];
+  for (let i = 0; i < count && pos + 46 <= buf.length; i++) {
+    if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+    const method = buf.readUInt16LE(pos + 10);
+    const csize = buf.readUInt32LE(pos + 20);
+    const usize = buf.readUInt32LE(pos + 24);
+    const nlen = buf.readUInt16LE(pos + 28), elen = buf.readUInt16LE(pos + 30), clen = buf.readUInt16LE(pos + 32);
+    const name = buf.slice(pos + 46, pos + 46 + nlen).toString('utf8');
+    out.push({ name, method, csize, usize, offset: buf.readUInt32LE(pos + 42) });
+    pos += 46 + nlen + elen + clen;
+  }
+  return out;
+}
+
+function zipRead(buf, entry) {
+  const p = entry.offset;
+  if (buf.readUInt32LE(p) !== 0x04034b50) return null;
+  const nlen = buf.readUInt16LE(p + 26), elen = buf.readUInt16LE(p + 28);
+  const data = buf.slice(p + 30 + nlen + elen, p + 30 + nlen + elen + entry.csize);
+  if (entry.method === 0) return data;
+  if (entry.method === 8) { try { return zlib.inflateRawSync(data); } catch { return null; } }
+  return null;
+}
+
+const colToNum = c => c.split('').reduce((a, ch) => a * 26 + (ch.charCodeAt(0) - 64), 0);
+
+function xlsxInfo(full) {
+  let buf; try { buf = fs.readFileSync(full); } catch { return { error: 'unreadable' }; }
+  const entries = zipEntries(buf);
+  if (!entries) return { error: 'not a valid xlsx (zip directory missing)' };
+  const wbEntry = entries.find(e => e.name === 'xl/workbook.xml');
+  if (!wbEntry) return { error: 'not an xlsx workbook (no xl/workbook.xml)' };
+  const wb = (zipRead(buf, wbEntry) || Buffer.alloc(0)).toString('utf8');
+  const names = [...wb.matchAll(/<sheet[^>]*\bname="([^"]*)"/g)].map(m => m[1]);
+  // worksheets in numeric order pair with workbook sheet order in the common case
+  const sheetEntries = entries.filter(e => /^xl\/worksheets\/sheet\d+\.xml$/.test(e.name))
+    .sort((a, b) => parseInt(a.name.match(/\d+/)[0], 10) - parseInt(b.name.match(/\d+/)[0], 10));
+  const sheets = sheetEntries.map((e, i) => {
+    const out = { name: names[i] || e.name.replace(/^xl\/worksheets\//, ''), rows: null, cols: null, ref: null };
+    if (e.usize > 40 * 1024 * 1024) { out.note = 'sheet too large to inspect'; return out; }
+    const xml = (zipRead(buf, e) || Buffer.alloc(0)).toString('utf8');
+    const dim = xml.match(/<dimension ref="([A-Z]+\d+(?::([A-Z]+)(\d+))?)"/);
+    if (dim) {
+      out.ref = dim[1];
+      if (dim[2]) { out.cols = colToNum(dim[2]); out.rows = parseInt(dim[3], 10); }
+      else { out.cols = 1; out.rows = 1; }
+    } else {
+      out.rows = (xml.match(/<row[ >]/g) || []).length; // fallback: count row tags
+    }
+    return out;
+  });
+  return { sheetCount: sheets.length, sheets };
+}
+
 async function handle(req, res, url) {
+  if (url.pathname === '/api/files/xlsx' && req.method === 'GET') {
+    const f = inboxFile(url.searchParams.get('name') || '');
+    if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    if (!/\.(xlsx|xlsm|xltx)$/i.test(f.safe)) { U.sendJson(res, { error: 'not an Excel workbook' }, 400); return true; }
+    U.sendJson(res, Object.assign({ name: f.safe }, xlsxInfo(f.full)));
+    return true;
+  }
   const p = url.pathname;
   if (p === '/api/files' && req.method === 'GET') { U.sendJson(res, listFiles()); return true; }
   if (p === '/api/files' && req.method === 'POST') {

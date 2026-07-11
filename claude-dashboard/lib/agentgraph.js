@@ -51,6 +51,7 @@ function buildGraph(id) {
   if (!meta) return null;
   const raw = U.safeRead(path.join(RUNS_DIR, id, 'output.jsonl')) || '';
   const running = meta.status === 'running' || meta.status === 'queued';
+  if (meta.engine === 'hermes') return buildHermesGraph(meta, raw, running);
 
   const tools = new Map();   // crew persona -> node
   const agents = new Map();  // tool_use id -> subagent node
@@ -109,6 +110,42 @@ function buildGraph(id) {
     status: meta.status, active: running, count: 1,
   };
   const nodes = [root, ...tools.values(), ...agents.values()];
+  if (meta.artifactCount) nodes.push({
+    id: 'artifacts', kind: 'artifacts', persona: 'Gallery', icon: '🖼️',
+    label: `${meta.artifactCount} artifact${meta.artifactCount === 1 ? '' : 's'}`,
+    count: meta.artifactCount, active: false, detail: 'files the run produced — rendered in the Run tab',
+  });
+  const links = nodes.filter(n => n.id !== 'run').map(n => ({ source: 'run', target: n.id }));
+  return { run: meta, nodes, links };
+}
+
+// H3: hermes runs. -z one-shot mode emits no tool telemetry (final text only),
+// so the graph shows the Maestro brain plus its standing auxiliary crew —
+// pulsing while the run is live — matching the Agents-tab persona language.
+function buildHermesGraph(meta, raw, running) {
+  let lastText = '';
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    let o; try { o = JSON.parse(line); } catch { continue; }
+    if (o.type === 'hermes_out' && o.text) lastText = short(String(o.text).trim(), 160) || lastText;
+  }
+  const root = {
+    id: 'run', kind: 'root', persona: 'Maestro', icon: '🎼',
+    label: `Maestro (hermes${meta.model ? ' · ' + meta.model : ''}) — the reasoning brain`,
+    detail: lastText || short(meta.promptExcerpt, 160),
+    status: meta.status, active: running, count: 1,
+  };
+  const crew = [
+    ['Crew', '🤖', 'delegate_task subagents (auto-cheap)'],
+    ['Scribe', '✍️', 'context compression'],
+    ['Falcon', '🌐', 'web extraction'],
+    ['Scout', '🔎', 'vision + screenshots'],
+    ['Archivist', '🗂️', 'session memory (FTS5)'],
+  ].map(([persona, icon, blurb]) => ({
+    id: 'tool:' + persona, kind: 'tool', persona, icon, label: blurb,
+    count: 1, active: running, detail: 'hermes auxiliary — exact usage is not exposed by one-shot mode',
+  }));
+  const nodes = [root, ...crew];
   if (meta.artifactCount) nodes.push({
     id: 'artifacts', kind: 'artifacts', persona: 'Gallery', icon: '🖼️',
     label: `${meta.artifactCount} artifact${meta.artifactCount === 1 ? '' : 's'}`,
