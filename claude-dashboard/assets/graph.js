@@ -80,7 +80,8 @@ async function renderCodeGraph(body) {
 };
 
 function drawGraphViz(container, data) {
-  const W = container.clientWidth || 800, H = 520, DPR = window.devicePixelRatio || 1;
+  const W = container.clientWidth || 800, DPR = window.devicePixelRatio || 1;
+  const H = Math.max(520, Math.min(780, Math.round(data.nodes.length * 1.6))); // more nodes → taller canvas
   const rootCss = getComputedStyle(document.documentElement);
   const BG = (rootCss.getPropertyValue('--bg') || '#0e0d0b').trim();
   const LINE = (rootCss.getPropertyValue('--line') || '#2a251d').trim();
@@ -114,6 +115,11 @@ function drawGraphViz(container, data) {
   const nbr = {}; nodes.forEach(n => nbr[n.id] = new Set());
   for (const l of links) { l.s.deg++; l.t.deg++; nbr[l.s.id].add(l.t.id); nbr[l.t.id].add(l.s.id); }
   const rad = n => 5 + Math.sqrt(n.deg);
+  // big graphs: permanent labels only for the most-connected nodes; everything
+  // else labels on hover/select/search so the map stays readable
+  const labeled = new Set(
+    nodes.length <= 90 ? nodes.map(n => n.id)
+      : [...nodes].sort((a, b) => b.deg - a.deg).slice(0, 48).map(n => n.id));
 
   // physics: pairwise repulsion + link springs + mild centering, clamped & damped
   const REP = 2600, SPRING = 0.02, REST = 95, CENTER = 0.012, DAMP = 0.85, PAD = 18, VMAX = 14;
@@ -169,8 +175,10 @@ function drawGraphViz(container, data) {
     }
     ctx.font = '10px "JetBrains Mono",Consolas,monospace'; ctx.textAlign = 'center';
     for (const n of nodes) {
-      ctx.globalAlpha = emphasis(n);
-      ctx.fillStyle = (n === hover || n === selected) ? TXT : MUTED;
+      const lit = n === hover || n === selected || matches.has(n.id);
+      if (!lit && !labeled.has(n.id)) continue;
+      ctx.globalAlpha = lit ? 1 : emphasis(n);
+      ctx.fillStyle = lit ? TXT : MUTED;
       ctx.fillText(n.label.slice(0, 24), n.x, n.y - rad(n) - 5);
     }
     ctx.globalAlpha = 1;

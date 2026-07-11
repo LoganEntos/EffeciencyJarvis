@@ -1,0 +1,20 @@
+{
+  "0": "server.js",
+  "1": "runs.js",
+  "2": "memory.js",
+  "3": "core.js",
+  "4": "schedules.js",
+  "5": "run.js",
+  "6": "app.js",
+  "7": "tasks.js",
+  "8": "util.js",
+  "9": "agentgraph.js",
+  "10": "tasks.js",
+  "11": "agentviz.js",
+  "12": "Claude Code Hub (claude-dashboard)",
+  "13": "assetlib.js",
+  "14": "memory.js",
+  "15": "files.js",
+  "16": "graph.js",
+  "17": "manifest.json"
+}
