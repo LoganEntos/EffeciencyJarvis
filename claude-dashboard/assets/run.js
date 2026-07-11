@@ -135,6 +135,28 @@ const addMsg = (text, cls) => addEl(esc(text), 'msg ' + cls);
 const toolEls = {}; // tool_use id -> <pre> that receives the tool result
 function excerpt(v, n) { const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n) + '…' : s; }
 
+// Turn a raw CLI stderr/crash dump into a one-line plain-English headline +
+// a collapsed <pre> with the full text — so a Node stack trace doesn't read
+// as an illegible wall of "at Object.<anonymous>" noise in the chat log.
+function summarizeError(raw) {
+  const text = (raw || '').trim();
+  if (!text) return 'The command failed with no output.';
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const first = lines[0] || text;
+  if (/ENOENT/.test(text)) return "Couldn't find a file or program it needed — " + first;
+  if (/EADDRINUSE/.test(text)) return 'That port is already in use by another process.';
+  if (/EACCES|permission denied/i.test(text)) return "Permission denied — " + first;
+  if (/is not recognized as an internal or external command|command not found/i.test(text)) return 'A required program is missing from PATH — ' + first;
+  if (/^(\w*Error|Exception):/.test(first) || /Error:/.test(first)) return first.replace(/^\s*at\s+/, '');
+  return first.length > 140 ? first.slice(0, 140) + '…' : first;
+}
+function errBlock(raw) {
+  const headline = esc(summarizeError(raw));
+  const full = esc(excerpt(raw, 6000));
+  return `<div class="errhead">✗ ${headline}</div>
+    <details><summary>show full error</summary><pre>${full}</pre></details>`;
+}
+
 // Render one stream-json line into the chat log. Returns the result meta if
 // this line was the final result event.
 function renderLine(o) {
@@ -173,10 +195,10 @@ function renderLine(o) {
     const tok = o.usage ? `${(o.usage.input_tokens || 0) + (o.usage.cache_read_input_tokens || 0)}→${o.usage.output_tokens || 0} tok` : '';
     const ok = o.subtype === 'success';
     addMsg(`${ok ? '✓ done' : '✗ ' + (o.subtype || 'error')} ${[secs, turns, tok, cost].filter(Boolean).join(' · ')}`, ok ? 'result' : 'errmsg');
-    if (!ok && o.result) addMsg(excerpt(o.result, 800), 'errmsg');
+    if (!ok && o.result) addEl(errBlock(o.result), 'errblk');
     return o;
   }
-  if (o.type === 'hub_stderr') { addMsg('CLI stderr: ' + o.text, 'errmsg'); return null; }
+  if (o.type === 'hub_stderr') { addEl(errBlock(o.text), 'errblk'); return null; }
   if (o.type === 'hub_status') { addMsg(o.text, 'sys'); return null; }
   if (o.type === 'hermes_out') {
     // hermes -z streams plain text lines — grow them into ONE assistant bubble

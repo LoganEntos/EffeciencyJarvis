@@ -16,6 +16,12 @@
         <label class="chk" style="margin-top:8px"><input type="checkbox" id="vTalk"${store.talk ? ' checked' : ''}> Speak Claude's replies out loud</label>
         <label class="chk" style="margin-top:8px" title="after each reply, re-open the mic for a natural back-and-forth"><input type="checkbox" id="vConv"${store.conv ? ' checked' : ''}> Hands-free call — a plain orb tap starts the loop ${SR ? '' : '(needs Chrome or Edge)'}</label>
         <div class="note" style="margin:8px 0 2px">Call mode keeps the mic open between turns (talk-back is always on during a call). A soft blip means it's your turn. Hang up with <b>Esc</b>, a click, or two quiet turns. Shift+click / long-press the orb starts a call any time.</div>
+        <label class="chk" style="margin-top:8px" title="in a call, ignore anything you say that doesn't include the wake word — stops room noise or my own voice from triggering a turn"><input type="checkbox" id="vWakeGate"${store.wakeGate ? ' checked' : ''}> Only act when you say my name (wake-word gate)</label>
+        <div class="flex" style="margin-top:8px;align-items:center">
+          <span class="muted" style="font-size:12px">Wake word</span>
+          <input type="text" id="vWake" value="${esc(store.wake)}" maxlength="24" style="width:130px" placeholder="Suzy">
+          <span class="muted" style="font-size:11.5px">During a call, say e.g. “<b>${esc(store.wake)}</b>, what's on the schedule” — the name is stripped from the prompt. Off = every turn is heard.</span>
+        </div>
         <div class="flex" style="margin-top:12px;align-items:center;gap:10px">
           <span class="muted" style="font-size:12px">Mic status</span>
           <span id="vMicStat" class="pill neutral" style="font-size:11px">checking…</span>
@@ -37,27 +43,33 @@
         <div class="flex" style="margin-top:12px;align-items:center" title="which engine reads replies aloud — CSM is a local neural voice on your GPU (see docs/voice-csm.md)">
           <span class="muted" style="font-size:12px">TTS engine</span>
           <select id="vEngine">
-            <option value="browser"${store.engine === 'browser' ? ' selected' : ''}>Browser (speechSynthesis)</option>
-            <option value="csm"${store.engine === 'csm' ? ' selected' : ''}>Sesame CSM-1B (local)</option>
+            <option value="browser"${store.engine === 'browser' ? ' selected' : ''}>Browser (speechSynthesis) — instant</option>
+            <option value="kokoro"${store.engine === 'kokoro' ? ' selected' : ''}>Kokoro-82M (local) — fast neural</option>
+            <option value="csm"${store.engine === 'csm' ? ' selected' : ''}>Sesame CSM-1B (local) — natural, slow</option>
           </select>
           <span class="muted" style="font-size:12px">Speaker</span>
           <input type="number" id="vCsmSpk" min="0" max="9" step="1" value="${store.csmSpeaker}" style="width:58px">
           <span id="vCsmEng" class="pill neutral" style="font-size:11px">engine: checking…</span>
           <button class="ghost hidden" id="vCsmStart" style="padding:6px 12px;font-size:11.5px">⚡ Start engine</button>
-          <button class="ghost" id="vCsmTest" style="padding:6px 12px;font-size:11.5px">▶ Test CSM voice</button>
+          <button class="ghost" id="vCsmTest" style="padding:6px 12px;font-size:11.5px">▶ Test voice</button>
           <span id="vCsmStat" class="pill neutral" style="font-size:11px;display:none"></span>
         </div>
-        <div class="note" style="margin:6px 0 2px">CSM-1B is a local neural voice on your GPU (runs in <span class="mono">.csm/</span> via <span class="mono">scripts/csm-server.py</span> — details in <span class="mono">docs/voice-csm.md</span>). If it's offline, hit <b>Start engine</b> (~20 s to load). First words of each reply take a few seconds to generate; if anything fails the hub falls back to the browser voice. Voice/rate above apply to the browser engine only.</div>
+        <div class="note" style="margin:6px 0 2px"><b>Kokoro-82M</b> is the fast local neural voice (runs in <span class="mono">.kokoro/</span> via <span class="mono">scripts/kokoro-server.py</span> on onnxruntime — ~0.1–0.3 s per sentence on the GPU, first run downloads ~340 MB). <b>CSM-1B</b> (<span class="mono">.csm/</span>) is more natural but slow (~6 s to first word) — see <span class="mono">docs/voice-csm.md</span>. Pick an engine above, hit <b>Start engine</b>, then <b>Test voice</b>; if a neural engine fails the hub falls back to the browser voice. Voice/rate sliders apply to the browser engine only; Speaker applies to the neural engines.</div>
       </div>`;
     const orb = $('#voiceOrb');
     container.querySelector('#vMic').onchange = e => { store.mic = e.target.checked; if (orb) orb.style.display = e.target.checked ? '' : 'none'; };
     container.querySelector('#vTalk').onchange = e => { store.talk = e.target.checked; };
     container.querySelector('#vConv').onchange = e => { store.conv = e.target.checked; if (e.target.checked && !store.mic) { store.mic = true; if (orb) orb.style.display = ''; const m = container.querySelector('#vMic'); if (m) m.checked = true; } };
+    container.querySelector('#vWakeGate').onchange = e => { store.wakeGate = e.target.checked; };
+    container.querySelector('#vWake').onchange = e => { store.wake = e.target.value; e.target.value = store.wake; };
     container.querySelector('#vVoice').onchange = e => { store.voiceURI = e.target.value; };
     container.querySelector('#vRate').onchange = e => { store.rate = parseFloat(e.target.value); };
     container.querySelector('#vPause').oninput = e => { store.pause = parseFloat(e.target.value); const pv = container.querySelector('#vPauseVal'); if (pv) pv.textContent = parseFloat(e.target.value).toFixed(1) + 's'; };
     container.querySelector('#vTest').onclick = () => speakBrowser('Voice is ready. I will read Claude\'s replies aloud when you turn talk-back on.');
-    container.querySelector('#vEngine').onchange = e => { store.engine = e.target.value; };
+    // which neural sidecar the status pill / Start / Test act on (browser → the
+    // recommended fast one so you can install it before switching)
+    const neuralEngine = () => (store.neural ? store.engine : 'kokoro');
+    container.querySelector('#vEngine').onchange = e => { store.engine = e.target.value; pollEngine(0); };
     container.querySelector('#vCsmSpk').onchange = e => {
       const n = parseInt(e.target.value, 10);
       store.csmSpeaker = isNaN(n) ? 0 : Math.max(0, Math.min(9, n));
@@ -69,15 +81,16 @@
     function paintEngine(j) {
       if (!eng) return;
       const s = (j && j.status) || 'offline';
-      if (s === 'ready') { eng.className = 'pill ok'; eng.textContent = `engine: ready · ${esc(j.device || '?')}${j.model ? ' · ' + esc(j.model.split('/').pop()) : ''}`; startBtn.classList.add('hidden'); }
-      else if (s === 'loading') { eng.className = 'pill warn'; eng.textContent = 'engine: loading model…'; startBtn.classList.add('hidden'); }
-      else if (s === 'error') { eng.className = 'pill err'; eng.textContent = 'engine: error — see .csm/server.log'; startBtn.classList.remove('hidden'); }
-      else { eng.className = 'pill ' + (j && j.installed ? 'warn' : 'err'); eng.textContent = j && j.installed ? 'engine: offline' : 'engine: not installed (docs/voice-csm.md)'; if (j && j.installed) startBtn.classList.remove('hidden'); else startBtn.classList.add('hidden'); }
+      const nm = neuralEngine(), dir = nm === 'kokoro' ? '.kokoro' : '.csm';
+      if (s === 'ready') { eng.className = 'pill ok'; eng.textContent = `${nm}: ready · ${esc(j.device || '?')}${j.model ? ' · ' + esc(String(j.model).split('/').pop()) : ''}`; startBtn.classList.add('hidden'); }
+      else if (s === 'loading') { eng.className = 'pill warn'; eng.textContent = `${nm}: loading model…`; startBtn.classList.add('hidden'); }
+      else if (s === 'error') { eng.className = 'pill err'; eng.textContent = `${nm}: error — see ${dir}/server.log`; startBtn.classList.remove('hidden'); }
+      else { eng.className = 'pill ' + (j && j.installed ? 'warn' : 'err'); eng.textContent = j && j.installed ? `${nm}: offline` : `${nm}: not installed`; if (j && j.installed) startBtn.classList.remove('hidden'); else startBtn.classList.add('hidden'); }
       return s;
     }
     async function pollEngine(times) {
       let j = null;
-      try { j = await api('/api/voice/status'); } catch {}
+      try { j = await api('/api/voice/status?engine=' + neuralEngine()); } catch {}
       const s = paintEngine(j);
       if (times > 0 && (s === 'loading' || s === 'offline') && container.isConnected) {
         setTimeout(() => pollEngine(times - 1), 2500);
@@ -85,22 +98,22 @@
     }
     pollEngine(0);
     startBtn.onclick = async () => {
-      eng.className = 'pill warn'; eng.textContent = 'engine: starting…'; startBtn.classList.add('hidden');
+      const nm = neuralEngine();
+      eng.className = 'pill warn'; eng.textContent = nm + ': starting…'; startBtn.classList.add('hidden');
       try {
-        const r = await api('/api/voice/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-        if (r.error) { eng.className = 'pill err'; eng.textContent = 'engine: ' + r.error.slice(0, 80); return; }
-      } catch (e) { eng.className = 'pill err'; eng.textContent = 'engine: start failed'; return; }
+        const r = await api('/api/voice/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ engine: nm }) });
+        if (r.error) { eng.className = 'pill err'; eng.textContent = nm + ': ' + r.error.slice(0, 80); return; }
+      } catch (e) { eng.className = 'pill err'; eng.textContent = nm + ': start failed'; return; }
       pollEngine(20); // follow it through loading → ready
     };
 
-    // Test = one real /api/voice/tts round-trip (engine forced to CSM, restored after)
+    // Test = one real /api/voice/tts round-trip against the selected neural engine
     container.querySelector('#vCsmTest').onclick = () => {
       const cs = container.querySelector('#vCsmStat');
+      const nm = neuralEngine();
       cs.style.display = ''; cs.className = 'pill neutral'; cs.textContent = 'generating… (first call can take a while)';
-      const prev = store.engine; store.engine = 'csm';
       stopSpeak();
-      const probe = csmFetch('Sesame voice check. If you can hear this, the local model server is working.');
-      store.engine = prev; // restore at once — the probe itself doesn't read it
+      const probe = csmFetch('Local voice check. If you can hear this, the ' + nm + ' engine is working.', nm);
       probe.then(blob => {
           cs.className = 'pill ok'; cs.textContent = 'reachable — playing';
           return playBlob(blob, () => { if (V.state === 'speaking') setState('idle'); });

@@ -1,20 +1,24 @@
 /*
- * Voice engine (Sesame CSM-1B) — proxy + lifecycle for the local TTS sidecar
- * (scripts/csm-server.py running in the gitignored .csm/ venv).
+ * Voice engines — proxy + lifecycle for the local TTS sidecars.
  *
- *   POST /api/voice/tts    { text, speaker } -> audio/wav streamed back
- *   GET  /api/voice/status -> sidecar /health + installed flag ("offline" if down)
- *   POST /api/voice/start  -> spawn the sidecar if not running (argv array, no shell)
+ * Two interchangeable neural engines, same contract, selected per-request:
+ *   • kokoro — Kokoro-82M, FAST (~0.1-0.3 s/sentence on the 3060). scripts/
+ *     kokoro-server.py in .kokoro/venv, port 8791. The recommended default.
+ *   • csm    — Sesame CSM-1B, most natural but slow (~6 s first word).
+ *     scripts/csm-server.py in .csm/venv, port 8790.
+ *
+ *   POST /api/voice/tts?engine=kokoro   { text, speaker } -> audio/wav
+ *   GET  /api/voice/status?engine=kokoro -> sidecar /health + installed flag
+ *   POST /api/voice/start   { engine }   -> spawn that sidecar (argv, no shell)
+ * The `engine` param defaults to "csm" for backward compatibility.
  *
  * Why a proxy instead of the browser calling the python server directly:
- * same-origin keeps CORS closed and the localhost invariant intact — the
- * page only ever talks to the hub, and the hub only ever talks to loopback.
+ * same-origin keeps CORS closed and the localhost invariant intact — the page
+ * only ever talks to the hub, and the hub only ever talks to loopback.
  *
- * Target URL: HUB_CSM_URL env var, default http://127.0.0.1:8790/tts.
- * SECURITY: the target host is validated to be loopback ONLY (127.0.0.1 /
- * localhost / ::1); anything else is rejected — no SSRF, no remote fetch.
- * Token guard: server.js already rejects every non-GET without X-Hub-Token
- * before this module is reached.
+ * SECURITY: each engine's target host is validated to be loopback ONLY
+ * (127.0.0.1 / localhost / ::1); anything else is rejected — no SSRF. Token
+ * guard: server.js rejects every non-GET without X-Hub-Token before this runs.
  */
 'use strict';
 const http = require('http');
@@ -23,20 +27,29 @@ const path = require('path');
 const { spawn } = require('child_process');
 const U = require('./util');
 
-const DEFAULT_CSM = 'http://127.0.0.1:8790/tts';
-const CSM_TIMEOUT_MS = 120000; // model inference is slow, esp. the first call
-
+const TTS_TIMEOUT_MS = 120000; // first CSM call is slow; Kokoro is quick but share the ceiling
 const PROJECT_DIR = path.resolve(__dirname, '..', '..');
-const VENV_PY = path.join(PROJECT_DIR, '.csm', 'venv', 'Scripts', 'python.exe');
-const SIDECAR = path.join(PROJECT_DIR, 'scripts', 'csm-server.py');
-const LOG_FILE = path.join(PROJECT_DIR, '.csm', 'server.log');
-let child = null; // sidecar spawned by this hub boot (it may also run standalone)
 
-// Parse + validate the CSM server URL. Returns a URL or null if it is not a
+// Per-engine config. `dir` is the gitignored venv/weights folder under the repo
+// root; `url` is overridable via env but always validated to loopback.
+const ENGINES = {
+  kokoro: { dir: '.kokoro', script: 'kokoro-server.py', port: 8791, urlEnv: 'HUB_KOKORO_URL' },
+  csm:    { dir: '.csm',    script: 'csm-server.py',    port: 8790, urlEnv: 'HUB_CSM_URL' },
+};
+const children = {}; // engine -> child spawned by this hub boot (may also run standalone)
+
+function engineKey(v) { return (v === 'kokoro' || v === 'csm') ? v : 'csm'; }
+function venvPy(engine) { return path.join(PROJECT_DIR, ENGINES[engine].dir, 'venv', 'Scripts', 'python.exe'); }
+function sidecarPath(engine) { return path.join(PROJECT_DIR, 'scripts', ENGINES[engine].script); }
+function logFile(engine) { return path.join(PROJECT_DIR, ENGINES[engine].dir, 'server.log'); }
+
+// Parse + validate an engine's server URL. Returns a URL or null if it is not a
 // plain-http loopback address (the only thing this proxy will ever talk to).
-function csmTarget() {
+function targetFor(engine) {
+  const e = ENGINES[engine];
+  const dflt = 'http://127.0.0.1:' + e.port + '/tts';
   let u;
-  try { u = new URL(process.env.HUB_CSM_URL || DEFAULT_CSM); } catch { return null; }
+  try { u = new URL(process.env[e.urlEnv] || dflt); } catch { return null; }
   if (u.protocol !== 'http:') return null;
   const host = u.hostname.replace(/^\[|\]$/g, '').toLowerCase(); // [::1] → ::1
   if (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') return null;
@@ -57,38 +70,46 @@ function health(target) {
   });
 }
 
-// Spawn scripts/csm-server.py inside the .csm venv. Fixed argv array (venv
-// python + repo script + validated loopback port) — no shell, no user input.
-function startSidecar(target) {
-  if (!fs.existsSync(VENV_PY)) return { error: '.csm venv missing — see docs/voice-csm.md for the one-time setup' };
-  if (!fs.existsSync(SIDECAR)) return { error: 'scripts/csm-server.py missing' };
-  if (child && child.exitCode === null) return { ok: true, note: 'already starting/running' };
+// Spawn an engine's sidecar inside its venv. Fixed argv array (venv python +
+// repo script + validated loopback port) — no shell, no user input.
+function startSidecar(engine, target) {
+  const py = venvPy(engine), script = sidecarPath(engine);
+  if (!fs.existsSync(py)) return { error: ENGINES[engine].dir + ' venv missing — see docs/voice-csm.md (Kokoro: docs/voice-kokoro.md)' };
+  if (!fs.existsSync(script)) return { error: 'scripts/' + ENGINES[engine].script + ' missing' };
+  const cur = children[engine];
+  if (cur && cur.exitCode === null) return { ok: true, note: 'already starting/running' };
   let log = 'ignore';
-  try { log = fs.openSync(LOG_FILE, 'a'); } catch {}
+  try { log = fs.openSync(logFile(engine), 'a'); } catch {}
   try {
-    child = spawn(VENV_PY, [SIDECAR, String(target.port || 8790)], {
+    const c = spawn(py, [script, String(target.port || ENGINES[engine].port)], {
       cwd: PROJECT_DIR, windowsHide: true, stdio: ['ignore', log, log],
     });
-    child.on('error', () => { child = null; });
-    child.on('close', () => { child = null; });
+    c.on('error', () => { children[engine] = null; });
+    c.on('close', () => { children[engine] = null; });
+    children[engine] = c;
+    return { ok: true, pid: c.pid, note: engine === 'kokoro' ? 'starting — first run downloads the model (~340 MB), then loads in a few s' : 'starting — model loads in ~15-30 s' };
   } catch (e) {
     return { error: 'spawn failed: ' + e.message };
   }
-  return { ok: true, pid: child.pid, note: 'starting — model loads in ~15-30 s' };
 }
 
 async function handle(req, res, url) {
   if (url.pathname === '/api/voice/status' && req.method === 'GET') {
-    const target = csmTarget();
-    const j = target ? await health(target) : { status: 'offline', error: 'bad HUB_CSM_URL' };
-    j.installed = fs.existsSync(VENV_PY);
-    j.spawnedByHub = !!(child && child.exitCode === null);
+    const engine = engineKey(url.searchParams.get('engine'));
+    const target = targetFor(engine);
+    const j = target ? await health(target) : { status: 'offline', error: 'bad ' + ENGINES[engine].urlEnv };
+    j.engine = engine;
+    j.installed = fs.existsSync(venvPy(engine));
+    j.spawnedByHub = !!(children[engine] && children[engine].exitCode === null);
     U.sendJson(res, j);
     return true;
   }
   if (url.pathname === '/api/voice/start' && req.method === 'POST') {
-    const target = csmTarget();
-    const r = target ? startSidecar(target) : { error: 'HUB_CSM_URL must be a loopback http URL' };
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 4 * 1024) || '{}'); } catch {}
+    const engine = engineKey(b.engine || url.searchParams.get('engine'));
+    const target = targetFor(engine);
+    const r = target ? startSidecar(engine, target) : { error: ENGINES[engine].urlEnv + ' must be a loopback http URL' };
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;
   }
@@ -100,10 +121,11 @@ async function handle(req, res, url) {
   if (!text) { U.sendJson(res, { error: 'text required' }, 400); return true; }
   let speaker = parseInt(b.speaker, 10);
   if (isNaN(speaker) || speaker < 0 || speaker > 9) speaker = 0;
+  const engine = engineKey(b.engine || url.searchParams.get('engine'));
 
-  const target = csmTarget();
+  const target = targetFor(engine);
   if (!target) {
-    U.sendJson(res, { error: 'HUB_CSM_URL must be a loopback http URL (127.0.0.1 / localhost / ::1)' }, 400);
+    U.sendJson(res, { error: ENGINES[engine].urlEnv + ' must be a loopback http URL (127.0.0.1 / localhost / ::1)' }, 400);
     return true;
   }
 
@@ -112,13 +134,13 @@ async function handle(req, res, url) {
     const fwd = http.request(target, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
-      timeout: CSM_TIMEOUT_MS,
+      timeout: TTS_TIMEOUT_MS,
     }, (up) => {
       if (up.statusCode !== 200) {
         let msg = '';
         up.on('data', d => { if (msg.length < 2000) msg += d; });
         up.on('end', () => {
-          U.sendJson(res, { error: `CSM server error ${up.statusCode}: ${msg.slice(0, 300)}` }, 502);
+          U.sendJson(res, { error: `${engine} server error ${up.statusCode}: ${msg.slice(0, 300)}` }, 502);
           resolve();
         });
         return;
@@ -132,12 +154,12 @@ async function handle(req, res, url) {
       up.on('end', resolve);
       up.on('error', () => { try { res.end(); } catch {} resolve(); });
     });
-    fwd.on('timeout', () => fwd.destroy(new Error('timed out after ' + CSM_TIMEOUT_MS / 1000 + 's')));
+    fwd.on('timeout', () => fwd.destroy(new Error('timed out after ' + TTS_TIMEOUT_MS / 1000 + 's')));
     fwd.on('error', (e) => {
       // headersSent = failure mid-stream; otherwise a clean JSON error the
       // client uses to fall back to browser TTS.
       if (!res.headersSent) {
-        U.sendJson(res, { error: `CSM server unreachable at ${target.href} (${e.message}) — start it from Config → Voice, or run scripts/csm-server.py` }, 502);
+        U.sendJson(res, { error: `${engine} server unreachable at ${target.href} (${e.message}) — start it from Config → Voice` }, 502);
       } else { try { res.end(); } catch {} }
       resolve();
     });
@@ -146,4 +168,4 @@ async function handle(req, res, url) {
   return true;
 }
 
-module.exports = { handle, csmTarget };
+module.exports = { handle, targetFor };

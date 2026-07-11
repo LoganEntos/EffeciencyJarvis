@@ -65,9 +65,8 @@ function runAll() {
   let started = 0;
   for (const t of list) {
     const m = t.runId ? runs.getRunMeta(t.runId) : null;
+    // run tasks that never ran, or that failed/cancelled (retry); leave done/active ones
     if (!t.runId || (m && settled(m.status) && m.status !== 'done')) {
-      // run tasks that never ran, or that failed/cancelled (retry); leave done ones
-      if (m && m.status === 'done') continue;
       const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'acceptEdits' });
       if (!r.error) { t.runId = r.id; t.startedAt = new Date().toISOString(); started++; }
     }

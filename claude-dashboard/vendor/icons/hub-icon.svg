@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Claude Code Hub">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1610"/>
+      <stop offset="1" stop-color="#0b0a08"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.40" r="0.62">
+      <stop offset="0" stop-color="#e8a33d" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#e8a33d" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- full-bleed background so the icon works as maskable + apple-touch-icon -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <!-- hairline frame, echoing the hub's instrument-panel grid -->
+  <rect x="40.5" y="40.5" width="431" height="431" rx="96" fill="none"
+        stroke="#e8a33d" stroke-opacity="0.22" stroke-width="2"/>
+  <!-- terminal prompt: chevron + underscore, amber on near-black -->
+  <path d="M170 196 L238 256 L170 316" fill="none" stroke="#e8a33d"
+        stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="270" y="298" width="118" height="30" rx="15" fill="#e8a33d"/>
+</svg>

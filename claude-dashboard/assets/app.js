@@ -322,6 +322,27 @@ function boot() {
     else document.documentElement.removeAttribute('data-theme');
     try { localStorage.setItem('hub.theme', light ? 'light' : 'dark'); } catch {}
   };
+  // Restart button (beside the theme toggle): tell the server to respawn, then
+  // poll the same port until the fresh process answers and hard-reload — the
+  // reload picks up the new per-boot X-Hub-Token the restarted server injects.
+  const rb = $('#restartTab');
+  if (rb) rb.onclick = async () => {
+    if (!confirm('Restart the hub server? The page will reconnect in a few seconds.')) return;
+    rb.disabled = true; const glyph = rb.textContent; rb.textContent = '…';
+    markServer(false); // flips the badge to "restarting/unreachable" immediately
+    try { await api('/api/restart', { method: 'POST', timeoutMs: 4000 }); } catch {}
+    let n = 0;
+    const poll = async () => {
+      n++;
+      try {
+        const r = await fetch('/api/overview', { cache: 'no-store' });
+        if (r.ok) { location.reload(); return; }
+      } catch {}
+      if (n < 40) setTimeout(poll, 500);
+      else { rb.disabled = false; rb.textContent = glyph; } // gave up — let the reconnect poller carry on
+    };
+    setTimeout(poll, 1500);
+  };
   let bootTab = 'run';
   try { const t = localStorage.getItem('hub.tab'); if (t && TABS.includes(t) && renderers[t]) bootTab = t; } catch {}
   goTab(bootTab);

@@ -36,13 +36,40 @@
     // seconds of silence before a spoken prompt is considered finished + sent
     get pause() { try { return parseFloat(localStorage.getItem('hub.voice.pause')) || 2.5; } catch { return 2.5; } },
     set pause(v) { try { localStorage.setItem('hub.voice.pause', String(v)); } catch {} },
-    // TTS engine: 'browser' (default) | 'csm' (local Sesame CSM-1B via /api/voice/tts)
-    get engine() { try { return localStorage.getItem('hub.voice.engine') === 'csm' ? 'csm' : 'browser'; } catch { return 'browser'; } },
-    set engine(v) { try { localStorage.setItem('hub.voice.engine', v === 'csm' ? 'csm' : 'browser'); } catch {} },
+    // TTS engine: 'browser' (default, instant) | 'kokoro' (local, fast neural)
+    // | 'csm' (local Sesame CSM-1B, most natural but slow). Neural engines both
+    // go through /api/voice/tts (the hub proxies to the right sidecar by ?engine).
+    get engine() { try { const v = localStorage.getItem('hub.voice.engine'); return (v === 'csm' || v === 'kokoro') ? v : 'browser'; } catch { return 'browser'; } },
+    set engine(v) { try { localStorage.setItem('hub.voice.engine', (v === 'csm' || v === 'kokoro') ? v : 'browser'); } catch {} },
+    get neural() { return this.engine === 'csm' || this.engine === 'kokoro'; },
     get csmSpeaker() { try { const n = parseInt(localStorage.getItem('hub.voice.csmspk'), 10); return isNaN(n) ? 0 : Math.max(0, Math.min(9, n)); } catch { return 0; } },
     set csmSpeaker(v) { try { localStorage.setItem('hub.voice.csmspk', String(v)); } catch {} },
+    // wake word — during a call, only speech that addresses me by name counts
+    get wake() { try { return (localStorage.getItem('hub.voice.wake') || 'Suzy').trim() || 'Suzy'; } catch { return 'Suzy'; } },
+    set wake(v) { try { localStorage.setItem('hub.voice.wake', String(v || '').trim()); } catch {} },
+    // wake-word gate on/off (default ON — user asked: don't interrupt unless named)
+    get wakeGate() { try { const v = localStorage.getItem('hub.voice.wakegate'); return v === null ? true : v === '1'; } catch { return true; } },
+    set wakeGate(v) { try { localStorage.setItem('hub.voice.wakegate', v ? '1' : '0'); } catch {} },
   };
   const silenceMs = () => Math.round(store.pause * 1000);
+
+  // Wake-word gate. In a hands-free call the mic re-opens between turns, so room
+  // noise or my own talk-back bleeding back through the speakers used to get
+  // transcribed and fired as a spurious turn — "you interrupted yourself" with
+  // nothing actually said. With the gate on, a re-listened utterance is only
+  // acted on if it addresses me by name (default "Suzy"); the name is then
+  // stripped from the prompt. Matches the name as a whole word, tolerant of the
+  // common misrecognitions of "Suzy". A custom wake word matches literally.
+  function wakeRe() {
+    const w = store.wake || 'Suzy';
+    const body = /^suzy$/i.test(w) ? '(?:suzy|susie|suzie|susy|soozy|sussy)'
+                                   : w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('\\b' + body + '\\b', 'i');
+  }
+  function stripWake(text) {
+    return String(text || '').replace(wakeRe(), ' ')
+      .replace(/\s+/g, ' ').replace(/^[\s,.:;!?—-]+/, '').trim();
+  }
 
   // V.call = hands-free loop active; V.silence = consecutive empty listens;
   // V.reTimer = pending re-open timer; V.press = long-press timer on the orb.
@@ -207,14 +234,24 @@
     rec.onend = () => {
       V.listening = false;
       clearTimeout(V.silTimer);
-      const send = V.finalText;
+      const heard = V.finalText;
       V.finalText = '';
-      // sendPrompt() self-guards on an already-running chat, so this is safe
+      let send = heard;
+      // Wake-word gate (call mode only): unless the utterance names me, treat it
+      // as noise — don't send, don't cut off my reply. Say "Suzy …" to talk.
+      if (heard && V.call && store.wakeGate) {
+        send = wakeRe().test(heard) ? stripWake(heard) : '';
+      }
+      // keep the composer in sync with what will actually be sent (noise → clear)
+      if (ta) ta.value = send ? ((pre ? pre + ' ' : '') + send) : pre;
+      // sendPrompt() reads #promptIn and self-guards on an already-running chat
       if (send && typeof sendPrompt === 'function') {
         V.silence = 0; setState('thinking'); sendPrompt();
       } else if (V.call) {
-        // heard nothing this turn — give one more chance, then hang up
-        if (++V.silence >= 2) endCall(true);
+        // nothing for me this turn (silence, or noise without the wake word).
+        // When gated, be slower to hang up — she's clearly around, just not
+        // addressing me; keep the line open longer before giving up.
+        if (++V.silence >= (store.wakeGate ? 6 : 2)) endCall(true);
         else reListenSoon(400);
       } else setState('idle');
     };
@@ -268,8 +305,9 @@
   function speak(text) {
     let clean = String(text || '').replace(/```[\s\S]*?```/g, ' (code block) ').replace(/[*_`#>]/g, '').trim();
     // CSM generates at ~0.4x realtime on this GPU, so its spoken cap is much
-    // tighter than the near-instant browser voice: long replies would take
-    // longer to synthesize than anyone waits. Full text is always on screen.
+    // tighter: long replies would take longer to synthesize than anyone waits.
+    // Kokoro is fast (near-realtime) so it gets the full browser-sized cap.
+    // Full text is always on screen regardless.
     const cap = store.engine === 'csm' ? 400 : 700;
     if (clean.length > cap) {
       // never cut mid-word: end the spoken part at the last sentence that fits
@@ -279,7 +317,7 @@
       clean = (end > Math.min(250, cap * 0.5) ? head.slice(0, end + 1) : head) + ' The rest is on screen.';
     }
     if (!clean) return false;
-    return store.engine === 'csm' ? speakCSM(clean) : speakBrowser(clean);
+    return store.neural ? speakCSM(clean) : speakBrowser(clean);
   }
   function speakBrowser(clean) {
     if (!SS || !clean) return false;
@@ -297,11 +335,12 @@
 
   // ---- Sesame CSM-1B — always via the hub's same-origin proxy (never the
   // python server directly: CORS stays closed, loopback enforced server-side).
-  function csmFetch(text) {
-    return fetch('/api/voice/tts', {
+  function csmFetch(text, engine) {
+    const eng = engine || (store.neural ? store.engine : 'kokoro');
+    return fetch('/api/voice/tts?engine=' + eng, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Hub-Token': (typeof HUB_TOKEN !== 'undefined' ? HUB_TOKEN : '') },
-      body: JSON.stringify({ text, speaker: store.csmSpeaker }),
+      body: JSON.stringify({ text, speaker: store.csmSpeaker, engine: eng }),
     }).then(async r => {
       if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch {} throw new Error(m || ('HTTP ' + r.status)); }
       return r.blob();

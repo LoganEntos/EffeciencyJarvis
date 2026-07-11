@@ -20,8 +20,20 @@ const MODEL_PERSONA = {
   opus: { persona: 'Maestro', icon: '🎼', blurb: 'heavyweight reasoning' },
   sonnet: { persona: 'Poet', icon: '✒️', blurb: 'balanced builder' },
   haiku: { persona: 'Dart', icon: '🎯', blurb: 'fast + cheap' },
+  fable: { persona: 'Bard', icon: '📖', blurb: 'nimble generalist' },
   '': { persona: 'Claude', icon: '✴️', blurb: 'CLI default' },
 };
+// Resolve a persona by tier SUBSTRING, so pinned versions the Run tab exposes
+// (claude-opus-4-8, claude-sonnet-5, claude-fable-5, …) map correctly instead
+// of missing the exact-key lookup and falling back to the generic "Claude".
+function personaFor(model) {
+  const m = String(model || '').toLowerCase();
+  if (m.includes('opus')) return MODEL_PERSONA.opus;
+  if (m.includes('sonnet')) return MODEL_PERSONA.sonnet;
+  if (m.includes('haiku')) return MODEL_PERSONA.haiku;
+  if (m.includes('fable')) return MODEL_PERSONA.fable;
+  return MODEL_PERSONA[''];
+}
 
 // tool name → crew persona (grouped: one node per crew, not per call)
 const TOOL_PERSONA = [
@@ -102,7 +114,7 @@ function buildGraph(id) {
   // "active" only means anything while the run is live
   if (!running) { for (const n of tools.values()) n.active = false; for (const n of agents.values()) n.active = false; }
 
-  const mp = MODEL_PERSONA[meta.model] || MODEL_PERSONA[''];
+  const mp = personaFor(meta.model);
   const root = {
     id: 'run', kind: 'root', persona: mp.persona, icon: mp.icon,
     label: `${mp.persona} (${meta.model || 'default'}) — ${mp.blurb}`,

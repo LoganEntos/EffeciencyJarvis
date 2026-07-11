@@ -2,9 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="hub-token" content="__HUB_TOKEN__">
 <title>Claude Code Hub</title>
+<!-- Phone install (PWA): standalone home-screen app over the user's Tailscale
+     HTTPS URL. No service worker (it must never cache the per-boot token page). -->
+<meta name="theme-color" content="#0e0d0b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Claude Hub">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/vendor/icons/hub-icon.svg">
+<link rel="icon" type="image/svg+xml" href="/vendor/icons/hub-icon.svg">
 <link rel="stylesheet" href="/vendor/css/fonts.css">
 <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -16,6 +26,7 @@
   <span class="badge mono" id="projBadge" title="project directory">loading…</span>
   <span class="spacer"></span>
   <button class="iconbtn" id="themeTab" title="Toggle dark / light theme">◐</button>
+  <button class="iconbtn" id="restartTab" title="Restart the hub server">⏻</button>
   <button class="iconbtn" id="refreshTab" title="Refresh current tab (R)">⟳</button>
 </header>
 <div class="wrap">

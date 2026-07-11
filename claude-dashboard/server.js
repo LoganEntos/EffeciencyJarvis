@@ -40,8 +40,20 @@ const VENDOR_MIME = {
 function badOrigin(req) {
   const o = req.headers.origin;
   if (!o) return false; // same-origin fetches and EventSource send no Origin (or it's checked below)
-  return !(o.startsWith('http://127.0.0.1:') || o.startsWith('http://localhost:')
-    || o === 'http://127.0.0.1' || o === 'http://localhost');
+  // Localhost (direct) OR the user's own Tailscale HTTPS URL (phone access via
+  // `tailscale serve` — it still proxies to 127.0.0.1, so the localhost BIND
+  // invariant holds; only the tailnet can reach it, and the per-boot X-Hub-Token
+  // remains the real CSRF guard on every mutating request).
+  if (o === 'http://127.0.0.1' || o === 'http://localhost'
+    || o.startsWith('http://127.0.0.1:') || o.startsWith('http://localhost:')) return false;
+  let u; try { u = new URL(o); } catch { return true; }
+  // The user's own tailnet, reached any way the phone connects: MagicDNS
+  // (*.ts.net) over http OR https, or a raw Tailscale CGNAT IP (100.64.0.0/10).
+  // `tailscale serve` still proxies to the 127.0.0.1 bind, and the per-boot
+  // X-Hub-Token stays the real CSRF guard on every mutating request.
+  if (/(^|\.)ts\.net$/.test(u.hostname)) return false;
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}$/.test(u.hostname)) return false;
+  return true;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -87,9 +99,37 @@ const server = http.createServer(async (req, res) => {
       return fs.createReadStream(full).pipe(res);
     }
 
+    // PWA manifest — served from root so start_url/scope stay "/" (installs the
+    // whole hub, not a subpath). GET-only, no secrets, safe before the token guard.
+    if (p === '/manifest.webmanifest') {
+      const manifest = {
+        name: 'Claude Code Hub', short_name: 'Claude Hub',
+        description: 'Local front end for working with Claude — runs, tasks, files, memory.',
+        start_url: '/', scope: '/', display: 'standalone', orientation: 'any',
+        background_color: '#0e0d0b', theme_color: '#0e0d0b',
+        icons: [{ src: '/vendor/icons/hub-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
+      };
+      res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(manifest));
+    }
+
     // every mutating endpoint requires the boot token
     if (req.method !== 'GET' && req.headers['x-hub-token'] !== TOKEN) {
       return U.sendJson(res, { error: 'missing or bad X-Hub-Token' }, 403);
+    }
+
+    // Restart the hub from the browser (button beside the theme toggle): answer
+    // the client, spawn a fully-detached replacement on the same port, then exit
+    // so the child can bind it (the child's listen retries through the handover).
+    if (p === '/api/restart' && req.method === 'POST') {
+      U.sendJson(res, { ok: true });
+      console.log('\n  Restart requested from the browser — respawning…\n');
+      const child = require('child_process').spawn(
+        process.execPath, [__filename, String(PORT)],
+        { cwd: __dirname, detached: true, stdio: 'ignore' });
+      child.unref();
+      setTimeout(() => process.exit(0), 400); // let the child start before we free the port
+      return;
     }
 
     if (await runs.handle(req, res, url)) return;
@@ -105,6 +145,21 @@ const server = http.createServer(async (req, res) => {
     res.end('not found');
   } catch (e) {
     try { U.sendJson(res, { error: e.message }, 500); } catch {}
+  }
+});
+
+// Bind with retry: a browser-triggered restart spawns the replacement while the
+// old process is still holding the port for a moment. Retry EADDRINUSE for ~10s
+// so the handover always succeeds instead of the new process dying on boot.
+let bindTries = 0;
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE' && bindTries < 40) {
+    bindTries++;
+    if (bindTries === 1) console.log(`  Port ${PORT} busy (restart handover) — retrying…`);
+    setTimeout(() => server.listen(PORT, HOST), 250);
+  } else {
+    console.error(`\n  Cannot bind ${HOST}:${PORT} — ${e.message}\n`);
+    process.exit(1);
   }
 });
 

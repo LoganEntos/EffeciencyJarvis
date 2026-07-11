@@ -26,6 +26,12 @@ in this repo. Never invent or reference Power BI/TMDL/semantic-model work here.
   id/file params; no shell-interpreted spawns (argv arrays only).
 - ALWAYS read a file before editing it. NEVER commit secrets.
 - Commit at each working, browser-verified stage. No Co-Authored-By trailers.
+- **Never report findings as an HTML webpage/artifact.** Reports, audits,
+  improvement lists, and status go in the chat reply as concise plain text, or
+  (when they need to persist) as a plain Markdown doc in `docs/`. Do NOT build
+  styled HTML pages to present outputs, and do NOT spawn subagents whose
+  deliverable is a web page — it wastes tokens/time. The dashboard's own UI is
+  exempt (that IS the product). See `docs/improvement-backlog.md`.
 
 ## Architecture (see claude-dashboard/README.md for detail)
 

@@ -56,6 +56,8 @@ Check "GET /api/agentgraph"    "$base/api/agentgraph"
 Check "GET /api/hermes"        "$base/api/hermes"
 Check "GET /vendor/css/fonts.css" "$base/vendor/css/fonts.css"
 Check "GET vendor traversal blocked" "$base/vendor/..%2Fserver.js" 404
+Check "GET /manifest.webmanifest"  "$base/manifest.webmanifest"
+Check "GET /vendor/icons/hub-icon.svg" "$base/vendor/icons/hub-icon.svg"
 Check "GET /api/memory"        "$base/api/memory"
 Check "GET /api/memory/search" "$base/api/memory/search?q=test"
 Check "GET /api/voice/tts (404)"  "$base/api/voice/tts" 404

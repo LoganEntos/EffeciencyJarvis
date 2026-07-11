@@ -1,0 +1,16 @@
+# Kokoro-82M fast TTS sidecar deps (scripts/kokoro-server.py) — install into
+# its own venv (kept separate from .csm so the two engines never fight over deps):
+#   %LOCALAPPDATA%\Programs\Python\Python311\python.exe -m venv .kokoro\venv
+#   .kokoro\venv\Scripts\python.exe -m pip install -r scripts\kokoro-requirements.txt
+#
+# No PyTorch / CUDA toolkit needed — Kokoro runs on onnxruntime. For the GPU
+# path use onnxruntime-gpu (below); on a machine with no CUDA, swap it for plain
+# `onnxruntime` and it still runs faster-than-realtime on CPU.
+#
+# The ONNX model + voice pack (~310 MB + ~26 MB) are NOT pip deps — the sidecar
+# auto-downloads them into .kokoro/ from the kokoro-onnx GitHub release on first
+# run (or set KOKORO_MODEL / KOKORO_VOICES to local files).
+kokoro-onnx
+onnxruntime-gpu
+soundfile
+numpy
