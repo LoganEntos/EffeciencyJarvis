@@ -120,8 +120,13 @@ main via provider auto, aux auto-cheap, subagents pinned to gemini-3-flash via
 nous), authenticated (user ran `hermes auth add nous`, OAuth in auth.json),
 and verified end-to-end (`hermes -z` one-shot answered "OK" through Nous).
 H1 shipped (`/api/hermes` + Agents-tab card shows **ready**; smoke script 33
-checks). Next up: H2 hermes engine in the Run composer → H3 hermes runs in the
-agent graph → H4 gateway toggle, N9 Jarvis voice module (user-committed), N2
+checks). Agents tab roster = 22: 8 live hermes roles + 14 curated local
+specialists (every one with explicit model frontmatter; tier chips on rows;
+never restore bulk libraries). Codebase graph defaults to the module-level
+view (warm palette, weighted links; symbols behind a chip). Voice plan:
+`docs/voice-plan.md` (Track A hub zero-dep loop = N9, Track B hermes gateway
+voice notes = H4). Next up: N9 Track A voice module → H2 hermes engine in the
+Run composer → H3 hermes in the agent graph → H4 gateway toggle + Track B, N2
 mobile polish, N4 routing feedback, N5 theme toggle, N6 xlsx preview, N7
 SharePoint Breakdown (queued, don't build until asked), N8 iPhone
 incorporation (queued), Q1 Playwright (needs a nod).
