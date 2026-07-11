@@ -1,26 +1,43 @@
-# Staged hermes-agent config — copy into ~/.hermes/config.yaml AFTER installing
-# hermes (see docs/hermes-adoption.md). The whole point of adopting hermes is
-# MODEL TIERING: the main brain runs on a big model, but cheap mechanical work
-# (compression, vision, extraction) runs on haiku-class models so we never pay
-# frontier prices to shuffle JSON.
+# Hermes config for the hub's agent stack — LIVE copy at ~/.hermes/config.yaml
+# (keep both in sync; ~/.hermes/config.yaml is what hermes actually reads).
+# Schema follows ~/.hermes/hermes-agent/cli-config.yaml.example (v0.18.x).
 #
-# Secrets do NOT go here — put ANTHROPIC_API_KEY (or OPENROUTER_API_KEY) in
-# ~/.hermes/.env. Run `hermes model` any time to switch interactively.
+# MODEL TIERING (why we switched to hermes):
+# - auxiliary side-tasks (vision, web extraction, compression summaries,
+#   session search) already default to cheap Gemini-Flash-class models via
+#   provider "auto" — no config needed, never a frontier model for JSON work.
+# - delegation.model below pins SUBAGENTS to a cheap model too.
+# - the main loop model is deliberately mid-tier; switch any time with
+#   `hermes model`.
+#
+# CREDENTIALS (user step, one of):
+#   hermes auth add nous          # Nous Portal OAuth — no key pasting
+#   ~/.hermes/.env with ANTHROPIC_API_KEY= or OPENROUTER_API_KEY=
 
 model:
-  default: "anthropic/claude-sonnet-5"   # main reasoning loop — strong but not max-price
-  provider: "anthropic"
-  context_length: 200000
+  default: "anthropic/claude-sonnet-5"   # main reasoning loop — strong, not max-price
+  provider: "auto"                        # auto-detect from whichever credential exists
 
-auxiliary:
-  compression:                            # context/session summarization — cheap tier
-    provider: "anthropic"
-    model: "anthropic/claude-haiku-4-5"
-    timeout: 120
-  vision:                                 # image description — cheap tier
-    provider: "anthropic"
-    model: "anthropic/claude-haiku-4-5"
+agent:
+  max_turns: 60
+  reasoning_effort: "medium"
 
-providers:
-  anthropic:
-    request_timeout_seconds: 1800
+# Subagents (delegate_task) on a cheap model — the "don't send a JSON with a
+# frontier model" rule. Uncomment the pair matching your credential:
+delegation:
+  max_iterations: 50
+  # With OPENROUTER_API_KEY:
+  # model: "google/gemini-3-flash-preview"
+  # provider: "openrouter"
+  # With Nous Portal OAuth (hermes auth add nous):
+  # model: "gemini-3-flash"
+  # provider: "nous"
+
+# Compression already uses a cheap aux model by default (provider auto).
+compression:
+  enabled: true
+  threshold: 0.50
+
+display:
+  compact: true
+  tool_progress: all

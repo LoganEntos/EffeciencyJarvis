@@ -190,10 +190,33 @@ function detail(type, name) {
   return hit ? U.safeRead(hit) : null;
 }
 
+// ---------- hermes stack (the agent library's replacement, 2026-07-10) ----------
+const HERMES_HOME = process.env.HERMES_HOME
+  || path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'hermes');
+const HERMES_INSTALL = path.join(os.homedir(), '.hermes');
+const HERMES_EXE = path.join(HERMES_INSTALL, 'venvs', 'hermes', 'Scripts', 'hermes.exe');
+
+function hermesInfo() {
+  const installed = U.safeRead(path.join(HERMES_INSTALL, 'hermes-agent', 'pyproject.toml')) !== null
+    && fs.existsSync(HERMES_EXE);
+  if (!installed) return { installed: false };
+  const py = U.safeRead(path.join(HERMES_INSTALL, 'hermes-agent', 'pyproject.toml')) || '';
+  const ver = (py.match(/^version\s*=\s*"([^"]+)"/m) || [])[1] || '';
+  const cfg = U.safeRead(path.join(HERMES_HOME, 'config.yaml')) || '';
+  const model = (cfg.match(/^\s*default:\s*"([^"]+)"/m) || [])[1] || '(auto)';
+  const env = U.safeRead(path.join(HERMES_HOME, '.env')) || '';
+  const hasKey = /^(ANTHROPIC_API_KEY|OPENROUTER_API_KEY|NOUS_API_KEY|OPENAI_API_KEY)\s*=\s*\S/m.test(env);
+  // OAuth/API credentials persisted by `hermes auth` live in HERMES_HOME/auth.json
+  const auth = U.safeJson(path.join(HERMES_HOME, 'auth.json'));
+  const hasOauth = !!(auth && Object.keys(auth).length);
+  return { installed: true, version: ver, model, credentials: hasKey || hasOauth, exe: HERMES_EXE };
+}
+
 // ---------- route handling: returns true if the request was handled ----------
 async function handle(req, res, url) {
   const p = url.pathname;
   if (p === '/api/overview') { U.sendJson(res, overview()); return true; }
+  if (p === '/api/hermes') { U.sendJson(res, hermesInfo()); return true; }
   if (p === '/api/agents') { U.sendJson(res, agentList()); return true; }
   if (p === '/api/skills') { U.sendJson(res, skillList()); return true; }
   if (p === '/api/commands') { U.sendJson(res, commandList()); return true; }

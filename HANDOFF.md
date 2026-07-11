@@ -72,11 +72,14 @@ memories into the prompt; rule-based failure-pattern distillation included.
   native one (run engine + in-run Agent-tool subagents). Swarm tab, /api/swarm/*,
   and the claude-flow MCP entry are gone. Multi-agent work is visualized in the
   Graph tab's Agents view instead.
-- **hermes → ADOPTED as the second agentic stack** (user, 2026-07-10 eve; this
-  supersedes "parked"). The 91 claude-flow agents were deleted — they all ran on
-  the session default model (Fable 5); hermes brings per-task model tiering
-  (haiku-class for mechanical work). Plan: `docs/hermes-adoption.md`; install +
-  API key are 🙋 user actions; then execute H1–H4 in the roadmap.
+- **hermes → ADOPTED and INSTALLED as the second agentic stack** (user,
+  2026-07-10 eve; supersedes "parked"). The 91 claude-flow agents were deleted —
+  they all ran on the session default model (Fable 5); hermes brings per-task
+  model tiering. v0.18.2 installed via git+uv (`~/.hermes/`), config at
+  `%LOCALAPPDATA%\hermes\config.yaml` (Windows HERMES_HOME — not ~/.hermes).
+  H1 shipped (`/api/hermes` + Agents-tab card). 🙋 remaining: credentials
+  (`hermes auth add nous` or API key), then H2–H4. Jarvis voice module (N9)
+  is user-committed work, right after H2. See `docs/hermes-adoption.md`.
 - **Assets library is a first-class Library tab** (user, 2026-07-10): vendor/
   fonts+icons+css, locally saved, advertised to every run; prefer /vendor/ over
   CDNs in all generated UI.
@@ -110,9 +113,10 @@ N3.5 recall (`d60da34`), Assets library (`8feb670`), ruflo retired + live agent
 graph (`3bc872f`), ui-ux-pro-max skill adoption (`c057624`), agent purge +
 graph fixes (`2cb18f8`). Working tree clean, smoke script green (32 checks).
 Overview reads: 0 agents (library purged — hermes replaces it) · 41 skills ·
-166 commands · MCP scrapling only · Engram memories counted. ISSUE-5 is
-resolved-by-adoption: hermes IS the second stack now (`docs/hermes-adoption.md`),
-blocked only on the 🙋 install + API key. Next up: H1–H4 hermes integration
-(once installed), N2 mobile polish, N4 routing feedback, N5 theme toggle,
-N6 xlsx preview, N7 SharePoint Breakdown (queued, don't build until asked),
-N8 iPhone incorporation (queued), Q1 Playwright (needs a nod).
+166 commands · MCP scrapling only · Engram memories counted. Hermes v0.18.2 is
+INSTALLED + configured (sonnet main, cheap aux; `docs/hermes-adoption.md`) and
+H1 shipped (`/api/hermes` + Agents-tab card, smoke script now 33 checks);
+blocked only on 🙋 credentials. Next up: H2–H4 hermes integration, N9 Jarvis
+voice module (user-committed), N2 mobile polish, N4 routing feedback, N5 theme
+toggle, N6 xlsx preview, N7 SharePoint Breakdown (queued, don't build until
+asked), N8 iPhone incorporation (queued), Q1 Playwright (needs a nod).

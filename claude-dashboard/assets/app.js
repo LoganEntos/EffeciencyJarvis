@@ -150,7 +150,22 @@ renderers.overview = async function () {
   startFeed();
 };
 
-renderers.agents = function () { return listView('#agents', 'Agents', '/api/agents', 'agents'); };
+renderers.agents = async function () {
+  let h = { installed: false };
+  try { h = await api('/api/hermes'); } catch {}
+  const card = h.installed ? `
+    <div class="row" style="margin-bottom:14px">
+      <div class="flex" style="justify-content:space-between">
+        <span class="name">⚕ Hermes Agent <span class="muted" style="font-weight:400;font-size:11.5px">v${esc(h.version || '?')} — the hub's agentic stack (claude-flow library retired)</span></span>
+        <span>${h.credentials ? '<span class="pill ok">ready</span>' : '<span class="pill warn">needs credentials</span>'}</span>
+      </div>
+      <div class="pex" style="white-space:normal;margin-top:6px">
+        main model <span class="mono">${esc(h.model || '(auto)')}</span> · aux tasks auto-route to cheap models · subagents tierable via delegation config${h.credentials ? '' : ' · run <span class="mono">hermes auth add nous</span> or add an API key to finish setup'}
+      </div>
+    </div>` : `
+    <div class="note" style="margin-bottom:14px">Hermes stack not detected — see <span class="mono">docs/hermes-adoption.md</span>.</div>`;
+  return listView('#agents', 'Agents', '/api/agents', 'agents', card);
+};
 renderers.skills = function () { return listView('#skills', 'Skills', '/api/skills', 'skills'); };
 renderers.commands = function () { return listView('#commands', 'Commands', '/api/commands', 'commands'); };
 
@@ -185,10 +200,11 @@ renderers.sessions = async function () {
     `Read the tail (last ~300 lines) of the Claude Code session transcript at ${dir}\\${b.dataset.id}.jsonl — it is JSONL, one event per line. Summarize for a project manager: what was worked on, key decisions, errors or failures hit, and open items. Under 250 words, bullet points.`));
 };
 
-async function listView(sel, title, endpoint, type) {
+async function listView(sel, title, endpoint, type, extraHtml = '') {
   const data = await api(endpoint);
   const el = $(sel);
   el.innerHTML = `<h2>${title} <span class="muted" style="font-weight:400">(${data.length})</span></h2>
+    ${extraHtml}
     <input class="search" placeholder="Filter ${title.toLowerCase()}… (click a row to view its definition)">
     <div class="list"></div>`;
   const listEl = el.querySelector('.list');

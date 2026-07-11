@@ -47,13 +47,24 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 *(N1, N3, N3.5 shipped 2026-07-10 → see S16–S18 above.)*
 
-### H1–H4. Hermes integration (top priority once the user installs it)
+### H1–H4. Hermes integration (H1 ✅ shipped; H2–H4 next once credentials exist)
 User decision 2026-07-10 eve: hermes-agent IS the second agentic stack (model
 tiering: cheap models for mechanical work). Full plan in
-`docs/hermes-adoption.md`. Blocked on 🙋 install + API key below; then:
-H1 hub presence (Overview/Agents tab reads hermes config) → H2 optional
-hermes engine in the Run composer → H3 hermes runs in the agent graph →
-H4 messaging gateway toggle (resolves ISSUE-5).
+`docs/hermes-adoption.md`. **INSTALLED 2026-07-10 late eve** (v0.18.2, manual
+git+uv path after the remote-script installer was permission-blocked): venv at
+`~/.hermes/venvs/hermes`, clone at `~/.hermes/hermes-agent`, config at
+`%LOCALAPPDATA%\hermes\config.yaml` (NOT ~/.hermes — Windows HERMES_HOME),
+mirrored in `scripts/hermes-config.yaml`. `hermes` is on the user PATH (new
+shells). H1 ✅: `/api/hermes` + Hermes stack card on the Agents tab
+(version/model/credentials pill), smoke-tested. Remaining, in order:
+🙋 credentials → H2 hermes engine option in the Run composer → H3 hermes runs
+in the agent graph → H4 messaging gateway toggle (the ISSUE-5 mobile bridge).
+
+### N9 → COMMITTED (user, 2026-07-10 late eve): Jarvis voice module
+User: "include jarvis voice module in the plan" — N9 below is no longer just
+researched, it's committed work. Build right after H2 (or immediately if
+credentials stall): mic button → Web Speech API → auto-routed run; talk-back
+via speechSynthesis; amber orb state machine in the header. Zero-dep.
 
 ### N7. Library: SharePoint Breakdown (user request 2026-07-10 — QUEUED, do not build yet)
 New Library item: a full breakdown of every file directory with an
@@ -142,7 +153,12 @@ Claude Code; never put it in `.mcp.json`.
 
 ## 🙋 Pending USER actions (agent will not do these — system/network/installs)
 
-- **Hermes install (unblocks H1–H4):** `iex (irm https://hermes-agent.nousresearch.com/install.ps1)` then put `ANTHROPIC_API_KEY=` (or `OPENROUTER_API_KEY=`) in `~/.hermes/.env` and copy `scripts/hermes-config.yaml` → `~/.hermes/config.yaml`. The agent's own installer run was permission-blocked (remote-code review); no key currently exists on this machine.
+- **Hermes credentials (unblocks H2–H4; install itself is DONE):** either
+  `hermes auth add nous` (Nous Portal OAuth — no key pasting, opens browser) or
+  put `ANTHROPIC_API_KEY=` / `OPENROUTER_API_KEY=` in `%LOCALAPPDATA%\hermes\.env`.
+  Then optionally uncomment the matching `delegation:` pair in
+  `%LOCALAPPDATA%\hermes\config.yaml` so subagents run on a cheap model.
+  The Agents tab's Hermes card flips from "needs credentials" to "ready".
 - **Autostart:** `cd claude-hub; powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1` — hub starts at logon so the bookmark always works.
 - **Mobile access:** install Tailscale on PC + phone, then `tailscale serve --bg 5757`; bookmark the private HTTPS URL on the phone. (Agent never touches VPN/network.)
 - **Obsidian (for Q-Obsidian below):** confirm you use/want Obsidian and give a vault path.

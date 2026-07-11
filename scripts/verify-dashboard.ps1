@@ -51,6 +51,7 @@ Check "GET /api/tasks"         "$base/api/tasks"
 Check "GET /api/schedules"     "$base/api/schedules"
 Check "GET /api/assets"        "$base/api/assets"
 Check "GET /api/agentgraph"    "$base/api/agentgraph"
+Check "GET /api/hermes"        "$base/api/hermes"
 Check "GET /vendor/css/fonts.css" "$base/vendor/css/fonts.css"
 Check "GET vendor traversal blocked" "$base/vendor/..%2Fserver.js" 404
 Check "GET /api/memory"        "$base/api/memory"
