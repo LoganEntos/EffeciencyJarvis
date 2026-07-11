@@ -18,7 +18,7 @@ const GRAPH_JSON = path.join(DASH_DIR, 'graphify-out', 'graph.json');
 
 // ---------- data collectors ----------
 function overview() {
-  const agents = U.collectMd(path.join(DOT_CLAUDE, 'agents')).length;
+  const agents = agentList().length;
   const skills = U.listDir(path.join(DOT_CLAUDE, 'skills')).filter(e => e.isDirectory()).length;
   const commands = U.collectMd(path.join(DOT_CLAUDE, 'commands')).length;
   const mcp = U.safeJson(path.join(PROJECT_DIR, '.mcp.json')) || {};
@@ -39,10 +39,32 @@ function overview() {
 }
 
 function agentList() {
-  return U.collectMd(path.join(DOT_CLAUDE, 'agents')).map(f => {
+  const local = U.collectMd(path.join(DOT_CLAUDE, 'agents')).map(f => {
     const fm = U.frontmatter(f);
     return { file: path.basename(f), name: fm.name || path.basename(f, '.md'), description: fm.description || '' };
   }).sort((a, b) => a.name.localeCompare(b.name));
+  return hermesAgents().concat(local);
+}
+
+// The hermes stack's working roles ARE the agent roster now (persona names
+// match the Graph tab's crew language). Models read live from hermes config.
+function hermesAgents() {
+  const h = hermesInfo();
+  if (!h.installed) return [];
+  const cfg = U.safeRead(path.join(HERMES_HOME, 'config.yaml')) || '';
+  const dlg = cfg.match(/^delegation:[\s\S]*?^\s*model:\s*"([^"]+)"[\s\S]*?^\s*provider:\s*"([^"]+)"/m);
+  const dlgModel = dlg ? `${dlg[1]} via ${dlg[2]}` : 'inherits main model';
+  const aux = 'auto — cheapest capable model (Gemini-Flash class)';
+  return [
+    { name: 'hermes: Maestro (main loop)', description: `The reasoning brain — ${h.model}. Tool-calling agent with terminal/file/web/browser/skills; switch any time with \`hermes model\`.` },
+    { name: 'hermes: Crew (subagents)', description: `delegate_task children with isolated context — ${dlgModel}. Mechanical/parallel work never burns frontier tokens.` },
+    { name: 'hermes: Scribe (compression)', description: `Long-conversation summarizer — ${aux}. Compacts history when context passes 50%.` },
+    { name: 'hermes: Falcon (web extract)', description: `Web page scraping + summarization — ${aux}.` },
+    { name: 'hermes: Scout (vision)', description: `Image + browser-screenshot analysis — ${aux}.` },
+    { name: 'hermes: Archivist (session search)', description: `Recalls + summarizes past sessions (FTS5) — ${aux}.` },
+    { name: 'hermes: Envoy (gateway)', description: 'Messaging bridge (Telegram/Discord/Slack/WhatsApp/Signal) — off until H4 wires the hub toggle.' },
+    { name: 'hermes: Clockwork (cron)', description: 'Natural-language scheduled automations (`hermes cron`) — complements the hub\'s own scheduler.' },
+  ];
 }
 
 function skillList() {
@@ -181,6 +203,15 @@ function assets() {
 
 // Serve the raw markdown of one agent/skill/command definition (path-traversal safe).
 function detail(type, name) {
+  if (type === 'agents' && /^hermes:/.test(name || '')) {
+    const a = hermesAgents().find(x => x.name === name);
+    if (!a) return null;
+    const h = hermesInfo();
+    return `# ${a.name}\n\n${a.description}\n\nStack: nousresearch/hermes-agent v${h.version} (MIT)\n`
+      + `Config: %LOCALAPPDATA%\\hermes\\config.yaml (mirror: scripts/hermes-config.yaml)\n`
+      + `Credentials: ${h.credentials ? 'ready (auth.json / .env)' : 'MISSING — hermes auth add nous'}\n`
+      + `Plan: docs/hermes-adoption.md (H2-H4 next)\n`;
+  }
   const dirs = { agents: path.join(DOT_CLAUDE, 'agents'), commands: path.join(DOT_CLAUDE, 'commands'), skills: path.join(DOT_CLAUDE, 'skills') };
   const base = dirs[type];
   if (!base || !name || name.includes('..') || name.includes('/') || name.includes('\\')) return null;
