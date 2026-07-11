@@ -62,10 +62,16 @@ Override with the `CSM_MODEL` env var.
    now speak with the CSM voice. **Speaker** 0-9 picks different voices.
 4. ▶ **Test CSM voice** does one real round-trip through the whole chain.
 
-Performance on the RTX 3060: model load ~14 s; generation ≈ 1.2× audio
-duration (a 5 s reply takes ~6-7 s of GPU before playback starts). The
-sidecar generates one utterance at a time (GPU lock) and holds ~4 GB VRAM
-while running — stop it (kill the python process) to reclaim.
+Performance on the RTX 3060 (bfloat16, measured 2026-07-11): model load
+~14 s + a warmup generation; synthesis runs at ≈ 0.4× realtime (~4.5 s fixed
+per request + ~0.07 s/char). The client hides most of that by chunking:
+first sentence ships alone (**first word ≈ 6 s** after the reply lands),
+later chunks synthesize while earlier ones play. Spoken text is capped at
+400 chars ("the rest is on screen"); max generation scales with text length
+(the shipped config's 10 s cap caused mid-sentence cutoffs — fixed in
+`scripts/csm-server.py`). The sidecar generates one utterance at a time
+(GPU lock) and holds ~4 GB VRAM while running — stop it (kill the python
+process) to reclaim.
 
 ## Rebuild from scratch
 
