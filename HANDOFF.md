@@ -114,9 +114,14 @@ graph (`3bc872f`), ui-ux-pro-max skill adoption (`c057624`), agent purge +
 graph fixes (`2cb18f8`). Working tree clean, smoke script green (32 checks).
 Overview reads: 0 agents (library purged — hermes replaces it) · 41 skills ·
 166 commands · MCP scrapling only · Engram memories counted. Hermes v0.18.2 is
-INSTALLED + configured (sonnet main, cheap aux; `docs/hermes-adoption.md`) and
-H1 shipped (`/api/hermes` + Agents-tab card, smoke script now 33 checks);
-blocked only on 🙋 credentials. Next up: H2–H4 hermes integration, N9 Jarvis
-voice module (user-committed), N2 mobile polish, N4 routing feedback, N5 theme
-toggle, N6 xlsx preview, N7 SharePoint Breakdown (queued, don't build until
-asked), N8 iPhone incorporation (queued), Q1 Playwright (needs a nod).
+**FULLY OPERATIONAL**: installed (venv rebuilt on winget CPython 3.11.9 after
+the uv-trampoline launcher broke in the user's console), configured (sonnet
+main via provider auto, aux auto-cheap, subagents pinned to gemini-3-flash via
+nous), authenticated (user ran `hermes auth add nous`, OAuth in auth.json),
+and verified end-to-end (`hermes -z` one-shot answered "OK" through Nous).
+H1 shipped (`/api/hermes` + Agents-tab card shows **ready**; smoke script 33
+checks). Next up: H2 hermes engine in the Run composer → H3 hermes runs in the
+agent graph → H4 gateway toggle, N9 Jarvis voice module (user-committed), N2
+mobile polish, N4 routing feedback, N5 theme toggle, N6 xlsx preview, N7
+SharePoint Breakdown (queued, don't build until asked), N8 iPhone
+incorporation (queued), Q1 Playwright (needs a nod).

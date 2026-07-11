@@ -153,12 +153,11 @@ Claude Code; never put it in `.mcp.json`.
 
 ## 🙋 Pending USER actions (agent will not do these — system/network/installs)
 
-- **Hermes credentials (unblocks H2–H4; install itself is DONE):** either
-  `hermes auth add nous` (Nous Portal OAuth — no key pasting, opens browser) or
-  put `ANTHROPIC_API_KEY=` / `OPENROUTER_API_KEY=` in `%LOCALAPPDATA%\hermes\.env`.
-  Then optionally uncomment the matching `delegation:` pair in
-  `%LOCALAPPDATA%\hermes\config.yaml` so subagents run on a cheap model.
-  The Agents tab's Hermes card flips from "needs credentials" to "ready".
+- ~~**Hermes credentials**~~ ✅ DONE 2026-07-10 late eve: user completed
+  `hermes auth add nous` (Nous Portal OAuth device-code → auth.json). Verified
+  end-to-end: `hermes -z` one-shot answered through Nous; delegation pair
+  (subagents → `gemini-3-flash` via nous) activated in config; Agents-tab
+  Hermes card shows **ready**. H2–H4 are fully unblocked.
 - **Autostart:** `cd claude-hub; powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1` — hub starts at logon so the bookmark always works.
 - **Mobile access:** install Tailscale on PC + phone, then `tailscale serve --bg 5757`; bookmark the private HTTPS URL on the phone. (Agent never touches VPN/network.)
 - **Obsidian (for Q-Obsidian below):** confirm you use/want Obsidian and give a vault path.

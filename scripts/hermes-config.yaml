@@ -23,15 +23,15 @@ agent:
   reasoning_effort: "medium"
 
 # Subagents (delegate_task) on a cheap model — the "don't send a JSON with a
-# frontier model" rule. Uncomment the pair matching your credential:
+# frontier model" rule. Active pair matches the live credential (Nous Portal
+# OAuth, added 2026-07-10):
 delegation:
   max_iterations: 50
-  # With OPENROUTER_API_KEY:
+  model: "gemini-3-flash"
+  provider: "nous"
+  # With OPENROUTER_API_KEY instead:
   # model: "google/gemini-3-flash-preview"
   # provider: "openrouter"
-  # With Nous Portal OAuth (hermes auth add nous):
-  # model: "gemini-3-flash"
-  # provider: "nous"
 
 # Compression already uses a cheap aux model by default (provider auto).
 compression:
