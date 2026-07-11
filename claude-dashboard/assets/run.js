@@ -10,12 +10,22 @@ function ensureRunUI() {
   $('#run').innerHTML = `
     <h2>Run — work with Claude in this project</h2>
     <div class="runbar">
-      <select id="runModel" title="model — auto routes each prompt to the cheapest capable model">
+      <select id="runModel" title="model — auto routes each prompt to the cheapest capable model; or pin a specific Claude">
         <option value="auto">model: auto (routed)</option>
         <option value="">CLI default</option>
-        <option value="sonnet">sonnet</option>
-        <option value="opus">opus</option>
-        <option value="haiku">haiku</option>
+        <optgroup label="Tier alias (current model)">
+          <option value="opus">opus</option>
+          <option value="sonnet">sonnet</option>
+          <option value="haiku">haiku</option>
+        </optgroup>
+        <optgroup label="Pin a version">
+          <option value="claude-fable-5">Fable 5</option>
+          <option value="claude-opus-4-8">Opus 4.8</option>
+          <option value="claude-opus-4-7">Opus 4.7</option>
+          <option value="claude-sonnet-5">Sonnet 5</option>
+          <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+          <option value="claude-haiku-4-5">Haiku 4.5</option>
+        </optgroup>
       </select>
       <select id="runPerm" title="permission mode">
         <option value="acceptEdits">perms: acceptEdits</option>

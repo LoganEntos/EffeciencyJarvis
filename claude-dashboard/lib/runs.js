@@ -21,7 +21,18 @@ const CLAUDE_EXE = process.env.HUB_CLAUDE_EXE || path.join(
   'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
 const MAX_ACTIVE = 2;
 const MAX_QUEUE = 5;
-const MODELS = ['', 'auto', 'sonnet', 'opus', 'haiku'];
+// Selectable models: 'auto' (hub-routed), '' (CLI default), the three tier
+// aliases (map to whatever the CLI currently points them at), and explicit
+// version IDs so a run can be pinned to a specific Claude. Passed to the CLI
+// as a plain argv element (no shell), and membership-checked before use.
+const MODELS = [
+  '', 'auto',
+  'opus', 'sonnet', 'haiku',
+  'claude-fable-5',
+  'claude-opus-4-8', 'claude-opus-4-7',
+  'claude-sonnet-5', 'claude-sonnet-4-6',
+  'claude-haiku-4-5',
+];
 const PERM_MODES = ['default', 'acceptEdits', 'bypassPermissions', 'plan'];
 
 // 'auto' model allocation — route each prompt to the cheapest model that can
