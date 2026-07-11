@@ -19,6 +19,13 @@
 */
 'use strict';
 (function () {
+  // ---- KILL SWITCH (user, 2026-07-11 late night) --------------------------
+  // "the voice module is absolutely awful and needs to be disabled and
+  // reassessed much later." Hard-disabled by default: no orb, no hotkey, no
+  // auto-talkback, regardless of any localStorage flags left over from
+  // earlier sessions. Flip VOICE_DISABLED back to false to bring it back for
+  // re-evaluation — the engine code below is untouched, just gated off.
+  const VOICE_DISABLED = true;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const SS = window.speechSynthesis;
   const store = {
@@ -444,8 +451,9 @@
 
   // ---- run lifecycle hooks (called from run.js) ----------------------------
   // Any new prompt — typed OR spoken — silences an in-progress reply at once.
-  function onRunStart() { if (speakingNow()) stopSpeak(); if (!V.listening) setState('thinking'); }
+  function onRunStart() { if (!VOICE_DISABLED) { if (speakingNow()) stopSpeak(); if (!V.listening) setState('thinking'); } }
   function onRunDone(text) {
+    if (VOICE_DISABLED) return;
     // During a call, always talk back (it's a conversation) and keep the loop
     // alive even when a run returns no text (error/cancel) by re-opening the mic.
     if (V.call) {
@@ -458,6 +466,7 @@
   }
 
   function init() {
+    if (VOICE_DISABLED) return; // see kill switch note at top of file
     if (!SR && !SS) return; // nothing available at all
     buildOrb();
     const orb = $('#voiceOrb');
@@ -490,9 +499,20 @@
   window.HubVoice = {
     init, onRunStart, onRunDone, speak, beginCall, endCall,
     _state: () => V.state, _call: () => V.call,
+    _disabled: VOICE_DISABLED,
     // closure internals for the Config settings panel (assets/voicecfg.js,
     // loaded right after this file — it attaches HubVoice.renderSettings)
     _cfg: { SS, SR, store, speakBrowser, csmFetch, playBlob, stopSpeak, setState, V, micBlockReason },
-    renderSettings: () => {}, // no-op until voicecfg.js attaches the real one
+    renderSettings: (container) => {
+      if (VOICE_DISABLED && container) {
+        container.innerHTML = `<h2 style="font-size:12px;margin-top:22px">Voice</h2>
+          <div class="note">Disabled for now — the voice module needs a rebuild before it's worth using
+          (mic reliability, wake-word gate, and CSM latency all need rework). Code is intact in
+          <span class="mono">assets/voice.js</span>; flip the <span class="mono">VOICE_DISABLED</span>
+          flag at the top of that file to bring it back for testing.</div>`;
+        return;
+      }
+    }, // real renderSettings attaches below when not disabled
   };
+  if (!VOICE_DISABLED) window.HubVoice.renderSettings = () => {}; // voicecfg.js overwrites this
 })();

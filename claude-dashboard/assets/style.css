@@ -55,11 +55,14 @@ header .spacer{flex:1}
 header .iconbtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;
   width:32px;height:32px;padding:0;font-size:15px;line-height:1;cursor:pointer}
 header .iconbtn:hover{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-soft)}
+#navToggle{display:none;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;
+  width:32px;height:32px;padding:0;font-size:16px;line-height:1;cursor:pointer;align-items:center;justify-content:center}
+#navToggle:hover{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-soft)}
 
 /* ---- shell / nav ---- */
-.wrap{display:flex;min-height:calc(100vh - 55px)}
+.wrap{display:flex;min-height:calc(100vh - 55px);position:relative}
 nav{width:196px;border-right:1px solid var(--line);padding:16px 10px;flex-shrink:0;position:sticky;
-  top:55px;height:calc(100vh - 55px);overflow:auto}
+  top:55px;height:calc(100vh - 55px);overflow:auto;z-index:32}
 nav .navlabel{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);padding:2px 14px 8px;
   font-family:var(--font-mono);font-weight:200}
 nav a{display:flex;align-items:center;gap:11px;padding:9px 14px;margin:1px 0;color:var(--muted);cursor:pointer;
@@ -134,6 +137,7 @@ button.danger:hover{background:#e0525233;box-shadow:none}
   font-family:var(--font-mono)}
 .pill.ok{background:#4bc47a18;color:var(--green);border:1px solid #4bc47a45}
 .pill.warn{background:#e0a63f18;color:#e8bc6a;border:1px solid #e0a63f45}
+.navOverlay{display:none}
 .pill.err{background:#e0525218;color:#f0908f;border:1px solid #e0525245}
 .pill.neutral{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-dim)}
 :root[data-theme="light"] .pill.warn{color:#8a6414}
@@ -233,12 +237,44 @@ label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:1
 .dropzone.drag{border-color:var(--accent);background:var(--accent-soft);color:var(--txt)}
 
 @media (max-width:760px){
-  nav{width:56px;padding:16px 6px}
-  nav .navlabel,nav a span.txt,nav a kbd{display:none}
-  nav a{justify-content:center;padding:11px 0}
-  main{padding:18px 14px 50px}
+  /* M1 mobile rebuild (2026-07-11): the old collapsed-rail + hamburger
+     pattern went fully invisible if the JS toggle ever failed to stick —
+     that's the "can't see pages on the left" bug report. Replaced with a
+     bottom tab bar: it's the SAME <nav><a> markup restyled into a fixed
+     horizontal strip, so every tab is always visible and tappable with zero
+     dependency on toggle state or JS class juggling. #navToggle/.navOverlay
+     are hidden outright — desktop rules for them are untouched above. */
+  #navToggle,.navOverlay{display:none!important}
+  .wrap{min-height:calc(100vh - 48px)}
+  nav{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;height:auto;flex-shrink:0;
+    display:flex;flex-direction:row;align-items:stretch;overflow-x:auto;overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));
+    border-right:none;border-top:1px solid var(--line);background:#151310f2;backdrop-filter:blur(8px);
+    z-index:35;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  :root[data-theme="light"] nav{background:#fbf8f1f2}
+  nav .navlabel{display:none}
+  nav a{flex:0 0 auto;flex-direction:column;justify-content:center;align-items:center;gap:2px;
+    padding:6px 12px;margin:0;border-radius:8px;min-width:58px}
+  nav a .ico{width:auto;font-size:17px;opacity:1}
+  nav a span.txt{display:block;font-size:9px;letter-spacing:.2px;white-space:nowrap}
+  nav a kbd{display:none}
+  nav a.active{box-shadow:inset 0 2px 0 var(--accent)}
+  main{padding:16px 14px calc(78px + env(safe-area-inset-bottom,0px))}
+  /* header: single tight row, status+spend (the "usage" readout) always
+     visible and legible — this was the other half of the complaint. */
+  header{padding:0 10px;height:48px;gap:8px}
+  header h1{font-size:11px;letter-spacing:.3px}
+  header h1 .logo{width:16px;height:16px;margin-right:5px;vertical-align:-3px}
   header .badge{display:none}
+  header #statusBadge{display:inline-flex;align-items:center;font-size:0;padding:6px;border-radius:50%;
+    max-width:none}
+  header #statusBadge .dot{margin-right:0}
+  header #spendBadge{display:inline-block;max-width:none;padding:4px 10px;font-size:11px;font-weight:600}
+  header .iconbtn{width:36px;height:36px;font-size:16px}
   .msg,.toolblk{max-width:96%}
+  .cards{grid-template-columns:repeat(2,1fr);gap:10px}
+  .card .n{font-size:28px}
 }
 
 /* N2 mobile polish: on touch devices, small inline action buttons (run-history

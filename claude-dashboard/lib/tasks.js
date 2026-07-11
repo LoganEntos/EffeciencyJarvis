@@ -75,6 +75,20 @@ function runAll() {
   return { ok: true, started };
 }
 
+// Enqueue a task without going through HTTP — used by the tasks API route
+// AND by the autopilot loop (lib/autopilot.js) to seed itself from the
+// improvement backlog. `source` marks autopilot-created tasks so the UI can
+// badge them distinctly from user-typed ones.
+function enqueue({ title, prompt, model, source }) {
+  const list = load();
+  const t = { id: newId(), title: title || prompt.slice(0, 60), prompt, model: model || 'auto',
+    createdAt: new Date().toISOString(), runId: null, startedAt: null };
+  if (source) t.source = source;
+  list.unshift(t);
+  save(list);
+  return t;
+}
+
 async function handle(req, res, url) {
   const p = url.pathname;
   if (p === '/api/tasks' && req.method === 'GET') {
@@ -88,9 +102,7 @@ async function handle(req, res, url) {
     const prompt = (b.prompt || '').toString().trim().slice(0, 20000);
     const model = ['auto', '', 'sonnet', 'opus', 'haiku'].includes(b.model) ? b.model : 'auto';
     if (!prompt) { U.sendJson(res, { error: 'prompt required' }, 400); return true; }
-    const list = load();
-    list.unshift({ id: newId(), title: title || prompt.slice(0, 60), prompt, model, createdAt: new Date().toISOString(), runId: null, startedAt: null });
-    save(list);
+    enqueue({ title, prompt, model });
     U.sendJson(res, { ok: true });
     return true;
   }
@@ -116,4 +128,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle };
+module.exports = { handle, enqueue, runTask, load };

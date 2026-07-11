@@ -20,9 +20,32 @@ async function api(p, opts = {}) {
     const r = await fetch(p, { ...opts, signal: ctl.signal });
     const j = await r.json();
     markServer(true);
+    // A 403 "missing or bad X-Hub-Token" means THIS page's copy of the token is
+    // stale — the hub rebooted (restart button, crash-recover, PWA tab left
+    // open across a laptop sleep) and minted a new per-boot token that this
+    // already-loaded JS never picked up. Every future mutating call would fail
+    // the same way forever (this was the standing "phone stuck on X-Hub-Token
+    // errors" bug — a backgrounded phone tab is exactly the case that never
+    // gets a manual refresh). Reload once to fetch the fresh token; if the
+    // reload doesn't fix it (server truly down) the 403 will simply recur and
+    // we won't loop-reload because location.reload() tears down this context.
+    if (r.status === 403 && /x-hub-token/i.test(j && j.error || '')) {
+      location.reload();
+      return new Promise(() => {}); // page is reloading — never resolve into stale code
+    }
     return j;
   } catch (e) { markServer(false); throw e; }
   finally { clearTimeout(t); }
+}
+function spendToday(runs) {
+  const today = new Date().toDateString();
+  return runs.filter(m => new Date(m.startedAt || m.queuedAt || 0).toDateString() === today)
+    .reduce((s, m) => s + (m.costUsd || 0), 0);
+}
+async function updateSpendBadge() {
+  const el = $('#spendBadge');
+  if (!el) return;
+  try { el.textContent = `$${spendToday(await api('/api/runs')).toFixed(2)} today`; } catch {}
 }
 let serverOk = true, reconnectTimer = null;
 function setAuthBadge(d) {
@@ -38,13 +61,31 @@ function markServer(ok) {
   if (reconnectTimer) return;
   reconnectTimer = setInterval(async () => {
     try {
-      const d = await api('/api/overview', { timeoutMs: 4000 });
+      await fetch('/api/overview', { cache: 'no-store' });
       clearInterval(reconnectTimer); reconnectTimer = null;
-      setAuthBadge(d);
-      load(currentTab, true); // server came back (possibly restarted) — refresh the visible tab
+      // A server that was unreachable came back — it may be a fresh boot with a
+      // NEW per-boot X-Hub-Token (restart, crash-recover, laptop sleep/wake).
+      // A soft refresh would keep firing the stale HUB_TOKEN const forever and
+      // every POST would 403 "missing or bad X-Hub-Token" (the phone/Tailscale
+      // bug: an open tab survives a hub restart with dead credentials). Hard
+      // reload picks the new token up from the freshly-served index.html.
+      location.reload();
     } catch {}
   }, 5000);
 }
+
+// ---- mobile nav toggle ----
+function closeNav() {
+  const nav = $('#mainNav');
+  if (nav && nav.classList.contains('open')) {
+    nav.classList.remove('open');
+  }
+}
+$('#navToggle').onclick = () => {
+  const nav = $('#mainNav');
+  if (nav) nav.classList.toggle('open');
+};
+$('#navOverlay').onclick = () => closeNav();
 
 // ---- tab switching (persisted, keyboard-driven) ----
 let currentTab = 'run';
@@ -52,6 +93,7 @@ const TABS = [...document.querySelectorAll('nav a')].map(a => a.dataset.tab);
 function goTab(tab) {
   if (!renderers[tab]) return;
   currentTab = tab;
+  closeNav(); // close mobile nav when switching tabs
   try { localStorage.setItem('hub.tab', tab); } catch {}
   document.querySelectorAll('nav a').forEach(x => x.classList.toggle('active', x.dataset.tab === tab));
   document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
@@ -113,23 +155,39 @@ renderers.overview = async function () {
   $('#nodeBadge').textContent = 'Node ' + d.nodeVersion;
   const today = new Date().toDateString();
   const tRuns = runs.filter(m => new Date(m.startedAt || m.queuedAt || 0).toDateString() === today);
-  const spend = tRuns.reduce((s, m) => s + (m.costUsd || 0), 0);
+  const spend = spendToday(runs);
+  if ($('#spendBadge')) $('#spendBadge').textContent = `$${spend.toFixed(2)} today`;
   const finished = runs.filter(m => ['done', 'error', 'cancelled'].includes(m.status));
   const errors = runs.filter(m => m.status === 'error');
   const okRate = finished.length ? Math.round(100 * finished.filter(m => m.status === 'done').length / finished.length) : null;
   const artifacts = runs.reduce((s, m) => s + (m.artifactCount || 0), 0);
   const apiPill = d.hasApiKey ? '<span class="pill ok">auth ready</span>' : '<span class="pill warn">no auth — runs can\'t execute</span>';
   const memPill = d.engramCount ? `<span class="pill ok">engram: ${d.engramCount} memories</span>` : '<span class="pill warn">memory empty — runs auto-capture</span>';
+
+  // compute usage breakdown by model
+  const modelCosts = {};
+  tRuns.forEach(r => {
+    const m = r.model || 'unknown';
+    if (!modelCosts[m]) modelCosts[m] = 0;
+    modelCosts[m] += r.costUsd || 0;
+  });
+  const costBreakdown = Object.entries(modelCosts).map(([m, c]) =>
+    `<span class="muted" style="font-size:11.5px">${esc(m)}: $${c.toFixed(3)}</span>`).join(' · ');
+
   $('#overview').innerHTML = `
     <h2>Overview — product cockpit</h2>
     <div class="cards">
-      <div class="card clickable" data-goto="run"><div class="n">${tRuns.length}</div><div class="l">Runs today</div></div>
-      <div class="card clickable" data-goto="run"><div class="n">$${spend.toFixed(2)}</div><div class="l">Spend today</div></div>
-      <div class="card"><div class="n">${okRate === null ? '—' : okRate + '%'}</div><div class="l">Success rate (all runs)</div></div>
-      <div class="card clickable" data-goto="run"><div class="n" ${errors.length ? 'style="color:var(--red);text-shadow:none"' : ''}>${errors.length}</div><div class="l">Failed runs</div></div>
-      <div class="card clickable" data-goto="run"><div class="n">${artifacts}</div><div class="l">Artifacts produced</div></div>
-      <div class="card clickable" data-goto="files"><div class="n">${files.length || 0}</div><div class="l">Inbox files</div></div>
+      <div class="card"><div class="n" style="color:var(--accent)">${tRuns.length}</div><div class="l">Runs today</div></div>
+      <div class="card" style="border-color:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--accent-soft)"><div class="n" style="color:var(--accent);text-shadow:0 0 16px var(--accent-dim)">\$${spend.toFixed(2)}</div><div class="l">Spend today</div></div>
+      <div class="card"><div class="n">${okRate === null ? '—' : okRate + '%'}</div><div class="l">Success rate</div></div>
+      <div class="card" ${errors.length ? 'style="border-color:#e0525255"' : ''}><div class="n" ${errors.length ? 'style="color:#e05252;text-shadow:none"' : ''}>${errors.length}</div><div class="l">Failed runs</div></div>
+      <div class="card"><div class="n">${artifacts}</div><div class="l">Artifacts</div></div>
+      <div class="card"><div class="n">${files.length || 0}</div><div class="l">Inbox files</div></div>
     </div>
+    ${costBreakdown ? `<div style="padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:22px">
+      <div style="color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Cost breakdown today</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">${costBreakdown}</div>
+    </div>` : ''}
     <div class="flex" style="margin-bottom:22px">${memPill}${apiPill}
       <span class="pill neutral">MCP: ${d.mcpServers.map(esc).join(', ') || 'none'}</span>
       <span class="pill neutral">library: ${d.counts.agents} agents · ${d.counts.skills} skills · ${d.counts.commands} commands</span></div>
@@ -173,13 +231,46 @@ renderers.config = async function () {
   const d = await api('/api/config');
   $('#config').innerHTML = `
     <h2>Config</h2>
+    <div id="autopilotPanel"></div>
     <h2 style="font-size:12px">.mcp.json</h2><pre>${esc(JSON.stringify(d.mcp, null, 2))}</pre>
     <h2 style="font-size:12px;margin-top:22px">.claude/settings.json (hooks &amp; more)</h2>
     <pre>${esc(JSON.stringify(d.settings, null, 2))}</pre>
     <h2 style="font-size:12px;margin-top:22px">CLAUDE.md (first 4k)</h2><pre>${esc(d.projectClaudeMd)}</pre>
     <div id="voiceSettings"></div>`;
   if (window.HubVoice) HubVoice.renderSettings($('#voiceSettings'));
+  renderAutopilot();
 };
+
+async function renderAutopilot() {
+  const el = $('#autopilotPanel');
+  if (!el) return;
+  let a;
+  try { a = await api('/api/autopilot'); } catch { el.innerHTML = '<div class="note">Autopilot status unavailable.</div>'; return; }
+  el.innerHTML = `
+    <h2 style="font-size:12px">Autopilot <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— unattended self-improvement loop over docs/improvement-backlog.md</span></h2>
+    <div class="note" style="margin-bottom:10px">Every ${5} min, picks the next open (⬜) backlog item, queues it as a hub task with
+      auto model routing, and asks that same run to mark the item ✅ and commit when done. Caps: 2 items in flight,
+      2 attempts per item before it's parked as "stuck" (won't burn budget retrying a bad one forever).</div>
+    <div class="flex" style="align-items:center;gap:10px;margin-bottom:10px">
+      <label class="chk"><input type="checkbox" id="apToggle"${a.enabled ? ' checked' : ''}> Enabled</label>
+      <span class="pill ${a.enabled ? 'ok' : 'neutral'}">${a.enabled ? 'running' : 'off'}</span>
+      <span class="pill neutral">backlog: ${a.backlogDone}/${a.backlogTotal} done</span>
+      <span class="pill ${a.inflight ? 'warn' : 'neutral'}">${a.inflight} in flight</span>
+      ${a.stuck.length ? `<span class="pill err" title="exhausted retries — edit docs/improvement-backlog.md or clear data/autopilot.json to retry">${a.stuck.length} stuck: ${esc(a.stuck.join(', '))}</span>` : ''}
+      <button class="ghost" id="apRunNow" style="padding:6px 12px;font-size:11.5px">▶ Check now</button>
+    </div>
+    ${a.lastPick ? `<div class="muted" style="font-size:11.5px">last picked: ${esc(a.lastPick)} · last tick: ${a.lastTick ? rel(a.lastTick) : '—'}</div>` : ''}`;
+  $('#apToggle').onchange = async (e) => {
+    try { await api('/api/autopilot/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); }
+    catch {}
+    renderAutopilot();
+  };
+  $('#apRunNow').onclick = async () => {
+    try { await api('/api/autopilot/run-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); }
+    catch {}
+    renderAutopilot();
+  };
+}
 
 renderers.sessions = async function () {
   const d = await api('/api/sessions');
@@ -312,6 +403,8 @@ function boot() {
     $('#nodeBadge').textContent = 'Node ' + d.nodeVersion;
     setAuthBadge(d);
   }).catch(() => {});
+  updateSpendBadge();
+  setInterval(updateSpendBadge, 60000); // header badge, not tab-scoped — the one thing mobile must always show while autopilot dispatches runs unattended
   // N5: theme toggle — the light-theme variable set ships in style.css under
   // :root[data-theme="light"]; flipping the attribute + persisting is all we do.
   try { if (localStorage.getItem('hub.theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch {}

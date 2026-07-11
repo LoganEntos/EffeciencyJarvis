@@ -20,6 +20,7 @@ const memory = require('./lib/memory');
 const schedules = require('./lib/schedules');
 const agentgraph = require('./lib/agentgraph');
 const voice = require('./lib/voice');
+const autopilot = require('./lib/autopilot');
 
 const PORT = parseInt(process.argv[2] || process.env.PORT || '5757', 10);
 const HOST = '127.0.0.1';
@@ -138,6 +139,7 @@ const server = http.createServer(async (req, res) => {
     if (await agentgraph.handle(req, res, url)) return;
     if (await memory.handle(req, res, url)) return;
     if (await voice.handle(req, res, url)) return;
+    if (await autopilot.handle(req, res, url)) return;
     if (await files.handle(req, res, url)) return;
     if (await core.handle(req, res, url)) return;
 
@@ -165,6 +167,7 @@ server.on('error', (e) => {
 
 server.listen(PORT, HOST, () => {
   schedules.startTicker(); // scheduled runs fire only while the hub is up
+  autopilot.startTicker(); // self-improvement loop — no-op unless enabled in Config
   console.log(`\n  Claude Code Hub running at  http://${HOST}:${PORT}`
     + `\n  Project: ${core.PROJECT_DIR}`
     + `\n  Hub token (auto-injected into the page): ${TOKEN}`

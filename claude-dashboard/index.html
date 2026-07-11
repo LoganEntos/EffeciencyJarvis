@@ -20,8 +20,10 @@
 </head>
 <body>
 <header>
+  <button id="navToggle" title="Toggle navigation menu">☰</button>
   <h1><span class="logo"></span>Claude Code Hub</h1>
   <span class="badge" id="statusBadge"><span class="dot ok"></span>server live</span>
+  <span class="badge mono" id="spendBadge" title="spend today — stays visible on mobile so autopilot spend is never out of sight">$0.00 today</span>
   <span class="badge" id="nodeBadge"></span>
   <span class="badge mono" id="projBadge" title="project directory">loading…</span>
   <span class="spacer"></span>
@@ -30,7 +32,7 @@
   <button class="iconbtn" id="refreshTab" title="Refresh current tab (R)">⟳</button>
 </header>
 <div class="wrap">
-  <nav>
+  <nav id="mainNav">
     <div class="navlabel">Work</div>
     <a data-tab="run" class="active"><span class="ico">▷</span><span class="txt">Run</span><kbd>1</kbd></a>
     <a data-tab="tasks"><span class="ico">☰</span><span class="txt">Tasks</span><kbd>2</kbd></a>
@@ -47,6 +49,7 @@
     <a data-tab="assets"><span class="ico">◧</span><span class="txt">Assets</span></a>
     <a data-tab="config"><span class="ico">⚙</span><span class="txt">Config</span></a>
   </nav>
+  <div class="navOverlay" id="navOverlay"></div>
   <main>
     <section id="run"></section>
     <section id="tasks" class="hidden"></section>

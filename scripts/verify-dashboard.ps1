@@ -63,6 +63,7 @@ Check "GET /api/memory/search" "$base/api/memory/search?q=test"
 Check "GET /api/voice/tts (404)"  "$base/api/voice/tts" 404
 Check "GET /api/voice/status"  "$base/api/voice/status"
 Check "GET /api/routing"       "$base/api/routing"
+Check "GET /api/autopilot"     "$base/api/autopilot"
 Check "GET /api/files/xlsx (bad name 404)" "$base/api/files/xlsx?name=nope.xlsx" 404
 Check "GET /api/run/transcript (bad id 404)" "$base/api/run/transcript?id=nope" 404
 Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2Fserver.js" 403
@@ -74,6 +75,7 @@ CheckPost "POST /api/memory w/o token (403)"      "$base/api/memory"      '{"tex
 CheckPost "POST /api/schedules w/o token (403)"   "$base/api/schedules"   '{"prompt":"x","kind":"daily","at":"08:00"}' 403
 CheckPost "POST /api/voice/tts w/o token (403)"   "$base/api/voice/tts"   '{"text":"x"}' 403
 CheckPost "POST /api/voice/start w/o token (403)" "$base/api/voice/start" '{}' 403
+CheckPost "POST /api/autopilot/toggle w/o token (403)" "$base/api/autopilot/toggle" '{}' 403
 
 if ($fails -eq 0) { Write-Host "`nAll checks passed." -ForegroundColor Green; exit 0 }
 Write-Host "`n$fails check(s) failed." -ForegroundColor Red

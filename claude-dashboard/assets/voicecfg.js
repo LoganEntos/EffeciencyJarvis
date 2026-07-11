@@ -156,5 +156,7 @@
     };
   }
 
-  if (window.HubVoice) window.HubVoice.renderSettings = renderSettings;
+  // Kill switch lives in voice.js (VOICE_DISABLED) — when set, its own
+  // renderSettings already shows a "disabled" note; don't clobber it.
+  if (window.HubVoice && !window.HubVoice._disabled) window.HubVoice.renderSettings = renderSettings;
 })();

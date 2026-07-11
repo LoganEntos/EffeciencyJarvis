@@ -46,7 +46,7 @@ function ensureRunUI() {
     <div class="chatlog" id="chatLog"><div class="msg sys">Type a prompt below — the claude CLI runs it inside the project directory and streams back here.</div></div>
     <div class="badgebar" id="runStatus" style="margin-bottom:10px"></div>
     <div class="composer">
-      <textarea id="promptIn" placeholder="Ask Claude to do something in this project… (Ctrl+Enter to send)"></textarea>
+      <textarea id="promptIn" placeholder="Ask Claude to do something in this project… (Enter to send, Shift+Enter for a new line)"></textarea>
       <div class="btns">
         <button id="sendBtn">Send ▷</button>
         <button id="cancelBtn" class="danger hidden">Cancel ✕</button>
@@ -59,7 +59,14 @@ function ensureRunUI() {
   $('#sendBtn').onclick = sendPrompt;
   $('#cancelBtn').onclick = cancelRun;
   $('#newChatBtn').onclick = newChat;
-  $('#promptIn').onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendPrompt(); } };
+  // Enter sends (the expectation on phones/low-end browsers where Ctrl/Cmd is
+  // awkward or absent); Shift+Enter inserts a newline. Ctrl/Cmd+Enter kept as
+  // an alias for muscle memory from the old binding.
+  $('#promptIn').onkeydown = e => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    e.preventDefault();
+    sendPrompt();
+  };
   $('#histFilter').oninput = renderHistory;
   // engine/model/permission choices survive reloads
   try {
