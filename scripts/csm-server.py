@@ -53,6 +53,9 @@ def load_model():
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         STATE["device"] = device
+        # TF32 is free accuracy-adequate speed on Ampere for any fp32 matmuls
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
         for model_id in MODEL_CANDIDATES:
             try:
                 processor = AutoProcessor.from_pretrained(model_id)
@@ -69,9 +72,15 @@ def load_model():
                 BUNDLE["sample_rate"] = getattr(
                     getattr(model.config, "codec_config", None), "sampling_rate", 24000) or 24000
                 STATE["model"] = model_id
+                STATE["dtype"] = str(next(model.parameters()).dtype)
+                try:  # warmup: absorb kernel/cudnn init so the first real
+                    synthesize("Ready.")  # utterance doesn't pay it
+                except Exception:
+                    pass
                 STATE["loaded_in_s"] = round(time.time() - t0, 1)
                 STATE["status"] = "ready"
-                print(f"[csm] {model_id} ready on {device} in {STATE['loaded_in_s']}s", flush=True)
+                print(f"[csm] {model_id} ready on {device} ({STATE['dtype']}) "
+                      f"in {STATE['loaded_in_s']}s", flush=True)
                 return
             except Exception as e:
                 errors.append(f"{model_id}: {type(e).__name__}: {e}")
@@ -91,8 +100,13 @@ def synthesize(text, speaker=0):
     sr = BUNDLE["sample_rate"]
     prompt = f"[{speaker}]{text}"  # CSM speaker tag; no audio context
     inputs = processor(prompt, add_special_tokens=True, return_tensors="pt").to(model.device)
+    # the shipped generation_config caps max_new_tokens at 125 audio frames =
+    # exactly 10 s — anything longer was cut off MID-SENTENCE. Scale the cap
+    # to the text instead: ~12.5 frames/s of audio, speech ≈ 15 chars/s, with
+    # 2x headroom; ceiling 1250 frames (100 s) as a runaway guard.
+    max_frames = min(1250, max(125, int(len(text) * 1.7)))
     with GEN_LOCK, torch.no_grad():
-        audio = model.generate(**inputs, output_audio=True)
+        audio = model.generate(**inputs, output_audio=True, max_new_tokens=max_frames)
     wav = audio[0] if isinstance(audio, (list, tuple)) else audio
     wav = wav.to(torch.float32).cpu().numpy().squeeze()
 

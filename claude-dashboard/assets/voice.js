@@ -266,7 +266,18 @@
   }
   // speak(text) → true iff it will produce audio (the call loop relies on this)
   function speak(text) {
-    const clean = String(text || '').replace(/```[\s\S]*?```/g, ' (code block) ').replace(/[*_`#>]/g, '').trim().slice(0, 700);
+    let clean = String(text || '').replace(/```[\s\S]*?```/g, ' (code block) ').replace(/[*_`#>]/g, '').trim();
+    // CSM generates at ~0.4x realtime on this GPU, so its spoken cap is much
+    // tighter than the near-instant browser voice: long replies would take
+    // longer to synthesize than anyone waits. Full text is always on screen.
+    const cap = store.engine === 'csm' ? 400 : 700;
+    if (clean.length > cap) {
+      // never cut mid-word: end the spoken part at the last sentence that fits
+      const head = clean.slice(0, cap);
+      const end = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '), head.lastIndexOf('.\n'));
+      // close with a spoken hand-off so truncation sounds intentional, not like a cutoff
+      clean = (end > Math.min(250, cap * 0.5) ? head.slice(0, end + 1) : head) + ' The rest is on screen.';
+    }
     if (!clean) return false;
     return store.engine === 'csm' ? speakCSM(clean) : speakBrowser(clean);
   }
@@ -303,31 +314,80 @@
     el.onplay = () => setState('speaking');
     el.onended = el.onerror = () => { if (onDone) onDone(); };
     el.src = V.audioUrl;
-    return el.play();
+    // a rejected play() (autoplay policy, device change) must still advance
+    // the chunk pipeline — otherwise `playing` stays true and the reply dies
+    // silently ("not replying at all")
+    return el.play().catch(() => { if (onDone) onDone(); });
+  }
+  // CSM synthesis on this GPU costs ~4.5 s fixed per request + ~0.07 s/char,
+  // while the audio itself plays at ~0.065 s/char — generation barely keeps up,
+  // so every chunk boundary risks a silence roughly the size of the NEXT
+  // chunk's synthesis minus the CURRENT chunk's audio. Sizing therefore ramps:
+  // first sentence alone (fast start), then a small chunk (short first gap),
+  // then larger ones (fewer boundaries → less total silence). Fetches run
+  // back-to-back so the GPU never idles.
+  function csmChunks(text) {
+    const sents = text.match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+\s*$/g) || [text];
+    const out = []; let cur = '';
+    for (const s of sents) {
+      if (!out.length && !cur) { out.push(s.trim()); continue; } // first sentence ships alone
+      if (cur && cur.length + s.length > (out.length === 1 ? 130 : 260)) { out.push(cur.trim()); cur = ''; }
+      cur += s;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out.length ? out : [text];
   }
   let csmWarned = false;
-  // Returns true optimistically (the wav arrives async); on ANY failure falls
-  // back to browser TTS for this utterance so the call loop stays alive.
+  // Returns true optimistically (the wav arrives async). If the FIRST chunk
+  // fails, falls back to browser TTS for the whole utterance so the call loop
+  // stays alive; a mid-utterance failure just ends the reply early.
   function speakCSM(clean) {
     stopSpeak();
     const gen = ++V.csmGen;
-    V.csmPending = true;
-    csmFetch(clean).then(blob => {
-      if (gen !== V.csmGen) return; // barged-in / superseded while fetching
-      V.csmPending = false;
-      return playBlob(blob, () => {
-        if (V.call) reListenSoon(200);
-        else if (V.state === 'speaking') setState('idle');
-      });
-    }).catch(e => {
+    V.csmPending = true; // stays true across inter-chunk gaps (barge-in guard)
+    const chunks = csmChunks(clean);
+    const ready = [];               // blobs by chunk index, filled as fetches land
+    let fetchIdx = 0, playIdx = 0, playing = false;
+
+    const done = () => {
       if (gen !== V.csmGen) return;
       V.csmPending = false;
-      if (!csmWarned) { csmWarned = true; say('CSM voice unavailable — using the browser voice instead. (' + String((e && e.message) || e).slice(0, 120) + ')', 'errmsg'); }
-      if (!speakBrowser(clean)) { // nothing could speak — keep the loop alive
-        if (V.call) reListenSoon(400);
-        else if (V.state === 'speaking' || V.state === 'thinking') setState('idle');
-      }
-    });
+      if (V.call) reListenSoon(200);
+      else if (V.state === 'speaking') setState('idle');
+    };
+    function playNext() {
+      if (gen !== V.csmGen) return;
+      if (playIdx >= chunks.length) { done(); return; }
+      const blob = ready[playIdx];
+      if (!blob) { playing = false; return; } // not synthesized yet — fetch cb resumes us
+      playing = true;
+      playBlob(blob, playNext);
+      ready[playIdx] = null; playIdx++;
+    }
+    function fetchNext() {
+      if (gen !== V.csmGen || fetchIdx >= chunks.length) return;
+      const i = fetchIdx++;
+      csmFetch(chunks[i]).then(blob => {
+        if (gen !== V.csmGen) return;
+        ready[i] = blob;
+        fetchNext();                          // keep the GPU busy on the next chunk
+        if (!playing && playIdx === i) playNext();
+      }).catch(e => {
+        if (gen !== V.csmGen) return;
+        if (!csmWarned) { csmWarned = true; say('CSM voice unavailable — using the browser voice instead. (' + String((e && e.message) || e).slice(0, 120) + ')', 'errmsg'); }
+        if (i === 0 && !playing) {            // nothing spoken yet — full fallback
+          V.csmPending = false;
+          if (!speakBrowser(clean)) {
+            if (V.call) reListenSoon(400);
+            else if (V.state === 'speaking' || V.state === 'thinking') setState('idle');
+          }
+        } else {                              // mid-reply — stop after what's queued
+          chunks.length = Math.min(chunks.length, i);
+          if (!playing) playNext();
+        }
+      });
+    }
+    fetchNext();
     return true;
   }
 
