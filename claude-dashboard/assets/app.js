@@ -210,7 +210,9 @@ async function listView(sel, title, endpoint, type, extraHtml = '') {
   const listEl = el.querySelector('.list');
   const render = (q = '') => {
     const f = data.filter(d => (d.name + ' ' + d.description).toLowerCase().includes(q.toLowerCase()));
-    listEl.innerHTML = f.map(d => `<div class="row clickable" data-i="${data.indexOf(d)}"><div class="name mono">${esc(d.name)}</div>
+    listEl.innerHTML = f.map(d => `<div class="row clickable" data-i="${data.indexOf(d)}">
+      <div class="flex" style="justify-content:space-between"><span class="name mono">${esc(d.name)}</span>
+        ${d.model ? `<span class="pill ${/haiku|flash|cheap/i.test(d.model) ? 'ok' : /opus|fable/i.test(d.model) ? 'err' : 'neutral'}">${esc(d.model)}</span>` : ''}</div>
       ${d.description ? `<div class="desc">${esc(d.description)}</div>` : ''}</div>`).join('') ||
       '<div class="muted">No matches.</div>';
     listEl.querySelectorAll('.row.clickable').forEach(r => r.onclick = () => {

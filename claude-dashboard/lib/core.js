@@ -41,7 +41,7 @@ function overview() {
 function agentList() {
   const local = U.collectMd(path.join(DOT_CLAUDE, 'agents')).map(f => {
     const fm = U.frontmatter(f);
-    return { file: path.basename(f), name: fm.name || path.basename(f, '.md'), description: fm.description || '' };
+    return { file: path.basename(f), name: fm.name || path.basename(f, '.md'), description: fm.description || '', model: fm.model || '' };
   }).sort((a, b) => a.name.localeCompare(b.name));
   return hermesAgents().concat(local);
 }
@@ -56,14 +56,14 @@ function hermesAgents() {
   const dlgModel = dlg ? `${dlg[1]} via ${dlg[2]}` : 'inherits main model';
   const aux = 'auto — cheapest capable model (Gemini-Flash class)';
   return [
-    { name: 'hermes: Maestro (main loop)', description: `The reasoning brain — ${h.model}. Tool-calling agent with terminal/file/web/browser/skills; switch any time with \`hermes model\`.` },
-    { name: 'hermes: Crew (subagents)', description: `delegate_task children with isolated context — ${dlgModel}. Mechanical/parallel work never burns frontier tokens.` },
-    { name: 'hermes: Scribe (compression)', description: `Long-conversation summarizer — ${aux}. Compacts history when context passes 50%.` },
-    { name: 'hermes: Falcon (web extract)', description: `Web page scraping + summarization — ${aux}.` },
-    { name: 'hermes: Scout (vision)', description: `Image + browser-screenshot analysis — ${aux}.` },
-    { name: 'hermes: Archivist (session search)', description: `Recalls + summarizes past sessions (FTS5) — ${aux}.` },
-    { name: 'hermes: Envoy (gateway)', description: 'Messaging bridge (Telegram/Discord/Slack/WhatsApp/Signal) — off until H4 wires the hub toggle.' },
-    { name: 'hermes: Clockwork (cron)', description: 'Natural-language scheduled automations (`hermes cron`) — complements the hub\'s own scheduler.' },
+    { name: 'hermes: Maestro (main loop)', model: h.model, description: 'The reasoning brain. Tool-calling agent with terminal/file/web/browser/skills; switch any time with `hermes model`.' },
+    { name: 'hermes: Crew (subagents)', model: dlgModel, description: 'delegate_task children with isolated context. Mechanical/parallel work never burns frontier tokens.' },
+    { name: 'hermes: Scribe (compression)', model: 'auto-cheap', description: `Long-conversation summarizer — ${aux}. Compacts history when context passes 50%.` },
+    { name: 'hermes: Falcon (web extract)', model: 'auto-cheap', description: `Web page scraping + summarization — ${aux}.` },
+    { name: 'hermes: Scout (vision)', model: 'auto-cheap', description: `Image + browser-screenshot analysis — ${aux}.` },
+    { name: 'hermes: Archivist (session search)', model: 'auto-cheap', description: `Recalls + summarizes past sessions (FTS5) — ${aux}.` },
+    { name: 'hermes: Envoy (gateway)', model: '', description: 'Messaging bridge (Telegram/Discord/Slack/WhatsApp/Signal) — off until H4 wires the hub toggle.' },
+    { name: 'hermes: Clockwork (cron)', model: '', description: 'Natural-language scheduled automations (`hermes cron`) — complements the hub\'s own scheduler.' },
   ];
 }
 

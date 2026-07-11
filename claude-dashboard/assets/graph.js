@@ -48,6 +48,10 @@ async function renderCodeGraph(body) {
     </div>
     <pre id="graphOut" class="hidden"></pre>
     <h2 style="font-size:12px;margin-top:22px">Graph map <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— search to highlight · click a node to inspect · drag to rearrange</span></h2>
+    <div class="flex" style="margin-bottom:10px">
+      <span class="pill viewChip" data-v="modules" style="cursor:pointer">◈ Modules</span>
+      <span class="pill viewChip" data-v="symbols" style="cursor:pointer">⌬ All symbols</span>
+    </div>
     <input class="search" id="graphFind" placeholder="Find a node by name or file… (Enter selects the best match)">
     <div id="graphViz" style="margin-bottom:6px"><div class="muted">Loading graph…</div></div>
     <div id="nodeDetail" class="row hidden" style="margin-top:8px"></div>
@@ -70,14 +74,61 @@ async function renderCodeGraph(body) {
   $('#graphBtn').onclick = ask;
   $('#graphQ').onkeydown = e => { if (e.key === 'Enter') ask(); };
   api('/api/graph/data').then(g => {
-    if (g && Array.isArray(g.nodes) && g.nodes.length) {
-      const viz = drawGraphViz($('#graphViz'), g);
+    if (!(g && Array.isArray(g.nodes) && g.nodes.length)) {
+      $('#graphViz').innerHTML = '<div class="muted">graph data unavailable</div>';
+      return;
+    }
+    const show = (v) => {
+      try { localStorage.setItem('hub.codeview', v); } catch {}
+      document.querySelectorAll('.viewChip').forEach(c => {
+        c.className = 'pill viewChip ' + (c.dataset.v === v ? 'neutral' : '');
+        c.style.cursor = 'pointer';
+      });
+      const viz = drawGraphViz($('#graphViz'), v === 'modules' ? moduleGraph(g) : g);
       const f = $('#graphFind');
       f.oninput = () => viz.find(f.value.trim().toLowerCase());
       f.onkeydown = e => { if (e.key === 'Enter') viz.selectFirst(); };
-    } else $('#graphViz').innerHTML = '<div class="muted">graph data unavailable</div>';
+    };
+    document.querySelectorAll('.viewChip').forEach(c => c.onclick = () => show(c.dataset.v));
+    show(localStorage.getItem('hub.codeview') || 'modules');
   });
 };
+
+// Collapse the symbol graph to one node per source file — the "satisfying
+// visual": ~15 modules with weighted links instead of a 277-symbol hairball.
+function moduleGraph(g) {
+  const fileOf = {};
+  const mods = new Map(); // file -> { id, label, count, community }
+  for (const n of g.nodes) {
+    const f = n.file || '(misc)';
+    fileOf[n.id] = f;
+    if (!mods.has(f)) mods.set(f, { id: f, label: f.split(/[\\/]/).pop(), file: f, community: mods.size, members: 0 });
+    mods.get(f).members++;
+  }
+  const w = new Map(); // "a||b" -> weight
+  for (const l of g.links) {
+    const a = fileOf[l.source], b = fileOf[l.target];
+    if (!a || !b || a === b) continue;
+    const key = a < b ? a + '||' + b : b + '||' + a;
+    w.set(key, (w.get(key) || 0) + 1);
+  }
+  // basename collisions (lib/files.js vs assets/files.js) → prefix parent dir
+  const seen = {};
+  for (const m of mods.values()) seen[m.label] = (seen[m.label] || 0) + 1;
+  for (const m of mods.values()) {
+    if (seen[m.label] > 1) {
+      const parts = m.file.split(/[\\/]/);
+      m.label = parts.slice(-2).join('/');
+    }
+  }
+  return {
+    nodes: [...mods.values()],
+    links: [...w.entries()].map(([k, weight]) => {
+      const [source, target] = k.split('||');
+      return { source, target, weight };
+    }),
+  };
+}
 
 function drawGraphViz(container, data) {
   const W = container.clientWidth || 800, DPR = window.devicePixelRatio || 1;
@@ -101,20 +152,24 @@ function drawGraphViz(container, data) {
   ctx.scale(DPR, DPR);
 
   // working copies, seeded on a phyllotaxis spiral so warmup converges fast
-  const hue = c => `hsl(${(c * 67) % 360} 60% 60%)`;
+  // curated warm palette (hub aesthetic) instead of rainbow HSL
+  const PALETTE = ['#e8a33d', '#4bc47a', '#5aa9e6', '#e0655f', '#a78bda', '#4fc1c1',
+    '#d9c06a', '#e07b3c', '#9db56f', '#c78ba5', '#7f9ccb', '#b0a08c'];
+  const hue = c => PALETTE[((c % PALETTE.length) + PALETTE.length) % PALETTE.length];
   const nodes = data.nodes.map((n, i) => ({
     id: n.id, label: n.label || n.id, community: +n.community || 0, file: n.file || '',
+    members: n.members || 0,
     x: W / 2 + 14 * Math.sqrt(i + 1) * Math.cos(i * 2.399963),
     y: H / 2 + 14 * Math.sqrt(i + 1) * Math.sin(i * 2.399963),
     vx: 0, vy: 0, deg: 0,
   }));
   const byId = {}; nodes.forEach(n => byId[n.id] = n);
   const links = data.links
-    .map(l => ({ s: byId[l.source], t: byId[l.target], relation: l.relation || '' }))
+    .map(l => ({ s: byId[l.source], t: byId[l.target], relation: l.relation || '', weight: l.weight || 0 }))
     .filter(l => l.s && l.t && l.s !== l.t);
   const nbr = {}; nodes.forEach(n => nbr[n.id] = new Set());
   for (const l of links) { l.s.deg++; l.t.deg++; nbr[l.s.id].add(l.t.id); nbr[l.t.id].add(l.s.id); }
-  const rad = n => 5 + Math.sqrt(n.deg);
+  const rad = n => n.members ? 9 + Math.min(26, Math.sqrt(n.members) * 2.6) : 5 + Math.sqrt(n.deg);
   // big graphs: permanent labels only for the most-connected nodes; everything
   // else labels on hover/select/search so the map stays readable
   const labeled = new Set(
@@ -122,7 +177,9 @@ function drawGraphViz(container, data) {
       : [...nodes].sort((a, b) => b.deg - a.deg).slice(0, 48).map(n => n.id));
 
   // physics: pairwise repulsion + link springs + mild centering, clamped & damped
-  const REP = 2600, SPRING = 0.02, REST = 95, CENTER = 0.012, DAMP = 0.85, PAD = 18, VMAX = 14;
+  const few = nodes.length < 40; // module view: roomier springs, stronger repulsion
+  const REP = few ? 9000 : 2600, SPRING = 0.02, REST = few ? 170 : 95,
+    CENTER = 0.012, DAMP = 0.85, PAD = few ? 46 : 18, VMAX = 14;
   let dragNode = null;
   function step() {
     for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
@@ -161,7 +218,7 @@ function drawGraphViz(container, data) {
     for (const l of links) {
       const lit = focus && (l.s === focus || l.t === focus);
       ctx.strokeStyle = lit ? ACCENT : LINE;
-      ctx.lineWidth = lit ? 1.4 : 0.7;
+      ctx.lineWidth = lit ? 1.6 : 0.7 + Math.min(2.6, l.weight / 5);
       ctx.globalAlpha = matches.size ? .25 : 1;
       ctx.beginPath(); ctx.moveTo(l.s.x, l.s.y); ctx.lineTo(l.t.x, l.t.y); ctx.stroke();
     }
@@ -173,13 +230,14 @@ function drawGraphViz(container, data) {
       if (n === selected) { ctx.strokeStyle = ACCENT; ctx.lineWidth = 2.2; ctx.stroke(); }
       if (matches.has(n.id)) { ctx.strokeStyle = '#e0a63f'; ctx.lineWidth = 1.8; ctx.stroke(); }
     }
-    ctx.font = '10px "JetBrains Mono",Consolas,monospace'; ctx.textAlign = 'center';
+    ctx.font = (nodes.length < 40 ? '600 11.5px' : '10px') + ' "JetBrains Mono",Consolas,monospace';
+    ctx.textAlign = 'center';
     for (const n of nodes) {
       const lit = n === hover || n === selected || matches.has(n.id);
       if (!lit && !labeled.has(n.id)) continue;
       ctx.globalAlpha = lit ? 1 : emphasis(n);
       ctx.fillStyle = lit ? TXT : MUTED;
-      ctx.fillText(n.label.slice(0, 24), n.x, n.y - rad(n) - 5);
+      ctx.fillText(n.label.slice(0, 24), n.x, n.y - rad(n) - 6);
     }
     ctx.globalAlpha = 1;
   }

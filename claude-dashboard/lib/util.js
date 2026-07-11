@@ -22,8 +22,10 @@ function frontmatter(mdPath) {
   const block = m ? m[1] : txt.slice(0, 600);
   const name = block.match(/^name:\s*(.+)$/m);
   const desc = block.match(/^description:\s*(.+)$/m);
+  const model = block.match(/^model:\s*(.+)$/m);
   if (name) out.name = name[1].trim().replace(/^["']|["']$/g, '');
   if (desc) out.description = desc[1].trim().replace(/^["']|["']$/g, '');
+  if (model) out.model = model[1].trim().replace(/^["']|["']$/g, '');
   return out;
 }
 
