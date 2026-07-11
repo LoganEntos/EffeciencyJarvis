@@ -113,8 +113,10 @@ N6 xlsx preview (/api/files/xlsx), ECC skills (Q4: 278 library / 18 active).
 Remaining, in order (autonomous unless marked 🙋):
 1. **H4 Hermes gateway toggle + N9 Track B** — `hermes gateway` on/off in the
    hub = the mobile voice/text bridge. 🙋 needs a Telegram bot token.
-2. **N2 Mobile polish** — audit all tabs at 375px; touch targets, overflow,
-   composer, and the voice orb on a phone.
+2. **N2 Mobile polish** — ✅ audited 2026-07-11: all 12 tabs clean at 375px
+   (zero horizontal overflow); coarse-pointer CSS added for touch-sized
+   buttons. Remaining: a REAL-phone pass over Tailscale once the user sets it
+   up (orb/mic behavior can't be judged in an emulated viewport).
 3. **H2.5 hermes resume** (new, optional) — usage.json exposes session_id;
    `--resume` could give hermes chats continuity like claude runs.
 4. **Q1 Playwright E2E** (dev-only, no run tax) — regression net; recommended

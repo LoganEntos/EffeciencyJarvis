@@ -233,3 +233,12 @@ label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:1
   header .badge{display:none}
   .msg,.toolblk{max-width:96%}
 }
+
+/* N2 mobile polish: on touch devices, small inline action buttons (run-history
+   ✕, row buttons) get a real finger-sized hit area; audited 375px 2026-07-11 —
+   no tab overflows horizontally, this was the one remaining offender. */
+@media (pointer:coarse){
+  .delRunBtn{padding:9px 14px!important;font-size:12px!important}
+  .runrow .pex{font-size:13px}
+  button,select{min-height:36px}
+}
