@@ -22,3 +22,7 @@ ruvector.db
 
 # CSM-1B local TTS sidecar (venv + model cache), see scripts/csm-server.py
 .csm/
+
+# raw ECC download (adopted copy lives in .claude/skills-library/)
+ECC-main/
+ECC-main.zip

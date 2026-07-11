@@ -148,27 +148,31 @@ fights the token goal — the hub-native queue S11 covers the need). If its
 PRD-decomposition is ever wanted, install CLI-only and invoke on demand in
 Claude Code; never put it in `.mcp.json`.
 
-### Q4. affaan-m/ecc — adopt its skills  (github.com/affaan-m/ecc) 🔜 USER REQUESTED 2026-07-11
-User: "add all of the skills to be utilized." Same adoption pattern as
-ui-ux-pro-max (S21) and hermes: pull the repo, copy its `skills/*` (and any
-`agents/*` / `commands/*`) into `.claude/`, keep the LICENSE, add a hub
-adaptation note (map fonts→/vendor/, no Python in the app, vanilla output, no
-always-on MCP unless token-justified). **Blocked this session:** the sandbox
-gated all network egress (WebFetch/gh/scrapling all needed ungranted approval),
-so the repo could not be inspected or cloned. **Blocked again 2026-07-11
-(second attempt):** every network avenue was permission-denied — `git clone`
-via Bash and PowerShell, `gh api repos/affaan-m/ecc/git/trees/HEAD`, WebFetch
-on the GitHub API, and `mcp__scrapling__get`. No skill contents were fetched
-or fabricated; nothing was installed. Needs a session with network egress
-granted (or the user cloning the repo locally and pointing us at the path).
-Next session with network:
-1. `gh api repos/affaan-m/ecc/git/trees/HEAD?recursive=1` (or clone) → enumerate
-   every skill + read each `SKILL.md` frontmatter.
-2. Triage per hub rules: adopt zero-dep skills; flag any that need a dependency
-   or an always-on MCP for the user (weigh token cost first).
-3. Copy adopted skills into `.claude/skills/`, preserve LICENSE + provenance in
-   a note, update the Skills-tab count, then browser-verify the Skills tab.
-4. Log the outcome here (which adopted, which skipped + why).
+### Q4. affaan-m/ecc — adopt its skills  ✅ DONE 2026-07-11 (curated-active + full library)
+Unblocked by the user downloading the repo locally (`ECC-main.zip`, now
+gitignored). 278 skills (MIT) adopted as a **two-tier install** — activating
+all would have added ~15-18k tokens of skill descriptions to EVERY session and
+hub run (incl. the voice loop), so the user chose curated-active when asked:
+- **`.claude/skills-library/`** (committed): all 278 + LICENSE + README with
+  provenance, the active list, skip reasons, and a one-command promote/demote
+  recipe. Not auto-loaded — Claude Code only reads `.claude/skills/`.
+- **`.claude/skills/`** (active, 41 → 59): 18 curated — hub dev
+  (make-interfaces-feel-better, browser-qa, e2e-testing, verification-loop,
+  security-review, api-design, backend-patterns), agents/workflows
+  (prompt-optimizer, team-agent-orchestration, autonomous-loops, search-first,
+  context-budget), business/logistics for the Entos work (market-research,
+  customs-trade-compliance, logistics-exception-management,
+  inventory-demand-planning, carrier-relationship-management,
+  returns-reverse-logistics).
+- Skipped-from-active: `deep-research` (needs firecrawl/exa MCPs),
+  `cost-tracking`/`continuous-learning*`/`skill-comply`/`ck` (need ECC's own
+  hooks/scripts infra), `frontend-design-direction` (would override this
+  repo's design language), `design-system` (name-collision with the
+  ui-ux-pro-max adoption), ~250 stack packs irrelevant here.
+- Active set grep-audited (network/exec/injection patterns — clean; hits were
+  teaching examples in the security docs). Hub Skills tab verified at 59.
+ECC's `agents/*` were NOT adopted — the curated-~20-agent-roster decision
+stands (never a bulk library).
 
 ---
 
