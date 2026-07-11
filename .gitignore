@@ -26,3 +26,6 @@ ruvector.db
 # raw ECC download (adopted copy lives in .claude/skills-library/)
 ECC-main/
 ECC-main.zip
+
+# Python bytecode cache (e.g. from py_compile checks of scripts/csm-server.py)
+__pycache__/
