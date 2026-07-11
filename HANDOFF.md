@@ -45,23 +45,30 @@ lib/core.js              overview / library / assets / sessions / graph endpoint
 lib/runs.js              run engine: spawn claude CLI, SSE, auto-routing, history, artifacts
 lib/tasks.js             hub-native task queue (feeds prompts to the run engine)
 lib/schedules.js         scheduled runs: hub-native cron → run engine (data/schedules.json)
-lib/agentgraph.js        run stream → persona-named agent crew graph (Graph tab live view)
-lib/files.js             upload inbox (vanilla multipart)
+lib/agentgraph.js        run stream → persona-named agent crew graph (hermes runs = Maestro + crew ring)
+lib/files.js             upload inbox (vanilla multipart) + zero-dep xlsx preview (/api/files/xlsx)
+lib/voice.js             CSM voice: loopback-only proxy /api/voice/tts + /status + /start (spawns sidecar)
 index.html               markup shell (token injected at serve time)
-assets/app.js            SPA core + Overview/Sessions/Library/Config
-assets/run.js  tasks.js  files.js  graph.js  agentviz.js  assetlib.js  memory.js  style.css
+assets/app.js            SPA core + Overview/Sessions/Library/Config + ◐ theme toggle
+assets/run.js  tasks.js  files.js  graph.js  agentviz.js  assetlib.js  memory.js  voice.js  voicecfg.js  style.css
 vendor/                  LOCAL asset library: 18 font faces, Lucide sprite, normalize (manifest.json = sources+licenses)
-.claude/skills/ui-design/  zero-dep design library (consult for UI work)
+.claude/skills/          59 active skills (41 pre-ECC + 18 curated ECC); ui-design = the design library
+.claude/skills-library/  all 278 ECC skills (MIT, NOT auto-loaded; README = promote/demote recipe)
 data/                    runtime: runs/<id>/, inbox/, tasks.json, schedules.json, memory.json (gitignored)
+.csm/                    CSM-1B runtime: venv + weights + server.log (~10 GB, gitignored)
 docs/roadmap.md          the prioritized plan (single source of truth)
-scripts/verify-dashboard.ps1   endpoint smoke test
+docs/voice-csm.md        CSM voice architecture, measured perf, pins, rebuild recipe
+scripts/csm-server.py    CSM-1B TTS sidecar (127.0.0.1:8790; csm-requirements.txt = pinned deps)
+scripts/verify-dashboard.ps1   endpoint smoke test (41 checks)
 scripts/install-autostart.ps1  user-run logon task
 ```
 Nav order: Run · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Config.
 Graph tab: "Agents" live crew view by default (persona names: Maestro/Poet/Dart
 models, Scout/Scribe/Wrench/etc tool crews). Codebase map behind a chip, with
 its own Modules (file-level, default) / All-symbols sub-views.
-`assets/voice.js` = N9 voice module (header mic orb; loaded last in index.html).
+`assets/voice.js` = N9 voice module (mic orb, browser+CSM engines, chunked CSM
+playback, barge-in); `assets/voicecfg.js` = its Config settings panel (split
+out for the 500-line rule; attaches HubVoice.renderSettings via HubVoice._cfg).
 
 `lib/memory.js` = Engram-style semantic memory (SEMANTIC OVER VECTORS): typed
 records, lexical+tag+recency+importance recall, NO embeddings/vector-DB. Captures
@@ -85,8 +92,9 @@ memories into the prompt; rule-based failure-pattern distillation included.
   which only holds the clone+venv), mirror in `scripts/hermes-config.yaml`.
   Authenticated (`hermes auth add nous`, OAuth in auth.json); verified
   end-to-end. Tiering live: main=sonnet, aux=auto-cheap, subagents=
-  gemini-3-flash via nous. H1 shipped; H2–H4 are the next builds. See
-  `docs/hermes-adoption.md`.
+  gemini-3-flash via nous. H1/H2/H3 SHIPPED (engine selector in the Run
+  composer + agent-graph personas, live-verified 2026-07-11); H4 gateway is
+  the next build. See `docs/hermes-adoption.md`.
 - **Agent roster = curated ~20, NEVER a bulk library** (user, 2026-07-10 late
   eve). 8 live hermes roles (read from config) + 14 hand-picked local
   specialists in `.claude/agents/`, EVERY one with explicit `model:`
@@ -96,6 +104,22 @@ memories into the prompt; rule-based failure-pattern distillation included.
 - **Voice = hermes's job + a hub loop** (user, 2026-07-10 late eve). N9 Track A
   SHIPPED (`assets/voice.js`, browser-native, zero-dep). Track B (hermes
   gateway voice notes) pairs with H4. Full plan: `docs/voice-plan.md`.
+- **Sesame CSM-1B = the hub's local neural voice** (user, 2026-07-11 "now").
+  Runs natively (Windows + RTX 3060, no WSL2) in gitignored `.csm/`;
+  transformers **pinned <5** (5.x babbles — audio-embed weight fails to map,
+  whisper-verified both ways); weights from ungated `unsloth/csm-1b` mirror
+  (official repo is HF-gated; used first if HF_TOKEN set). Known floor:
+  ~0.4× realtime on this GPU → ~6 s to first word via chunked playback; if
+  that ever grates, Kokoro/Piper are the faster-but-less-natural fallbacks.
+- **ECC skills = curated-active + full library** (user choice, 2026-07-11).
+  All 278 from affaan-m/ecc (MIT) live in `.claude/skills-library/` (not
+  auto-loaded); 18 curated actives in `.claude/skills/` (activating all would
+  tax every run ~15-18k tokens). NO ECC agents adopted (curated-roster rule).
+- **The user drives parallel work through the hub's own Run tab** (Fable 5
+  acceptEdits runs editing this very repo, often by voice). Before editing,
+  check `git status` + `/api/runs` for an active run on the same files —
+  reconcile, don't clobber. Hub-run replies must stay SHORT (2-4 sentences)
+  because they're spoken aloud (see memory + S25 chunking).
 - **Assets library is a first-class Library tab** (user, 2026-07-10): vendor/
   fonts+icons+css, locally saved, advertised to every run; prefer /vendor/ over
   CDNs in all generated UI.
@@ -127,46 +151,53 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
 (Tailscale PWA vs Base44-over-Tailscale vs native wrapper).
 
 ## Pending USER actions (remind them; you can't do these)
+- **H4 needs a Telegram bot token** (from @BotFather) — 2 minutes, unblocks the
+  phone voice/text bridge.
 - Autostart: `powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1`
+  (hub only — the CSM sidecar starts from Config → Voice → ⚡ Start engine).
 - Mobile: install Tailscale (PC + phone), `tailscale serve --bg 5757`, bookmark the URL.
+- Q1 Playwright: quick "yes" to install (dev-only) and I'll build the E2E net.
+- Housekeeping: `ECC-main.zip` + `ECC-main/` in the repo root are the raw
+  download (gitignored; adopted copy is committed) — delete when convenient.
+- Optional: accept the `sesame/csm-1b` terms on HF + set HF_TOKEN to pull the
+  official weights instead of the mirror.
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
 
-## Current state (2026-07-10, end of late-eve session)
-All S1–S24 shipped and browser-verified (see roadmap table). **Working tree
-clean; smoke script green (34 checks).** Latest commits: agent purge + graph
-fixes (`2cb18f8`), hermes docs (`c288a63`), voice research (`17dcf6e`), hermes
-switch + H1 (`8808536`), hermes operational (`f93d855`), Agents roster
-(`7c0a3ab`), agent bench + graph visual (`9e4671e`), voice plan (`36463d1`),
-N9 voice Track A (`2060af2`).
+## Current state (2026-07-11, end of session)
+All S1–S26 shipped and browser-verified (see roadmap table). **Smoke script
+green (41 checks).** This session's commits: all-Claude-versions model picker
+(`98774ec`), CSM-1B voice engine (`cd81339`), ECC skills Q4 (`6d6c499`),
+H2+H3+N5+N4+N6 batch (`56ab84c`), N2 mobile audit (`2149124`), CSM cutoff/
+latency/silent-death fixes (`62ebc7a`), perf docs (`22ad9e7`), handoff (HEAD).
 
 Snapshot of what's true right now:
-- **Hermes v0.18.2 FULLY OPERATIONAL** — installed, configured (main=sonnet,
-  aux=auto-cheap, subagents=gemini-3-flash via nous), authenticated (Nous
-  OAuth), verified end-to-end. `/api/hermes` shows **ready**.
-- **Agents tab = 22 roster**: 8 live hermes roles + 14 curated local
-  specialists, all with explicit model tiers + chips. (Overview also reads
-  41 skills · 166 commands · MCP scrapling only · Engram memories.)
-- **Graph tab**: live Agents crew view default; Codebase map has Modules
-  (file-level, warm palette, weighted links) + All-symbols sub-views.
-- **Voice N9 Track A SHIPPED**: `assets/voice.js` — header mic orb, Web Speech
-  API → auto-routed run, speechSynthesis talk-back, Config settings (both
-  toggles default OFF). Live mic capture works only in the user's real
-  Chrome/Edge (my Browser pane sandbox blocks mic; that's not a bug).
-- **Sesame CSM-1B local neural voice INSTALLED & VERIFIED (S25, 2026-07-11)**:
-  second TTS engine, native Windows + RTX 3060 CUDA. Runtime in gitignored
-  `.csm/` (venv: torch 2.6.0+cu124, transformers **pinned <5** — 5.x babbles;
-  weights from ungated `unsloth/csm-1b` mirror since `sesame/csm-1b` is
-  HF-gated). Sidecar `scripts/csm-server.py` :8790 ← `lib/voice.js` proxy
-  (`/api/voice/tts|status|start`) ← engine picker + Start button in Config →
-  Voice. Whisper-verified round trip. Docs: `docs/voice-csm.md`. Run-tab model
-  dropdown also now offers every Claude version (pin Fable 5 / Opus 4.8/4.7 /
-  Sonnet 5/4.6 / Haiku 4.5).
-- **Heads-up: the user drives parallel work through the hub's own Run tab**
-  (Fable 5 runs in acceptEdits editing this very repo). Before editing, check
-  `git status` + `/api/runs` for an active run touching the same files —
-  reconcile, don't clobber (this session merged one such run's CSM work).
+- **Hermes v0.18.2 OPERATIONAL + IN THE COMPOSER (H2/H3)** — "engine: claude |
+  hermes" selector; hermes runs spawn `hermes -z --usage-file` into the same
+  history/SSE/cost accounting (live-verified: $0.0557 run). Graph tab shows
+  Maestro + crew ring for hermes runs. No resume yet (H2.5: usage.json carries
+  a session_id). `/api/hermes` shows **ready**.
+- **Voice is TWO engines**: browser speechSynthesis (instant) + Sesame CSM-1B
+  local neural (Config → Voice → TTS engine). CSM verified end-to-end and
+  then FIXED after live use: the shipped 10 s generation cap caused
+  mid-sentence cutoffs (now scales with text), chunked playback brings first
+  word to ~6 s (hard floor: ~0.4× realtime on the 3060), spoken text capped
+  at 400 chars + "the rest is on screen", and a swallowed audio.play()
+  rejection that silently killed replies now recovers. All measured numbers
+  in `docs/voice-csm.md`. Sidecar must be running (Config shows a status
+  pill + ⚡ Start engine; it does NOT autostart with the hub).
+- **Run tab**: every Claude version pinnable (Fable 5 / Opus 4.8/4.7 /
+  Sonnet 5/4.6 / Haiku 4.5) alongside auto-routing; ⚖ routing-accuracy chip
+  (`/api/routing`) flags over/under-routed auto picks.
+- **Skills = 59 active** (41 + 18 curated ECC) with the other 260 ECC skills
+  promotable from `.claude/skills-library/` (see its README). Files tab has
+  ▦ xlsx sheet/dimension preview; header has ◐ dark/light toggle; all 12 tabs
+  clean at 375 px.
+- **Agents tab = 22 roster** (8 hermes roles + 14 curated locals with tier
+  chips) — unchanged, and the curated-roster rule still stands.
+- **Mic capture** works only in the user's real Chrome/Edge (the Browser pane
+  sandbox blocks mic — not a bug). Voice-run replies must stay SHORT (TTS).
 
-**Next up (see EXECUTE NEXT above):** H2 hermes engine in the Run composer →
-H3 hermes in the agent graph → H4 gateway toggle + N9 Track B, then N2 mobile,
-N5 theme, N4 routing, N6 xlsx, Q1 Playwright. Queued (don't build until asked):
-N7 SharePoint Breakdown, N8 iPhone.
+**Next up (see EXECUTE NEXT above):** H4 gateway + N9 Track B (🙋 Telegram
+token) → H2.5 hermes resume → Q1 Playwright (🙋 nod) → N2 real-phone pass
+(🙋 Tailscale). Queued (don't build until asked): N7 SharePoint Breakdown,
+N8 iPhone.
