@@ -95,7 +95,18 @@ into the auto-allocation logic (`lib/runs.js` routeModel neighbourhood).
 
 ---
 
-## ISSUE-5 🟡 Hermes stack inclusion — PARKED (ISSUE-1 now resolved; user confirmed 2026-07-10 they still like hermes)
+## ISSUE-5 ✅ RESOLVED 2026-07-10 eve — hermes ADOPTED as the second agentic stack (user decision)
+**Resolution.** After purging the 91 claude-flow agent definitions (every one
+ran on the session default model — no tiering), the user chose hermes-agent as
+the replacement stack. Its per-task model config (`model.default` +
+`auxiliary.*`) is exactly the "cheap models for mechanical work" requirement,
+and its messaging gateway delivers the original toggle-able mobile bridge.
+Plan + install steps: `docs/hermes-adoption.md`; roadmap items H1–H4. The
+"second cost model" caveat below still holds (hermes bills per API call —
+needs an API key, not the claude subscription). Original analysis kept below
+for context.
+
+*(superseded analysis)*
 **User request (2026-07-10):** include BOTH the hub stack and the hermes stack,
 with a **UI toggle to turn hermes on/off** (for mobile / another device). Then
 paused it pending the ruflo↔engine overlap above.

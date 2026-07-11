@@ -1,0 +1,26 @@
+# Staged hermes-agent config — copy into ~/.hermes/config.yaml AFTER installing
+# hermes (see docs/hermes-adoption.md). The whole point of adopting hermes is
+# MODEL TIERING: the main brain runs on a big model, but cheap mechanical work
+# (compression, vision, extraction) runs on haiku-class models so we never pay
+# frontier prices to shuffle JSON.
+#
+# Secrets do NOT go here — put ANTHROPIC_API_KEY (or OPENROUTER_API_KEY) in
+# ~/.hermes/.env. Run `hermes model` any time to switch interactively.
+
+model:
+  default: "anthropic/claude-sonnet-5"   # main reasoning loop — strong but not max-price
+  provider: "anthropic"
+  context_length: 200000
+
+auxiliary:
+  compression:                            # context/session summarization — cheap tier
+    provider: "anthropic"
+    model: "anthropic/claude-haiku-4-5"
+    timeout: 120
+  vision:                                 # image description — cheap tier
+    provider: "anthropic"
+    model: "anthropic/claude-haiku-4-5"
+
+providers:
+  anthropic:
+    request_timeout_seconds: 1800

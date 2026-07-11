@@ -38,6 +38,7 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 | S18 | **N3.5 Memory auto-recall** — opt-in toggle (default OFF) in the Run composer injects top-3 relevant Engram memories (1.2k char cap) into the CLI prompt; injected count streamed to chat + stored as `recallCount`. Rule-based distillation: 3+ failed runs sharing a tag → standing semantic "failure pattern" record. Verified: haiku answered chart values purely from recalled context ($0.036, 1 turn, no tools) | `lib/memory.js`, `lib/runs.js`, `assets/run.js` |
 | S19 | **Assets library (user request)** — `vendor/` with 18 OFL font faces (all 12 ui-design families, latin woff2), Lucide sprite (1,746 icons, ISC), modern-normalize (MIT); manifest.json records every source+license. Guarded `/vendor/` route, `/api/assets`, fifth Library tab (font specimens + searchable click-to-copy icon grid). Hub fonts now fully local (offline, no CDN); artifact CSP allows `/vendor/` only; run hint advertises the library so generated pages use local assets | `vendor/`, `assets/assetlib.js`, `server.js` |
 | S20 | **Ruflo retired + live Agent Graph (user decision)** — Swarm tab/endpoints/claude-flow MCP removed (open-issues 1/2/3/4/6 resolved). Graph tab's default view is now a live radial map of the current run's crew: persona-named workers (Maestro/Poet/Dart models; Scout, Bloodhound, Scribe, Wrench, Falcon, Foreman, Spellbook, Envoy crews; recruited subagents; Gallery) with pulsing active nodes, animated links, auto-follow of live runs, click-to-inspect, click-center-to-replay. Codebase map kept behind a chip. Zero-token: polls a local disk-read endpoint | `lib/agentgraph.js`, `assets/agentviz.js`, `assets/graph.js` |
+| S22 | **Agent purge + Graph fixes (user decision, eve)** — all 91 claude-flow agent .md definitions deleted (every one ran on the session default = Fable 5; model tiering is the requirement). Replacement stack chosen: **hermes-agent** (see `docs/hermes-adoption.md`, install pending user). Graph tab: codebase map was a day stale (31 nodes) → regenerated (277 nodes/484 edges/18 communities); big-graph label declutter (top-48 by degree; hover/search labels the rest); live Agents view verified working via simulated running run | `.claude/`, `assets/graph.js`, `graphify-out/` |
 | S21 | **ui-ux-pro-max skills adopted (user request)** — 6 MIT skills from nextlevelbuilder/ui-ux-pro-max-skill copied into `.claude/skills/`: ui-ux-pro-max (1.4MB CSV design DB), design, design-system, brand, banner-design, slides; hub adaptation note (no Python → Grep the CSVs, map fonts to /vendor/, vanilla CSS output); skipped ui-styling (React/Tailwind + duplicate TTFs). Library: 41 skills | `.claude/skills/` |
 
 ---
@@ -45,6 +46,31 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 ## 🔜 DO NEXT — autonomous, no user action needed (execute top-down)
 
 *(N1, N3, N3.5 shipped 2026-07-10 → see S16–S18 above.)*
+
+### H1–H4. Hermes integration (top priority once the user installs it)
+User decision 2026-07-10 eve: hermes-agent IS the second agentic stack (model
+tiering: cheap models for mechanical work). Full plan in
+`docs/hermes-adoption.md`. Blocked on 🙋 install + API key below; then:
+H1 hub presence (Overview/Agents tab reads hermes config) → H2 optional
+hermes engine in the Run composer → H3 hermes runs in the agent graph →
+H4 messaging gateway toggle (resolves ISSUE-5).
+
+### N7. Library: SharePoint Breakdown (user request 2026-07-10 — QUEUED, do not build yet)
+New Library item: a full breakdown of every file directory with an
+embedding/summary of what each file contains, kept up to date so any new
+thread gets instant file-level orientation. Build it ONCE with Fable 5 (much
+more efficient at the initial sweep), then hand maintenance to Opus 4.8.
+Shape TBD: likely `data/breakdown.json` + a Library tab section; refresh via a
+scheduled run (S17). **User said: to-do list only for now.**
+
+### N8. iPhone incorporation (user request 2026-07-10 — QUEUED, evaluate options)
+Get the hub properly usable from an iPhone — possibly via Base44 or another
+app-builder, possibly without one. Options to weigh when picked up:
+(a) Tailscale + PWA manifest/icon on the existing hub (zero-dep, already
+half-planned in 🙋 Mobile access + N2); (b) a Base44-built front-end that
+talks to the hub over the user's Tailscale HTTPS URL (revisits the earlier
+"Base44 can't reach localhost" objection — Tailscale changes the math);
+(c) a thin native wrapper. Depends on N2 mobile polish either way.
 
 ### N2. Mobile polish  (was P2)
 Audit every tab at 375px width (the nav already collapses <760px). Fix touch
@@ -95,6 +121,7 @@ Claude Code; never put it in `.mcp.json`.
 
 ## 🙋 Pending USER actions (agent will not do these — system/network/installs)
 
+- **Hermes install (unblocks H1–H4):** `iex (irm https://hermes-agent.nousresearch.com/install.ps1)` then put `ANTHROPIC_API_KEY=` (or `OPENROUTER_API_KEY=`) in `~/.hermes/.env` and copy `scripts/hermes-config.yaml` → `~/.hermes/config.yaml`. The agent's own installer run was permission-blocked (remote-code review); no key currently exists on this machine.
 - **Autostart:** `cd claude-hub; powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1` — hub starts at logon so the bookmark always works.
 - **Mobile access:** install Tailscale on PC + phone, then `tailscale serve --bg 5757`; bookmark the private HTTPS URL on the phone. (Agent never touches VPN/network.)
 - **Obsidian (for Q-Obsidian below):** confirm you use/want Obsidian and give a vault path.
@@ -110,7 +137,7 @@ Claude Code; never put it in `.mcp.json`.
 | **21st.dev** | React/Tailwind component marketplace — conflicts with the zero-dep vanilla rule. | Only if a deliberate React rewrite is chosen |
 | **per-simmons/damon-ade** | Agentic dev env, macOS Apple-Silicon only; user is on Windows. | N/A — reference for UI inspiration only |
 | **charlie-labs** | Commercial autonomous eng agent (GitHub/Linear/Slack); a product, not a tool. Their instructions/daemons catalog is prior art for the task queue. | N/A |
-| **nousresearch/hermes-agent** | Parallel Python agent stack; duplicates the claude CLI. Idea harvested → N3 (shipped as S17). User confirmed (2026-07-10) they still like hermes → keep ISSUE-5's thin-messaging-bridge shape, PARKED. ISSUE-1 is resolved (ruflo retired), so this is now unblocked when wanted. | User says go |
+| **nousresearch/hermes-agent** | ✅ ADOPTED 2026-07-10 eve (user picked it as the replacement agentic stack after the claude-flow agent purge — per-task model tiering is the draw). No longer parked; see `docs/hermes-adoption.md` and H1–H4 above. Install itself is a 🙋 user action. | done (decision) |
 | **nextlevelbuilder/ui-ux-pro-max** | ✅ ADOPTED 2026-07-10 (user re-sent link; upstream now ships real Claude skills). Copied 6 skills into `.claude/skills/`: **ui-ux-pro-max** (1.4MB CSV design DB: 50+ styles, 161 palettes, 57 font pairings, 161 product types, 99 UX rules, per-stack guides), design, design-system, brand, banner-design, slides. Hub adaptation note added (no Python → Grep the CSVs; map fonts to /vendor/). Skipped **ui-styling** (React/shadcn/Tailwind stack + 5.6MB TTFs — conflicts with zero-dep rule, fonts already vendored). MIT, LICENSE kept. | done |
 | **Base44** | Cloud app-builder; can't reach a localhost server that spawns the CLI without exposing it publicly (bad). The hub already IS the web app. | N/A — don't link |
 
