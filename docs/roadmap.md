@@ -4,11 +4,10 @@ Single source of truth for what to build next. Ordering rule: items that make
 every later item cheaper/better ship first. **Token efficiency is the north
 star** — prefer zero-dep, avoid always-on MCPs (they tax every run).
 
-> **Architecture decision log: `docs/open-issues.md`** — ISSUE-1/2/3/4/6 were
-> RESOLVED 2026-07-10 by retiring ruflo (user decision; one agent stack only).
-> Only ISSUE-5 remains parked: the hermes thin-messaging-bridge with a mobile
-> on/off toggle — the user likes it; build it as ~100 lines on the run engine
-> when asked, never as a parallel stack.
+> **Architecture decision log: `docs/open-issues.md`** — ALL six ISSUES
+> resolved 2026-07-10: 1/2/3/4/6 by retiring ruflo; ISSUE-5 by ADOPTING hermes
+> as the second agentic stack (installed + operational; H2–H4 wire it into the
+> hub, the gateway toggle is the mobile bridge). No open architecture issues.
 
 Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred (needs a trigger) · 🙋 needs user action
 
@@ -47,20 +46,28 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ## 🔜 DO NEXT — autonomous, no user action needed (execute top-down)
 
-*(N1, N3, N3.5 shipped 2026-07-10 → see S16–S18 above.)*
+> **North star / definition of done:** the hub is a token-efficient, voice-
+> capable local cockpit where (1) every prompt lands on the cheapest capable
+> model — hub `routeModel()` for claude runs, hermes tiering for agentic runs;
+> (2) you can run work by **typing OR talking**, on desktop and phone;
+> (3) the whole system is observable (runs, spend, live agent graph, memory);
+> (4) it survives regressions (smoke + Playwright). The list below is what
+> remains to reach that; H2→H4 and N9 Track B are the load-bearing items.
 
-### H1–H4. Hermes integration (H1 ✅ shipped; H2–H4 next once credentials exist)
-User decision 2026-07-10 eve: hermes-agent IS the second agentic stack (model
-tiering: cheap models for mechanical work). Full plan in
-`docs/hermes-adoption.md`. **INSTALLED 2026-07-10 late eve** (v0.18.2, manual
-git+uv path after the remote-script installer was permission-blocked): venv at
-`~/.hermes/venvs/hermes`, clone at `~/.hermes/hermes-agent`, config at
-`%LOCALAPPDATA%\hermes\config.yaml` (NOT ~/.hermes — Windows HERMES_HOME),
-mirrored in `scripts/hermes-config.yaml`. `hermes` is on the user PATH (new
-shells). H1 ✅: `/api/hermes` + Hermes stack card on the Agents tab
-(version/model/credentials pill), smoke-tested. Remaining, in order:
-🙋 credentials → H2 hermes engine option in the Run composer → H3 hermes runs
-in the agent graph → H4 messaging gateway toggle (the ISSUE-5 mobile bridge).
+### H1–H4. Hermes integration (H1 ✅ shipped; credentials ✅ done; H2–H4 next)
+hermes-agent IS the second agentic stack (model tiering: cheap models for
+mechanical work). Full plan in `docs/hermes-adoption.md`. Installed +
+configured + authenticated + verified end-to-end (see S23). H1 ✅ shipped:
+`/api/hermes` + Hermes stack card + 8 live hermes roles in the Agents roster.
+Remaining, in order:
+- **H2** — "engine: claude | hermes" selector in the Run composer; hermes runs
+  spawn via argv arrays (same security invariants), land in the same run
+  history + Engram memory. THE next build.
+- **H3** — hermes runs feed `lib/agentgraph.js` personas like claude runs do
+  (Maestro/Crew/etc. light up in the live graph).
+- **H4** — `hermes gateway` on/off toggle + status in the hub = the mobile
+  messaging bridge (old ISSUE-5). Pairs with N9 Track B. 🙋 needs the user's
+  Telegram bot token when we get there.
 
 ### N9 Jarvis voice module — Track A ✅ SHIPPED (2026-07-10 late eve)
 Full plan in **`docs/voice-plan.md`**. **Track A DONE**: `assets/voice.js` —
@@ -80,27 +87,6 @@ thread gets instant file-level orientation. Build it ONCE with Fable 5 (much
 more efficient at the initial sweep), then hand maintenance to Opus 4.8.
 Shape TBD: likely `data/breakdown.json` + a Library tab section; refresh via a
 scheduled run (S17). **User said: to-do list only for now.**
-
-### N9. Jarvis voice layer — talk back and forth with the hub (researched 2026-07-10 eve)
-External research done (see sources in HANDOFF session notes / this entry).
-Studied: isair/jarvis (offline, MCP tools), ethanplusai/jarvis (voice →
-`[ACTION:BUILD]` → spawns Claude Code sessions; Chrome Web Speech API + Fish
-Audio TTS + Three.js orb), rezaulhreza/jarvis (dashboard + 4-state orb:
-idle/listening/speaking/thinking; Whisper/Edge-TTS/browser TTS options),
-Julian-Ivanov/jarvis-voice-assistant (web UI + WebSocket + Claude Vision).
-Conclusion: the hub already has their entire server side (run engine = action
-dispatch, SSE = their WebSocket, Engram = their SQLite memory). The gap is
-ONLY the voice loop, and it's achievable **zero-dep, browser-native**:
-1. Mic button in the Run composer → `webkitSpeechRecognition` (Chrome/Edge)
-   → live transcript → send as a normal auto-routed run.
-2. Talk-back toggle: stream the run's final text → `speechSynthesis` (pick a
-   good local voice, rate/pitch tuned) — the hub literally answers out loud.
-3. A canvas **orb** in the header reflecting state (idle / listening /
-   run-active / speaking) in the hub's amber aesthetic — small, always
-   visible, doubles as the mic button. (Orb state machine harvested from
-   rezaulhreza; skip Three.js.)
-Upgrade path later (not now): local Whisper or Edge-TTS for nicer voices.
-Pairs with N8 (voice on the phone over Tailscale = true pocket Jarvis).
 
 ### N8. iPhone incorporation (user request 2026-07-10 — QUEUED, evaluate options)
 Get the hub properly usable from an iPhone — possibly via Base44 or another

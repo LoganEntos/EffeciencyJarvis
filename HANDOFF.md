@@ -1,9 +1,9 @@
 # HANDOFF — Claude Hub  ⭐ START HERE
 
 Read this first, then `docs/roadmap.md` for the plan and `docs/open-issues.md`
-for the architecture decision log (ISSUE-1..4/6 resolved 2026-07-10 by retiring
-ruflo; only ISSUE-5, the hermes messaging bridge, remains parked). Everything
-you need to continue is here. Work happens in **this repo**
+for the architecture decision log (all six ISSUES resolved 2026-07-10: 1–4/6 by
+retiring ruflo, ISSUE-5 by ADOPTING hermes as the second stack). Everything you
+need to continue is here. Work happens in **this repo**
 (`C:\Users\logto\Documents\claude-hub`) — NOT in `bigplans.SemanticModel`
 (that's the separate Power BI project; leave it alone).
 
@@ -58,8 +58,10 @@ scripts/verify-dashboard.ps1   endpoint smoke test
 scripts/install-autostart.ps1  user-run logon task
 ```
 Nav order: Run · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Config.
-Graph tab = "Agents" live crew view by default (persona names: Maestro/Poet/Dart
-models, Scout/Scribe/Wrench/etc tool crews); codebase map behind a chip.
+Graph tab: "Agents" live crew view by default (persona names: Maestro/Poet/Dart
+models, Scout/Scribe/Wrench/etc tool crews). Codebase map behind a chip, with
+its own Modules (file-level, default) / All-symbols sub-views.
+`assets/voice.js` = N9 voice module (header mic orb; loaded last in index.html).
 
 `lib/memory.js` = Engram-style semantic memory (SEMANTIC OVER VECTORS): typed
 records, lexical+tag+recency+importance recall, NO embeddings/vector-DB. Captures
@@ -72,63 +74,87 @@ memories into the prompt; rule-based failure-pattern distillation included.
   native one (run engine + in-run Agent-tool subagents). Swarm tab, /api/swarm/*,
   and the claude-flow MCP entry are gone. Multi-agent work is visualized in the
   Graph tab's Agents view instead.
-- **hermes → ADOPTED and INSTALLED as the second agentic stack** (user,
-  2026-07-10 eve; supersedes "parked"). The 91 claude-flow agents were deleted —
-  they all ran on the session default model (Fable 5); hermes brings per-task
-  model tiering. v0.18.2 installed via git+uv (`~/.hermes/`), config at
-  `%LOCALAPPDATA%\hermes\config.yaml` (Windows HERMES_HOME — not ~/.hermes).
-  H1 shipped (`/api/hermes` + Agents-tab card). 🙋 remaining: credentials
-  (`hermes auth add nous` or API key), then H2–H4. Jarvis voice module (N9)
-  is user-committed work, right after H2. See `docs/hermes-adoption.md`.
+- **hermes → ADOPTED, INSTALLED, OPERATIONAL as the second agentic stack**
+  (user, 2026-07-10 eve; supersedes "parked" — this is the resolution of
+  ISSUE-5). The 91 claude-flow agents were deleted — they all ran on the
+  session default model (Fable 5); hermes brings per-task model tiering.
+  v0.18.2 installed via git+uv; **venv rebuilt on winget CPython 3.11.9**
+  (`%LOCALAPPDATA%\Programs\Python\Python311`) after the uv-python-store
+  trampoline broke in the user's console. Config at
+  `%LOCALAPPDATA%\hermes\config.yaml` (Windows HERMES_HOME — NOT ~/.hermes,
+  which only holds the clone+venv), mirror in `scripts/hermes-config.yaml`.
+  Authenticated (`hermes auth add nous`, OAuth in auth.json); verified
+  end-to-end. Tiering live: main=sonnet, aux=auto-cheap, subagents=
+  gemini-3-flash via nous. H1 shipped; H2–H4 are the next builds. See
+  `docs/hermes-adoption.md`.
+- **Agent roster = curated ~20, NEVER a bulk library** (user, 2026-07-10 late
+  eve). 8 live hermes roles (read from config) + 14 hand-picked local
+  specialists in `.claude/agents/`, EVERY one with explicit `model:`
+  frontmatter (haiku for mechanical, sonnet for build/review, opus only for
+  security-auditor/architect). Tier chips on the Agents tab. Do not restore
+  the deleted claude-flow catalog.
+- **Voice = hermes's job + a hub loop** (user, 2026-07-10 late eve). N9 Track A
+  SHIPPED (`assets/voice.js`, browser-native, zero-dep). Track B (hermes
+  gateway voice notes) pairs with H4. Full plan: `docs/voice-plan.md`.
 - **Assets library is a first-class Library tab** (user, 2026-07-10): vendor/
   fonts+icons+css, locally saved, advertised to every run; prefer /vendor/ over
   CDNs in all generated UI.
 - **task-master → NOT an always-on MCP** (per-run tax). Hub-native queue (`lib/tasks.js`) covers it. CLI-only if ever wanted.
 - **UI/UX skill → both layers now local**: `.claude/skills/ui-design` (fast anti-slop rules, written here) + 6 skills adopted 2026-07-10 from nextlevelbuilder/ui-ux-pro-max-skill (MIT) — `ui-ux-pro-max` CSV design database (Grep it; no Python on this machine), design, design-system, brand, banner-design, slides. Skipped upstream `ui-styling` (React/Tailwind stack + duplicate fonts).
-- **hermes-agent → don't adopt**; harvested its scheduling idea → roadmap N3.
-- **Base44 / 21st.dev / Tavily / damon-ade / charlie-labs → not adopted** (see roadmap deferred table for why + triggers).
+- **Base44 / 21st.dev / Tavily / damon-ade / charlie-labs → not adopted** (see roadmap deferred table for why + triggers). Base44 may be revisited for N8 iPhone (Tailscale changes the "can't reach localhost" math).
 - **Frontend-aesthetics cookbook → adopted**; rules in CLAUDE.md + auto-injected into run artifact hints.
 - **ruflo daemons → killed**, then the whole stack **retired** (see above); the claude-flow entry is fully removed from `.mcp.json` (scrapling is the only MCP left). Leftover ruflo state on disk (`.swarm/`, `.claude-flow/`) is gitignored and inert.
 
-## EXECUTE NEXT — clear list to knock out instantly (detail in docs/roadmap.md)
-Autonomous, no user action, in order (N1/N3/N3.5 shipped 2026-07-10 → S16–S18):
-1. **N2 Mobile polish** — audit all tabs at 375px; touch targets, overflow, composer.
-2. **N4 Routing-accuracy feedback** — compare routed model vs outcome; tune `routeModel()`.
-3. **N5 Dark/light theme toggle** — header toggle + persistence (light CSS vars already shipped in S16).
-4. **N6 xlsx preview in Files** — zero-dep sheet/dimension preview.
+## EXECUTE NEXT — the path to "where it needs to be" (detail in docs/roadmap.md)
+Ordered; H2→H4 and voice are the load-bearing items. Autonomous unless marked 🙋.
+1. **H2 Hermes engine in the Run composer** — "engine: claude | hermes"
+   selector; hermes runs via argv arrays (keep security invariants), into the
+   same run history + Engram. THE next build.
+2. **H3 Hermes runs in the live agent graph** — Maestro/Crew personas light up
+   for hermes runs like claude runs already do.
+3. **H4 Hermes gateway toggle + N9 Track B** — `hermes gateway` on/off in the
+   hub = the mobile voice/text bridge. 🙋 needs a Telegram bot token.
+4. **N2 Mobile polish** — audit all tabs at 375px; touch targets, overflow,
+   composer, and the new voice orb on a phone.
+5. **N5 Dark/light theme toggle** — header toggle + persistence (light CSS vars
+   already shipped in S16).
+6. **N4 Routing-accuracy feedback** — routed model vs outcome; tune `routeModel()`.
+7. **N6 xlsx preview in Files** — zero-dep sheet/dimension preview.
+8. **Q1 Playwright E2E** (dev-only, no run tax) — regression net; recommended
+   install. 🙋 quick nod to install.
 
-Needs a dependency install (weigh token cost, get a quick nod):
-7. **Q1 Playwright E2E** (dev-only, no run tax) — recommended first install; regression safety net.
-8. **Q2 markdownify-MCP** — only when document workflows are active (MCP tax).
+Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
+(file-level directory index, first sweep by Fable 5), **N8 iPhone incorporation**
+(Tailscale PWA vs Base44-over-Tailscale vs native wrapper).
 
 ## Pending USER actions (remind them; you can't do these)
 - Autostart: `powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1`
 - Mobile: install Tailscale (PC + phone), `tailscale serve --bg 5757`, bookmark the URL.
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
 
-## Current state
-All S1–S22 shipped and browser-verified (see roadmap table). 2026-07-10 evening
-session shipped, in order: N1 restyle (`eae41ba`), N3 schedules (`363246f`),
-N3.5 recall (`d60da34`), Assets library (`8feb670`), ruflo retired + live agent
-graph (`3bc872f`), ui-ux-pro-max skill adoption (`c057624`), agent purge +
-graph fixes (`2cb18f8`). Working tree clean, smoke script green (32 checks).
-Overview reads: 0 agents (library purged — hermes replaces it) · 41 skills ·
-166 commands · MCP scrapling only · Engram memories counted. Hermes v0.18.2 is
-**FULLY OPERATIONAL**: installed (venv rebuilt on winget CPython 3.11.9 after
-the uv-trampoline launcher broke in the user's console), configured (sonnet
-main via provider auto, aux auto-cheap, subagents pinned to gemini-3-flash via
-nous), authenticated (user ran `hermes auth add nous`, OAuth in auth.json),
-and verified end-to-end (`hermes -z` one-shot answered "OK" through Nous).
-H1 shipped (`/api/hermes` + Agents-tab card shows **ready**; smoke script 33
-checks). Agents tab roster = 22: 8 live hermes roles + 14 curated local
-specialists (every one with explicit model frontmatter; tier chips on rows;
-never restore bulk libraries). Codebase graph defaults to the module-level
-view (warm palette, weighted links; symbols behind a chip). Voice plan:
-`docs/voice-plan.md` (Track A hub zero-dep loop = N9, Track B hermes gateway
-voice notes = H4). **N9 Track A voice module SHIPPED** (`assets/voice.js` — header mic orb, Web
-Speech API → auto-routed run, speechSynthesis talk-back, Config settings both
-default OFF; smoke 34 checks). Next up: H2 hermes engine in the Run composer →
-H3 hermes in the agent graph → H4 gateway toggle + N9 Track B (hermes voice
-notes), N2 mobile polish, N4 routing feedback, N5 theme toggle, N6 xlsx
-preview, N7 SharePoint Breakdown (queued, don't build until asked), N8 iPhone
-incorporation (queued), Q1 Playwright (needs a nod).
+## Current state (2026-07-10, end of late-eve session)
+All S1–S24 shipped and browser-verified (see roadmap table). **Working tree
+clean; smoke script green (34 checks).** Latest commits: agent purge + graph
+fixes (`2cb18f8`), hermes docs (`c288a63`), voice research (`17dcf6e`), hermes
+switch + H1 (`8808536`), hermes operational (`f93d855`), Agents roster
+(`7c0a3ab`), agent bench + graph visual (`9e4671e`), voice plan (`36463d1`),
+N9 voice Track A (`2060af2`).
+
+Snapshot of what's true right now:
+- **Hermes v0.18.2 FULLY OPERATIONAL** — installed, configured (main=sonnet,
+  aux=auto-cheap, subagents=gemini-3-flash via nous), authenticated (Nous
+  OAuth), verified end-to-end. `/api/hermes` shows **ready**.
+- **Agents tab = 22 roster**: 8 live hermes roles + 14 curated local
+  specialists, all with explicit model tiers + chips. (Overview also reads
+  41 skills · 166 commands · MCP scrapling only · Engram memories.)
+- **Graph tab**: live Agents crew view default; Codebase map has Modules
+  (file-level, warm palette, weighted links) + All-symbols sub-views.
+- **Voice N9 Track A SHIPPED**: `assets/voice.js` — header mic orb, Web Speech
+  API → auto-routed run, speechSynthesis talk-back, Config settings (both
+  toggles default OFF). Live mic capture works only in the user's real
+  Chrome/Edge (my Browser pane sandbox blocks mic; that's not a bug).
+
+**Next up (see EXECUTE NEXT above):** H2 hermes engine in the Run composer →
+H3 hermes in the agent graph → H4 gateway toggle + N9 Track B, then N2 mobile,
+N5 theme, N4 routing, N6 xlsx, Q1 Playwright. Queued (don't build until asked):
+N7 SharePoint Breakdown, N8 iPhone.
