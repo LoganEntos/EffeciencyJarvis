@@ -38,6 +38,7 @@ Check "GET /assets/run.js"     "$base/assets/run.js"
 Check "GET /assets/files.js"   "$base/assets/files.js"
 Check "GET /assets/graph.js"   "$base/assets/graph.js"
 Check "GET /assets/voice.js"   "$base/assets/voice.js"
+Check "GET /assets/voicecfg.js" "$base/assets/voicecfg.js"
 Check "GET /api/overview"      "$base/api/overview"
 Check "GET /api/agents"        "$base/api/agents"
 Check "GET /api/skills"        "$base/api/skills"
@@ -57,6 +58,8 @@ Check "GET /vendor/css/fonts.css" "$base/vendor/css/fonts.css"
 Check "GET vendor traversal blocked" "$base/vendor/..%2Fserver.js" 404
 Check "GET /api/memory"        "$base/api/memory"
 Check "GET /api/memory/search" "$base/api/memory/search?q=test"
+Check "GET /api/voice/tts (404)"  "$base/api/voice/tts" 404
+Check "GET /api/voice/status"  "$base/api/voice/status"
 Check "GET /api/run/transcript (bad id 404)" "$base/api/run/transcript?id=nope" 404
 Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2Fserver.js" 403
 CheckPost "POST /api/run w/o token (403)"        "$base/api/run"        '{"prompt":"x"}' 403
@@ -65,6 +68,8 @@ CheckPost "POST /api/files/delete w/o token (403)" "$base/api/files/delete" '{"n
 CheckPost "POST /api/tasks w/o token (403)"       "$base/api/tasks"       '{"prompt":"x"}' 403
 CheckPost "POST /api/memory w/o token (403)"      "$base/api/memory"      '{"text":"x"}' 403
 CheckPost "POST /api/schedules w/o token (403)"   "$base/api/schedules"   '{"prompt":"x","kind":"daily","at":"08:00"}' 403
+CheckPost "POST /api/voice/tts w/o token (403)"   "$base/api/voice/tts"   '{"text":"x"}' 403
+CheckPost "POST /api/voice/start w/o token (403)" "$base/api/voice/start" '{}' 403
 
 if ($fails -eq 0) { Write-Host "`nAll checks passed." -ForegroundColor Green; exit 0 }
 Write-Host "`n$fails check(s) failed." -ForegroundColor Red

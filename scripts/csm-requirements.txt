@@ -1,0 +1,14 @@
+# Sesame CSM-1B sidecar deps (scripts/csm-server.py) — install into .csm/venv:
+#   %LOCALAPPDATA%\Programs\Python\Python311\python.exe -m venv .csm\venv
+#   .csm\venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+#   .csm\venv\Scripts\python.exe -m pip install -r scripts\csm-requirements.txt
+#
+# torch is installed separately from the cu124 index (GPU wheel, ~2.5 GB).
+# transformers is pinned <5: the CSM checkpoint uses 4.x weight names — under
+# 5.x the audio embedding loads randomly initialized and the model babbles
+# (verified 2026-07-11: 5.13 babbles, 4.57.6 speaks the requested text).
+transformers<5
+accelerate
+soundfile
+# optional — only used by verification scripts to transcribe test WAVs:
+# faster-whisper

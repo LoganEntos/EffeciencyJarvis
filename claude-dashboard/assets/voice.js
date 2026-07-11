@@ -1,12 +1,20 @@
-/* Voice module (N9 Track A) — talk to the hub, it talks back. Zero-dependency,
-   browser-native: webkitSpeechRecognition for the mic, speechSynthesis for the
-   reply, a small canvas orb in the header for state. No server cost: speech
-   never leaves the browser except through the vendor's own speech service.
+/* Voice module (N9 Track A + hands-free call) — talk to the hub, it talks back.
+   Zero-dependency, browser-native: webkitSpeechRecognition for the mic,
+   speechSynthesis for the reply, WebAudio for turn earcons, a small canvas orb
+   in the header for state. No server cost: speech never leaves the browser
+   except through the vendor's own speech service.
+
+   Two ways to talk:
+     • One-shot  — click the orb (or press V): speak once, it sends & replies.
+     • Call mode — a hands-free loop: after Claude finishes speaking, the mic
+       re-opens automatically so you can go back and forth without the keyboard.
+       Start with Shift+click / long-press the orb (or when "hands-free" is on in
+       Config, a normal click starts it). End with Esc, a click, or two silences.
 
    Public surface (window.HubVoice):
-     init()                    - inject the orb + wire hotkey (called from boot)
+     init()                    - inject the orb + wire hotkeys (called from boot)
      onRunStart()              - a run began → orb goes "thinking"
-     onRunDone(text, meta)     - a run ended → orb idle; speak text if talkback on
+     onRunDone(text, meta)     - a run ended → orb idle; speak text if talkback/call
      renderSettings(container) - Config-tab settings block
 */
 'use strict';
@@ -14,19 +22,70 @@
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const SS = window.speechSynthesis;
   const store = {
-    get mic() { try { return localStorage.getItem('hub.voice.mic') === '1'; } catch { return false; } },
+    // orb visible by default so voice is discoverable; user can hide it in Config
+    get mic() { try { const v = localStorage.getItem('hub.voice.mic'); return v === null ? true : v === '1'; } catch { return true; } },
     set mic(v) { try { localStorage.setItem('hub.voice.mic', v ? '1' : '0'); } catch {} },
     get talk() { try { return localStorage.getItem('hub.voice.talk') === '1'; } catch { return false; } },
     set talk(v) { try { localStorage.setItem('hub.voice.talk', v ? '1' : '0'); } catch {} },
+    get conv() { try { return localStorage.getItem('hub.voice.conv') === '1'; } catch { return false; } },
+    set conv(v) { try { localStorage.setItem('hub.voice.conv', v ? '1' : '0'); } catch {} },
     get voiceURI() { try { return localStorage.getItem('hub.voice.uri') || ''; } catch { return ''; } },
     set voiceURI(v) { try { localStorage.setItem('hub.voice.uri', v); } catch {} },
     get rate() { try { return parseFloat(localStorage.getItem('hub.voice.rate')) || 1; } catch { return 1; } },
     set rate(v) { try { localStorage.setItem('hub.voice.rate', String(v)); } catch {} },
+    // seconds of silence before a spoken prompt is considered finished + sent
+    get pause() { try { return parseFloat(localStorage.getItem('hub.voice.pause')) || 2.5; } catch { return 2.5; } },
+    set pause(v) { try { localStorage.setItem('hub.voice.pause', String(v)); } catch {} },
+    // TTS engine: 'browser' (default) | 'csm' (local Sesame CSM-1B via /api/voice/tts)
+    get engine() { try { return localStorage.getItem('hub.voice.engine') === 'csm' ? 'csm' : 'browser'; } catch { return 'browser'; } },
+    set engine(v) { try { localStorage.setItem('hub.voice.engine', v === 'csm' ? 'csm' : 'browser'); } catch {} },
+    get csmSpeaker() { try { const n = parseInt(localStorage.getItem('hub.voice.csmspk'), 10); return isNaN(n) ? 0 : Math.max(0, Math.min(9, n)); } catch { return 0; } },
+    set csmSpeaker(v) { try { localStorage.setItem('hub.voice.csmspk', String(v)); } catch {} },
   };
+  const silenceMs = () => Math.round(store.pause * 1000);
 
-  const V = { state: 'idle', rec: null, listening: false, raf: null, canvas: null, ctx: null, t0: performance.now() };
+  // V.call = hands-free loop active; V.silence = consecutive empty listens;
+  // V.reTimer = pending re-open timer; V.press = long-press timer on the orb.
+  const V = { state: 'idle', rec: null, listening: false, call: false, silence: 0,
+    reTimer: null, press: null, raf: null, canvas: null, ctx: null, t0: performance.now(),
+    // CSM audio: csmGen invalidates in-flight fetches on barge-in
+    audioEl: null, audioUrl: null, csmGen: 0, csmPending: false };
 
   function css(name, fb) { return (getComputedStyle(document.documentElement).getPropertyValue(name) || fb).trim() || fb; }
+
+  // ---- earcons (WebAudio) — a soft rising blip when the mic opens for your
+  // turn, a falling one when the call hangs up. Purely cosmetic; fails silent.
+  let actx = null;
+  function tone(freqs, step) {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime;
+      freqs.forEach((f, i) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(actx.destination);
+        const s = t + i * step;
+        g.gain.setValueAtTime(0.0001, s);
+        g.gain.exponentialRampToValueAtTime(0.06, s + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, s + step + 0.05);
+        o.start(s); o.stop(s + step + 0.08);
+      });
+    } catch {}
+  }
+  const earOpen = () => tone([620, 880], 0.09);   // "your turn"
+  const earClose = () => tone([560, 360], 0.10);   // "hanging up"
+
+  // Surface a message in the chat log so mic problems are never silent.
+  function say(msg, cls) {
+    try { goTab('run'); ensureRunUI(); if (typeof addMsg === 'function') addMsg(msg, cls || 'sys'); } catch {}
+  }
+  // Why the mic can't run right now (null = it can). The #1 cause is an
+  // insecure origin — Web Speech only works on https or localhost/127.0.0.1.
+  function micBlockReason() {
+    if (!SR) return 'This browser has no speech recognition — use Chrome or Edge on desktop. (Talk-back still works everywhere.)';
+    if (!window.isSecureContext) return 'The mic is blocked because this page is not a secure context. Open the hub at http://localhost:5757 or http://127.0.0.1:5757 — not a Tailscale IP/hostname over plain http. (Over Tailscale, use its HTTPS "serve" URL.)';
+    return null;
+  }
 
   // ---- orb -----------------------------------------------------------------
   function buildOrb() {
@@ -34,7 +93,7 @@
     const btn = document.createElement('button');
     btn.id = 'voiceOrb';
     btn.className = 'iconbtn';
-    btn.title = SR ? 'Voice (V) — click to talk' : 'Voice input needs Chrome or Edge (desktop)';
+    btn.title = orbTitle();
     btn.style.cssText = 'padding:0;width:38px;height:38px;display:inline-grid;place-items:center';
     const cv = document.createElement('canvas');
     const DPR = window.devicePixelRatio || 1;
@@ -43,15 +102,34 @@
     const ref = $('#refreshTab');
     ref.parentNode.insertBefore(btn, ref);
     V.canvas = cv; V.ctx = cv.getContext('2d'); V.ctx.scale(DPR, DPR);
-    btn.onclick = () => {
+    // Long-press (400ms) starts a hands-free call; a plain tap is one-shot.
+    btn.onpointerdown = (e) => {
+      if (e.button && e.button !== 0) return;
+      V.longPressed = false;
+      clearTimeout(V.press);
+      V.press = setTimeout(() => { V.longPressed = true; if (SR && !V.call) beginCall(); }, 400);
+    };
+    btn.onpointerup = btn.onpointercancel = () => clearTimeout(V.press);
+    btn.onclick = (e) => {
+      clearTimeout(V.press);
+      if (V.longPressed) { V.longPressed = false; return; } // long-press already acted
+      if (V.call) { endCall(); return; }                    // click hangs up a call
       if (V.state === 'speaking') { stopSpeak(); return; }
-      if (!SR) { setState('idle'); return; }
-      V.listening ? stopListen() : startListen();
+      const blocked = micBlockReason();
+      if (blocked) { say(blocked, 'errmsg'); return; }        // tell the user why, don't sit silent
+      if (e.shiftKey) { beginCall(); return; }               // Shift+click = start call
+      if (V.listening) { stopListen(); return; }
+      store.conv ? beginCall() : startListen();              // hands-free pref → call
     };
     loop();
   }
 
-  function setState(s) { V.state = s; }
+  function orbTitle() {
+    if (!SR) return 'Voice input needs Chrome or Edge (desktop) · talk-back works everywhere';
+    if (V.call) return 'In a call — click or press Esc to hang up';
+    return 'Voice — tap to talk once · Shift+click or long-press for a hands-free call (V)';
+  }
+  function setState(s) { V.state = s; const b = $('#voiceOrb'); if (b) b.title = orbTitle(); }
 
   function loop() {
     V.raf = requestAnimationFrame(loop);
@@ -78,41 +156,104 @@
       ctx.fillStyle = css('--bg', '#0e0d0b'); ctx.globalAlpha = 0.9;
       ctx.fillRect(cx - 1.3, cy - 3, 2.6, 5); ctx.globalAlpha = 1;
     }
+    // persistent outer ring while on a hands-free call — the "line is open" tell
+    if (V.call) {
+      ctx.beginPath(); ctx.arc(cx, cy, 13, 0, 6.2832);
+      ctx.strokeStyle = green; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 3);
+      ctx.lineWidth = 1.4; ctx.setLineDash([3, 3]); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
   }
 
   // ---- speech-to-text ------------------------------------------------------
   function startListen() {
-    if (!SR) return;
-    if (SS && SS.speaking) SS.cancel();
+    const blocked = micBlockReason();
+    if (blocked) { say(blocked, 'errmsg'); if (V.call) endCall(); return; }
+    if (speakingNow()) stopSpeak();
     const rec = new SR();
-    rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
-    V.rec = rec; V.listening = true; setState('listening');
+    // continuous=true so a pause mid-thought doesn't end the turn; we decide when
+    // you're done ourselves via a silence timer, so you never get cut off.
+    rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
+    V.rec = rec; V.listening = true; V.sentByTimer = false; setState('listening');
     goTab('run'); ensureRunUI();
     const ta = $('#promptIn'); const pre = ta ? ta.value : '';
     rec.onresult = (e) => {
-      let txt = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i][0].transcript;
-      if (!ta) return;
-      ta.value = (pre ? pre + ' ' : '') + txt;
-      if (e.results[e.results.length - 1].isFinal) {
-        V.finalText = txt.trim();
-      }
+      // rebuild the whole transcript each event (results accumulate with continuous)
+      let full = '';
+      for (let i = 0; i < e.results.length; i++) full += e.results[i][0].transcript;
+      full = full.replace(/\s+/g, ' ').trim();
+      if (ta) ta.value = (pre ? pre + ' ' : '') + full;
+      V.finalText = full;
+      // restart the "you've stopped talking" countdown on every bit of speech
+      clearTimeout(V.silTimer);
+      if (full) V.silTimer = setTimeout(() => { V.sentByTimer = true; try { V.rec && V.rec.stop(); } catch {} }, silenceMs());
     };
-    rec.onerror = () => { stopListen(); };
+    rec.onerror = (e) => {
+      V.listening = false;
+      const reason = ({
+        'not-allowed': 'Microphone permission denied. Click the 🔒/mic icon in the address bar → Allow, and check Windows Settings → Privacy → Microphone (both "apps" and "desktop apps" toggles on).',
+        'service-not-allowed': 'Speech service blocked — usually an insecure origin or a Windows mic-privacy setting.',
+        'audio-capture': 'No microphone found. Plug one in / enable it in Windows Sound settings, then try again.',
+        'no-speech': "Didn't catch anything — speak a moment after the blip.",
+        'network': 'Speech-recognition network error (Chrome/Edge send audio to their speech service — needs internet).',
+        'aborted': '',
+      })[e && e.error] || ('Voice input error: ' + ((e && e.error) || 'unknown'));
+      // don't spam "didn't catch anything" every quiet turn of a call
+      if (reason && !(V.call && e && e.error === 'no-speech')) say(reason, 'errmsg');
+      // a real failure (not just silence) should end a call rather than loop on the error
+      if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture')) { endCall(); return; }
+      if (V.call) reListenSoon(600); else if (V.state === 'listening') setState('idle');
+    };
     rec.onend = () => {
       V.listening = false;
+      clearTimeout(V.silTimer);
       const send = V.finalText;
       V.finalText = '';
       // sendPrompt() self-guards on an already-running chat, so this is safe
-      if (send && typeof sendPrompt === 'function') { setState('thinking'); sendPrompt(); }
-      else setState('idle');
+      if (send && typeof sendPrompt === 'function') {
+        V.silence = 0; setState('thinking'); sendPrompt();
+      } else if (V.call) {
+        // heard nothing this turn — give one more chance, then hang up
+        if (++V.silence >= 2) endCall(true);
+        else reListenSoon(400);
+      } else setState('idle');
     };
-    try { rec.start(); } catch { stopListen(); }
+    try { rec.start(); } catch { if (V.call) reListenSoon(600); else stopListen(); }
   }
   function stopListen() {
     V.listening = false;
+    clearTimeout(V.silTimer);
     try { V.rec && V.rec.stop(); } catch {}
     if (V.state === 'listening') setState('idle');
+  }
+
+  // ---- hands-free call loop ------------------------------------------------
+  // A call is: listen → send → speak reply → (re-open mic) → repeat, until the
+  // user hangs up (Esc/click) or two turns of silence. Talk-back is implied.
+  function reListenSoon(ms) {
+    clearTimeout(V.reTimer);
+    if (!V.call) return;
+    V.reTimer = setTimeout(() => {
+      if (!V.call || (typeof chat === 'object' && chat.running)) return;
+      earOpen();
+      startListen();
+    }, ms);
+  }
+  function beginCall() {
+    if (V.call) return;
+    const blocked = micBlockReason();
+    if (blocked) { say(blocked, 'errmsg'); return; }
+    V.call = true; V.silence = 0;
+    earOpen();
+    startListen();
+  }
+  function endCall(fromSilence) {
+    if (!V.call) return;
+    V.call = false; V.silence = 0;
+    clearTimeout(V.reTimer);
+    stopListen();
+    earClose();
+    setState('idle');
   }
 
   // ---- text-to-speech ------------------------------------------------------
@@ -123,50 +264,98 @@
     if (store.voiceURI) { const m = voices.find(v => v.voiceURI === store.voiceURI); if (m) return m; }
     return voices.find(v => /en[-_]US/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang)) || voices[0];
   }
+  // speak(text) → true iff it will produce audio (the call loop relies on this)
   function speak(text) {
-    if (!SS || !text) return;
-    const clean = String(text).replace(/```[\s\S]*?```/g, ' (code block) ').replace(/[*_`#>]/g, '').trim().slice(0, 700);
-    if (!clean) return;
+    const clean = String(text || '').replace(/```[\s\S]*?```/g, ' (code block) ').replace(/[*_`#>]/g, '').trim().slice(0, 700);
+    if (!clean) return false;
+    return store.engine === 'csm' ? speakCSM(clean) : speakBrowser(clean);
+  }
+  function speakBrowser(clean) {
+    if (!SS || !clean) return false;
     SS.cancel();
     const u = new SpeechSynthesisUtterance(clean);
     const v = pickVoice(); if (v) u.voice = v;
     u.rate = store.rate; u.onstart = () => setState('speaking');
-    u.onend = () => { if (V.state === 'speaking') setState('idle'); };
+    u.onend = u.onerror = () => {
+      if (V.call) reListenSoon(200);        // reply finished → your turn again
+      else if (V.state === 'speaking') setState('idle');
+    };
     SS.speak(u);
+    return true;
   }
-  function stopSpeak() { if (SS) SS.cancel(); if (V.state === 'speaking') setState('idle'); }
+
+  // ---- Sesame CSM-1B — always via the hub's same-origin proxy (never the
+  // python server directly: CORS stays closed, loopback enforced server-side).
+  function csmFetch(text) {
+    return fetch('/api/voice/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Hub-Token': (typeof HUB_TOKEN !== 'undefined' ? HUB_TOKEN : '') },
+      body: JSON.stringify({ text, speaker: store.csmSpeaker }),
+    }).then(async r => {
+      if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch {} throw new Error(m || ('HTTP ' + r.status)); }
+      return r.blob();
+    });
+  }
+  function playBlob(blob, onDone) {
+    if (V.audioUrl) { try { URL.revokeObjectURL(V.audioUrl); } catch {} }
+    V.audioUrl = URL.createObjectURL(blob);
+    const el = V.audioEl = V.audioEl || new Audio();
+    el.onplay = () => setState('speaking');
+    el.onended = el.onerror = () => { if (onDone) onDone(); };
+    el.src = V.audioUrl;
+    return el.play();
+  }
+  let csmWarned = false;
+  // Returns true optimistically (the wav arrives async); on ANY failure falls
+  // back to browser TTS for this utterance so the call loop stays alive.
+  function speakCSM(clean) {
+    stopSpeak();
+    const gen = ++V.csmGen;
+    V.csmPending = true;
+    csmFetch(clean).then(blob => {
+      if (gen !== V.csmGen) return; // barged-in / superseded while fetching
+      V.csmPending = false;
+      return playBlob(blob, () => {
+        if (V.call) reListenSoon(200);
+        else if (V.state === 'speaking') setState('idle');
+      });
+    }).catch(e => {
+      if (gen !== V.csmGen) return;
+      V.csmPending = false;
+      if (!csmWarned) { csmWarned = true; say('CSM voice unavailable — using the browser voice instead. (' + String((e && e.message) || e).slice(0, 120) + ')', 'errmsg'); }
+      if (!speakBrowser(clean)) { // nothing could speak — keep the loop alive
+        if (V.call) reListenSoon(400);
+        else if (V.state === 'speaking' || V.state === 'thinking') setState('idle');
+      }
+    });
+    return true;
+  }
+
+  // True while ANY engine is (or is about to be) talking — barge-in guard.
+  const speakingNow = () => (SS && SS.speaking) || V.csmPending || (V.audioEl && !V.audioEl.paused);
+  // The one place speech dies (SS + in-flight CSM fetch + CSM audio element);
+  // every barge-in path — typing, Esc, run start, orb click — funnels here.
+  function stopSpeak() {
+    if (SS) SS.cancel();
+    V.csmGen++; V.csmPending = false;
+    if (V.audioEl) { try { V.audioEl.onended = V.audioEl.onerror = null; V.audioEl.pause(); V.audioEl.currentTime = 0; } catch {} }
+    if (V.audioUrl) { try { URL.revokeObjectURL(V.audioUrl); } catch {} V.audioUrl = null; }
+    if (V.state === 'speaking') setState('idle');
+  }
 
   // ---- run lifecycle hooks (called from run.js) ----------------------------
-  function onRunStart() { if (!V.listening) setState('thinking'); }
+  // Any new prompt — typed OR spoken — silences an in-progress reply at once.
+  function onRunStart() { if (speakingNow()) stopSpeak(); if (!V.listening) setState('thinking'); }
   function onRunDone(text) {
+    // During a call, always talk back (it's a conversation) and keep the loop
+    // alive even when a run returns no text (error/cancel) by re-opening the mic.
+    if (V.call) {
+      // speak's onend re-opens the mic; if there's nothing to say, re-open directly
+      if (!(text && speak(text))) reListenSoon(500);
+      return;
+    }
     if (store.talk && text) speak(text);
     else if (V.state === 'thinking') setState('idle');
-  }
-
-  // ---- Config-tab settings -------------------------------------------------
-  function renderSettings(container) {
-    const voices = SS ? SS.getVoices() : [];
-    const opts = voices.map(v => `<option value="${esc(v.voiceURI)}"${v.voiceURI === store.voiceURI ? ' selected' : ''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('');
-    container.innerHTML = `
-      <h2 style="font-size:12px;margin-top:22px">Voice <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— N9 Track A · browser-native, zero server cost</span></h2>
-      <div class="row">
-        ${SR ? '' : '<div class="note" style="margin-bottom:10px">Mic input needs Chrome or Edge on desktop. Talk-back works everywhere.</div>'}
-        <label class="chk" title="show the mic orb and allow click/V-key to talk"><input type="checkbox" id="vMic"${store.mic ? ' checked' : ''}> Mic orb in header ${SR ? '' : '(input unavailable in this browser)'}</label>
-        <label class="chk" style="margin-top:8px"><input type="checkbox" id="vTalk"${store.talk ? ' checked' : ''}> Speak Claude's replies out loud</label>
-        <div class="flex" style="margin-top:12px;align-items:center">
-          <span class="muted" style="font-size:12px">Voice</span>
-          <select id="vVoice" style="min-width:220px">${opts || '<option>system default</option>'}</select>
-          <span class="muted" style="font-size:12px">Rate</span>
-          <input type="range" id="vRate" min="0.6" max="1.6" step="0.1" value="${store.rate}" style="width:120px">
-          <button class="ghost" id="vTest" style="padding:6px 12px;font-size:11.5px">▶ Test voice</button>
-        </div>
-      </div>`;
-    const orb = $('#voiceOrb');
-    container.querySelector('#vMic').onchange = e => { store.mic = e.target.checked; if (orb) orb.style.display = e.target.checked ? '' : 'none'; };
-    container.querySelector('#vTalk').onchange = e => { store.talk = e.target.checked; };
-    container.querySelector('#vVoice').onchange = e => { store.voiceURI = e.target.value; };
-    container.querySelector('#vRate').onchange = e => { store.rate = parseFloat(e.target.value); };
-    container.querySelector('#vTest').onclick = () => speak('Voice is ready. I will read Claude\'s replies aloud when you turn talk-back on.');
   }
 
   function init() {
@@ -175,15 +364,36 @@
     const orb = $('#voiceOrb');
     if (orb && !store.mic) orb.style.display = 'none';
     if (SS && SS.onvoiceschanged === null) SS.onvoiceschanged = () => {}; // prime async voice list
+    // The moment you start texting me, I go quiet — stop the reply mid-sentence.
+    // (Barge-in rule; the spoken-input half arrives when we keep the mic open
+    //  during talk-back — see startListen's SS.cancel for the manual version.)
+    document.addEventListener('input', e => {
+      const t = e.target;
+      if (t && t.id === 'promptIn' && speakingNow()) stopSpeak();
+    });
+    document.addEventListener('keydown', e => {
+      // Esc always kills talk-back (both engines), even when a call isn't active
+      if (e.key === 'Escape' && speakingNow()) stopSpeak();
+    });
     window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && V.call) { e.preventDefault(); endCall(); return; }
       if (e.key !== 'v' && e.key !== 'V') return;
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (!store.mic || !SR) return;
       e.preventDefault();
-      V.listening ? stopListen() : startListen();
+      if (V.call) { endCall(); return; }
+      if (e.shiftKey) { beginCall(); return; }
+      V.listening ? stopListen() : (store.conv ? beginCall() : startListen());
     });
   }
 
-  window.HubVoice = { init, onRunStart, onRunDone, renderSettings, speak, _state: () => V.state };
+  window.HubVoice = {
+    init, onRunStart, onRunDone, speak, beginCall, endCall,
+    _state: () => V.state, _call: () => V.call,
+    // closure internals for the Config settings panel (assets/voicecfg.js,
+    // loaded right after this file — it attaches HubVoice.renderSettings)
+    _cfg: { SS, SR, store, speakBrowser, csmFetch, playBlob, stopSpeak, setState, V, micBlockReason },
+    renderSettings: () => {}, // no-op until voicecfg.js attaches the real one
+  };
 })();

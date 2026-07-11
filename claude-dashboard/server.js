@@ -19,6 +19,7 @@ const tasks = require('./lib/tasks');
 const memory = require('./lib/memory');
 const schedules = require('./lib/schedules');
 const agentgraph = require('./lib/agentgraph');
+const voice = require('./lib/voice');
 
 const PORT = parseInt(process.argv[2] || process.env.PORT || '5757', 10);
 const HOST = '127.0.0.1';
@@ -96,6 +97,7 @@ const server = http.createServer(async (req, res) => {
     if (await schedules.handle(req, res, url)) return;
     if (await agentgraph.handle(req, res, url)) return;
     if (await memory.handle(req, res, url)) return;
+    if (await voice.handle(req, res, url)) return;
     if (await files.handle(req, res, url)) return;
     if (await core.handle(req, res, url)) return;
 

@@ -37,6 +37,7 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 | S18 | **N3.5 Memory auto-recall** — opt-in toggle (default OFF) in the Run composer injects top-3 relevant Engram memories (1.2k char cap) into the CLI prompt; injected count streamed to chat + stored as `recallCount`. Rule-based distillation: 3+ failed runs sharing a tag → standing semantic "failure pattern" record. Verified: haiku answered chart values purely from recalled context ($0.036, 1 turn, no tools) | `lib/memory.js`, `lib/runs.js`, `assets/run.js` |
 | S19 | **Assets library (user request)** — `vendor/` with 18 OFL font faces (all 12 ui-design families, latin woff2), Lucide sprite (1,746 icons, ISC), modern-normalize (MIT); manifest.json records every source+license. Guarded `/vendor/` route, `/api/assets`, fifth Library tab (font specimens + searchable click-to-copy icon grid). Hub fonts now fully local (offline, no CDN); artifact CSP allows `/vendor/` only; run hint advertises the library so generated pages use local assets | `vendor/`, `assets/assetlib.js`, `server.js` |
 | S20 | **Ruflo retired + live Agent Graph (user decision)** — Swarm tab/endpoints/claude-flow MCP removed (open-issues 1/2/3/4/6 resolved). Graph tab's default view is now a live radial map of the current run's crew: persona-named workers (Maestro/Poet/Dart models; Scout, Bloodhound, Scribe, Wrench, Falcon, Foreman, Spellbook, Envoy crews; recruited subagents; Gallery) with pulsing active nodes, animated links, auto-follow of live runs, click-to-inspect, click-center-to-replay. Codebase map kept behind a chip. Zero-token: polls a local disk-read endpoint | `lib/agentgraph.js`, `assets/agentviz.js`, `assets/graph.js` |
+| S25 | **N9 CSM voice engine — INSTALLED & VERIFIED end-to-end (optional, default OFF)** — Sesame CSM-1B as a second TTS engine, running **natively on Windows + the RTX 3060** (no WSL2). `assets/voice.js`: engine selector (browser speechSynthesis default \| CSM local) + speaker id (0–9); `speakCSM()` posts to same-origin `/api/voice/tts` (X-Hub-Token), plays the wav, auto-falls-back to the browser voice on any error so the call loop never dies; unified `stopSpeak()` barge-in kills both engines. `assets/voicecfg.js` (settings panel split out for the 500-line rule): engine status pill + one-click **⚡ Start engine** + ▶ Test round-trip. `lib/voice.js`: token-guarded proxy → `HUB_CSM_URL` (default `http://127.0.0.1:8790/tts`), **loopback-only target validation** (no SSRF), plus `/api/voice/status` (health) and `/api/voice/start` (spawns the sidecar — argv array, no shell). Runtime: `scripts/csm-server.py` in the gitignored `.csm/` venv — torch 2.6.0+cu124, **transformers pinned <5** (under 5.x the audio-embed weight fails to map and the model babbles; whisper-verified both ways), weights from the ungated `unsloth/csm-1b` mirror (official `sesame/csm-1b` is HF-gated; tried first when HF_TOKEN is set). Verified: model loads ~14 s on cuda, gen ≈1.2× audio duration, faster-whisper transcribed generated speech back to the requested text, full browser→hub→sidecar round-trip + Config UI browser-checked. Smoke +5 checks | `lib/voice.js`, `assets/voice.js`, `assets/voicecfg.js`, `scripts/csm-server.py`, `scripts/csm-requirements.txt`, `docs/voice-csm.md`, `server.js` |
 | S24 | **N9 voice module Track A (late eve)** — `assets/voice.js`: header mic orb (Web Speech API → transcript → auto-routed run), talk-back (speechSynthesis reads replies), amber canvas orb state machine, Config settings (toggles default OFF + voice picker/rate). Zero-dep, zero server cost; run.js lifecycle hooks; browser-verified (orb, states, TTS speaking, STT available, no console errors); smoke 34/34 | `assets/voice.js`, `index.html`, `assets/run.js`, `assets/app.js` |
 | S23 | **Hermes operational + agent bench + graph visual (late eve)** — hermes v0.18.2 installed (git+uv, venv rebuilt on winget CPython 3.11.9), Nous OAuth done, end-to-end verified; subagents pinned to gemini-3-flash. Agents tab roster = 8 live hermes roles + 14 curated local specialists, every one with explicit model frontmatter + tier chips (research-grounded: haiku for mechanical, sonnet for build/review, opus only for security-auditor/architect). Codebase graph defaults to a module-level view (~20 file nodes, weighted links, warm curated palette); voice plan written (`docs/voice-plan.md`) | `.claude/agents/`, `lib/core.js`, `assets/graph.js`, `docs/` |
 | S22 | **Agent purge + Graph fixes (user decision, eve)** — all 91 claude-flow agent .md definitions deleted (every one ran on the session default = Fable 5; model tiering is the requirement). Replacement stack chosen: **hermes-agent** (see `docs/hermes-adoption.md`, install pending user). Graph tab: codebase map was a day stale (31 nodes) → regenerated (277 nodes/484 edges/18 communities); big-graph label declutter (top-48 by degree; hover/search labels the rest); live Agents view verified working via simulated running run | `.claude/`, `assets/graph.js`, `graphify-out/` |
@@ -79,6 +80,11 @@ smoke script covers voice.js (34 checks). Remaining: **Track B** = hermes-native
 voice notes via gateway (faster-whisper STT + Edge TTS, both free/built-in,
 pairs with H4); **Track C** parked (wake word, full duplex). Live mic capture
 is the one manual check (needs a real microphone).
+**CSM engine (S25)** is fully installed and verified end-to-end — native
+Windows CUDA runtime in `.csm/` (venv + weights, ~10 GB, gitignored), sidecar
+started from Config → Voice (⚡ Start engine), speech content whisper-verified.
+Browser voice stays the default; flip Config → Voice → TTS engine to
+"Sesame CSM-1B (local)" to use it. Setup/rebuild notes: `docs/voice-csm.md`.
 
 ### N7. Library: SharePoint Breakdown (user request 2026-07-10 — QUEUED, do not build yet)
 New Library item: a full breakdown of every file directory with an
@@ -141,6 +147,28 @@ PRD→task breakdown. **Decision made: NOT as an always-on MCP** (taxes every ru
 fights the token goal — the hub-native queue S11 covers the need). If its
 PRD-decomposition is ever wanted, install CLI-only and invoke on demand in
 Claude Code; never put it in `.mcp.json`.
+
+### Q4. affaan-m/ecc — adopt its skills  (github.com/affaan-m/ecc) 🔜 USER REQUESTED 2026-07-11
+User: "add all of the skills to be utilized." Same adoption pattern as
+ui-ux-pro-max (S21) and hermes: pull the repo, copy its `skills/*` (and any
+`agents/*` / `commands/*`) into `.claude/`, keep the LICENSE, add a hub
+adaptation note (map fonts→/vendor/, no Python in the app, vanilla output, no
+always-on MCP unless token-justified). **Blocked this session:** the sandbox
+gated all network egress (WebFetch/gh/scrapling all needed ungranted approval),
+so the repo could not be inspected or cloned. **Blocked again 2026-07-11
+(second attempt):** every network avenue was permission-denied — `git clone`
+via Bash and PowerShell, `gh api repos/affaan-m/ecc/git/trees/HEAD`, WebFetch
+on the GitHub API, and `mcp__scrapling__get`. No skill contents were fetched
+or fabricated; nothing was installed. Needs a session with network egress
+granted (or the user cloning the repo locally and pointing us at the path).
+Next session with network:
+1. `gh api repos/affaan-m/ecc/git/trees/HEAD?recursive=1` (or clone) → enumerate
+   every skill + read each `SKILL.md` frontmatter.
+2. Triage per hub rules: adopt zero-dep skills; flag any that need a dependency
+   or an always-on MCP for the user (weigh token cost first).
+3. Copy adopted skills into `.claude/skills/`, preserve LICENSE + provenance in
+   a note, update the Skills-tab count, then browser-verify the Skills tab.
+4. Log the outcome here (which adopted, which skipped + why).
 
 ---
 

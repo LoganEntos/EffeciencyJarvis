@@ -153,6 +153,19 @@ Snapshot of what's true right now:
   API → auto-routed run, speechSynthesis talk-back, Config settings (both
   toggles default OFF). Live mic capture works only in the user's real
   Chrome/Edge (my Browser pane sandbox blocks mic; that's not a bug).
+- **Sesame CSM-1B local neural voice INSTALLED & VERIFIED (S25, 2026-07-11)**:
+  second TTS engine, native Windows + RTX 3060 CUDA. Runtime in gitignored
+  `.csm/` (venv: torch 2.6.0+cu124, transformers **pinned <5** — 5.x babbles;
+  weights from ungated `unsloth/csm-1b` mirror since `sesame/csm-1b` is
+  HF-gated). Sidecar `scripts/csm-server.py` :8790 ← `lib/voice.js` proxy
+  (`/api/voice/tts|status|start`) ← engine picker + Start button in Config →
+  Voice. Whisper-verified round trip. Docs: `docs/voice-csm.md`. Run-tab model
+  dropdown also now offers every Claude version (pin Fable 5 / Opus 4.8/4.7 /
+  Sonnet 5/4.6 / Haiku 4.5).
+- **Heads-up: the user drives parallel work through the hub's own Run tab**
+  (Fable 5 runs in acceptEdits editing this very repo). Before editing, check
+  `git status` + `/api/runs` for an active run touching the same files —
+  reconcile, don't clobber (this session merged one such run's CSM work).
 
 **Next up (see EXECUTE NEXT above):** H2 hermes engine in the Run composer →
 H3 hermes in the agent graph → H4 gateway toggle + N9 Track B, then N2 mobile,

@@ -19,3 +19,6 @@ Desktop.ini
 .swarm/
 .claude/proven-config.json
 ruvector.db
+
+# CSM-1B local TTS sidecar (venv + model cache), see scripts/csm-server.py
+.csm/
