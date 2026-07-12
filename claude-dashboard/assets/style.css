@@ -70,6 +70,10 @@
 :root[data-theme="dark"] .planblk{border-radius:4px}
 :root[data-theme="dark"] .badgebar .pill.live{box-shadow:0 0 0 1px #4bc47a30}
 *{box-sizing:border-box}
+/* a11y: a clear, consistent keyboard-focus ring on every focusable control
+   (nav items, buttons, chips, rows, inputs) — keyboard focus must be visible */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+nav a:focus-visible{outline-offset:-2px}
 ::selection{background:var(--accent-dim);color:#0e0d0b}
 html{scrollbar-color:var(--line2) transparent}
 ::-webkit-scrollbar{width:10px;height:10px}

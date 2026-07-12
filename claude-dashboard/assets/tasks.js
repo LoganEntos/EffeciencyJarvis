@@ -120,7 +120,7 @@ async function refreshSchedules() {
         ${s.lastRunId ? `<button class="ghost sOpen" data-run="${esc(s.lastRunId)}" style="padding:5px 11px;font-size:11px">last run</button>` : ''}
         <button class="ghost sNow" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">▶ run now</button>
         <button class="ghost sTog" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">${s.enabled ? '⏸ pause' : '▶ resume'}</button>
-        <button class="danger sDel" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">✕</button>
+        <button class="danger sDel" data-id="${esc(s.id)}" aria-label="Delete schedule" style="padding:5px 11px;font-size:11px">✕</button>
       </div>
     </div>`;
   }).join('') : '<div class="muted">No schedules yet — create one above (e.g. a Monday-morning report of last week\'s runs).</div>';
@@ -190,7 +190,7 @@ async function refreshTasks() {
         <span class="spacer" style="flex:1"></span>
         ${t.runId && ['done', 'error', 'cancelled', 'gone'].includes(t.runStatus) ? `<button class="ghost tOpen" data-run="${esc(t.runId)}" style="padding:5px 11px;font-size:11px">view run</button>` : ''}
         ${(!t.runId || ['error', 'cancelled', 'gone'].includes(t.runStatus)) ? `<button class="ghost tRun" data-id="${esc(t.id)}" style="padding:5px 11px;font-size:11px">${t.runId ? 'retry' : '▶ run'}</button>` : ''}
-        <button class="danger tDel" data-id="${esc(t.id)}" style="padding:5px 11px;font-size:11px">✕</button>
+        <button class="danger tDel" data-id="${esc(t.id)}" aria-label="Delete task" style="padding:5px 11px;font-size:11px">✕</button>
       </div>
     </div>`;
   }).join('') : '<div class="muted">No tasks yet — queue one above.</div>';

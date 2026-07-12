@@ -100,14 +100,24 @@ function goTab(tab) {
   currentTab = tab;
   closeNav(); // close mobile nav when switching tabs
   try { localStorage.setItem('hub.tab', tab); } catch {}
-  document.querySelectorAll('nav a').forEach(x => x.classList.toggle('active', x.dataset.tab === tab));
+  document.querySelectorAll('nav a').forEach(x => {
+    const on = x.dataset.tab === tab;
+    x.classList.toggle('active', on);
+    if (on) x.setAttribute('aria-current', 'page'); else x.removeAttribute('aria-current'); // announce the current tab
+  });
   document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
   const sec = $('#' + tab);
   sec.classList.remove('hidden');
   sec.style.animation = 'none'; void sec.offsetHeight; sec.style.animation = ''; // retrigger entrance
   load(tab);
 }
-document.querySelectorAll('nav a').forEach(a => a.onclick = () => goTab(a.dataset.tab));
+// nav items are hrefless <a> — make them keyboard-operable (focusable + Enter/Space)
+document.querySelectorAll('nav a').forEach(a => {
+  a.tabIndex = 0;
+  a.setAttribute('role', 'link');
+  a.onclick = () => goTab(a.dataset.tab);
+  a.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTab(a.dataset.tab); } };
+});
 
 const loaded = {};
 async function load(tab, force) {

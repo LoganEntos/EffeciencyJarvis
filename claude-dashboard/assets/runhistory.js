@@ -72,7 +72,7 @@ function renderHistory() {
         <span><span class="pill ${pill(m.status)}">${esc(m.status)}</span>${liveBadge(m)}
           <span class="muted" style="font-size:11.5px">${new Date(m.startedAt || m.queuedAt || 0).toLocaleString()}</span></span>
         <span class="muted" style="font-size:11.5px">${m.engine === 'hermes' ? '⬡ hermes · ' : ''}${m.model ? esc(m.model) + (m.routedReason ? ' (auto)' : '') + ' · ' : ''}${m.durationMs ? (m.durationMs / 1000).toFixed(1) + 's' : ''}${m.costUsd != null ? ' · $' + m.costUsd.toFixed(4) : (m.tokensOut != null ? ' · ' + (m.tokensIn || 0) + '→' + m.tokensOut + ' tok' : '')}${m.resumedFrom ? ' · ⟲ resumed' : ''}${m.artifactCount ? ' · ◫ ' + m.artifactCount : ''}
-          <button class="danger delRunBtn" data-id="${esc(m.id)}" title="delete this run from history" style="padding:2px 9px;font-size:10.5px;margin-left:8px">✕</button></span>
+          <button class="danger delRunBtn" data-id="${esc(m.id)}" title="delete this run from history" aria-label="Delete this run from history" style="padding:2px 9px;font-size:10.5px;margin-left:8px">✕</button></span>
       </div>
       <div class="pex">${esc(m.promptExcerpt || '')}</div>
       ${m.errorExcerpt ? `<div class="pex" style="color:#f0908f;white-space:normal">↳ ${esc(m.errorExcerpt)}</div>` : ''}
