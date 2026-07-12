@@ -201,7 +201,8 @@ function assets() {
   const man = U.safeJson(path.join(DASH_DIR, 'vendor', 'manifest.json'));
   if (!man) return { exists: false, items: [], iconIndex: [] };
   const iconIndex = U.safeJson(path.join(DASH_DIR, 'vendor', 'icons', 'lucide-index.json')) || [];
-  return { exists: true, generatedAt: man.generatedAt, items: man.items || [], iconIndex };
+  const tablerIndex = U.safeJson(path.join(DASH_DIR, 'vendor', 'icons', 'tabler-index.json')) || [];
+  return { exists: true, generatedAt: man.generatedAt, items: man.items || [], iconIndex, tablerIndex };
 }
 
 // Serve the raw markdown of one agent/skill/command definition (path-traversal safe).

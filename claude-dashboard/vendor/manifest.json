@@ -189,6 +189,24 @@
       "license": "generated",
       "source": "generated locally",
       "bytes": 2975
+    },
+    {
+      "file": "icons/tabler-sprite.svg",
+      "type": "icons",
+      "name": "Tabler Icons sprite (5093 icons)",
+      "role": "alternate UI iconography — outline set; use via <use href=\"/vendor/icons/tabler-sprite.svg#tabler-NAME\">",
+      "license": "MIT",
+      "source": "https://cdn.jsdelivr.net/npm/@tabler/icons-sprite/dist/tabler-sprite.svg",
+      "bytes": 2157427
+    },
+    {
+      "file": "css/pattern.min.css",
+      "type": "css",
+      "name": "pattern.css (14 background patterns × 4 sizes)",
+      "role": "decorative background patterns — .pattern-dots/grid/checks/diagonal-lines/triangles etc.; color = currentColor",
+      "license": "MIT",
+      "source": "https://cdn.jsdelivr.net/npm/pattern.css/dist/pattern.min.css",
+      "bytes": 9589
     }
   ]
 }
