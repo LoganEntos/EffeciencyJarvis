@@ -12,7 +12,7 @@ const { spawn } = require('child_process');
 const U = require('./util');
 const memory = require('./memory');
 const liveness = require('./liveness');
-const acp = require('./acp');
+const hermes = require('./hermes');
 const { countArtifacts, listArtifacts, serveArtifact } = require('./artifacts');
 
 const DASH_DIR = path.resolve(__dirname, '..');
@@ -144,14 +144,13 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   let recalled = null;
   if (recall) { try { recalled = memory.recall(prompt); } catch {} }
   const fullPrompt = (recalled ? recalled.block + '\n\n' : '') + prompt + hint;
-  let args = null, acpCfg = null;
+  let args = null, hermesCfg = null;
   const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'acceptEdits';
   if (engine === 'hermes') {
-    // H4: hermes now runs over ACP (hermes acp, JSON-RPC/stdio) instead of -z,
-    // so its per-step work (text, thoughts, tool calls + results, plan) streams
-    // live. The ACP client (lib/acp.js) drives the handshake; we just stash the
-    // prompt + optional resume id. hermes does its own model tiering + approvals.
-    acpCfg = { prompt: fullPrompt, resume: resume && /^[a-f0-9-]{6,}$/.test(resume) ? resume : '' };
+    // hermes transport is chosen at launch by HUB_HERMES_ENGINE (acp default /
+    // oneshot fallback — see lib/hermes.js). Either way we just stash the prompt
+    // + optional resume id here. hermes does its own model tiering + approvals.
+    hermesCfg = { prompt: fullPrompt, resume: resume && /^[a-f0-9-]{6,}$/.test(resume) ? resume : '' };
     model = '';
   } else {
     args = ['-p', fullPrompt, '--output-format', 'stream-json', '--verbose'];
@@ -166,7 +165,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
     costUsd: null, durationMs: null, routedReason, recallCount: recalled ? recalled.count : 0,
   };
-  const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, acpCfg, dir, out: null };
+  const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);
   writeMeta(st);
   if (routedReason) pushLine(st, JSON.stringify({ type: 'hub_status', text: `auto → ${model} (${routedReason})` }));
@@ -180,7 +179,10 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
 }
 
 function launch(st) {
-  if (st.meta.engine === 'hermes') return launchHermesAcp(st);
+  if (st.meta.engine === 'hermes') {
+    markRunning(st);
+    return hermes.launch(st, { HERMES_EXE, PROJECT_DIR, pushLine, finalize: finalizeRun });
+  }
   return launchClaude(st);
 }
 
@@ -225,39 +227,6 @@ function finalizeRun(st) {
   st.listeners.clear();
   setTimeout(() => active.delete(st.meta.id), 30000); // grace for late SSE attach
   dequeueNext();
-}
-
-// hermes over ACP: real per-step streaming (see lib/acp.js). Each ACP event is
-// already shaped like claude's stream-json, so it flows through pushLine into
-// the same Run tab + agent graph rendering.
-function launchHermesAcp(st) {
-  markRunning(st);
-  const cfg = st.acpCfg || { prompt: '', resume: '' };
-  st.acp = acp.run({ exe: HERMES_EXE, cwd: PROJECT_DIR, prompt: cfg.prompt, resume: cfg.resume }, {
-    onEvent: obj => pushLine(st, JSON.stringify(obj)),
-    onSession: sid => { st.meta.sessionId = sid; },
-    onStderr: text => {
-      if (st.stderr.length < 20000) st.stderr += text;
-      if (!st.meta.model) { const m = text.match(/model=([\w./-]+)/); if (m) st.meta.model = m[1]; }
-    },
-    onDone: info => {
-      st.child = null;
-      const u = info.usage || {};
-      st.meta.tokensIn = u.inputTokens ?? null;
-      st.meta.tokensOut = u.outputTokens ?? null;
-      if (st.cancelled || info.stopReason === 'cancelled') st.meta.status = 'cancelled';
-      else if (info.stopReason) st.meta.status = 'done'; // a real turn result
-      else if (info.error) { st.meta.status = 'error'; st.meta.errorExcerpt = String(info.error).slice(0, 300); }
-      else if (info.code) { st.meta.status = 'error'; st.meta.errorExcerpt = `hermes acp exited (code ${info.code}) before completing`; }
-      else st.meta.status = 'done';
-      st.meta.exitCode = info.code ?? (info.error ? 1 : 0);
-      const tok = (st.meta.tokensIn || st.meta.tokensOut)
-        ? ` · ${st.meta.tokensIn || 0}→${st.meta.tokensOut || 0} tok` : '';
-      pushLine(st, JSON.stringify({ type: 'hub_status', text: `hermes done · ${st.meta.model || 'config default'}${tok}` }));
-      finalizeRun(st);
-    },
-  });
-  st.child = st.acp.child;
 }
 
 function launchClaude(st) {
