@@ -163,23 +163,43 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
   official weights instead of the mirror.
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
 
-## ⚡ Latest session (2026-07-12) — agent-stack visibility + hermes ACP streaming
-Two things shipped; **run the hub from a TERMINAL** (`node claude-dashboard/server.js`),
-not headless — see the caveat below.
-1. **Run STATUS visible (commit cebfe6a)** — `lib/liveness.js`: orphan reaper
-   (kills zombie "running" rows on boot + every 60s), a 5s heartbeat, and Run-tab
-   `◉ running`/`⚠ stalled`/`process gone` badges for BOTH stacks. Artifact serving
-   split to `lib/artifacts.js`; the run-hint moved to `util.buildRunHint`.
-2. **hermes CONTENT via ACP (commit 7b1eac2)** — hermes now runs over `hermes acp`
-   (JSON-RPC/stdio) not `-z`, streaming real text/thoughts/tool-calls/results/plan
-   into the Run tab + a live agent-graph crew; captures model + tokens. `lib/acp.js`
-   is the client. **Verified live terminal-launched** (text + Bash-tool runs).
-   **⚠ KNOWN ISSUE:** ACP HANGS on the inference call when the hub SERVER is
-   launched HEADLESS (the preview/dev tool + the Task Scheduler autostart) — a
-   Windows worker-thread quirk. A 75s watchdog fails such runs with a clear
-   "launch from a terminal" message. Fix options + full detail: roadmap top +
-   memory `hermes-acp-headless-hang`. **The autostart task will hit this — either
-   run the hub from a terminal, or fix headless before relying on autostart.**
+## ⚡ CURRENT STATE (2026-07-12, late) — Claude-only pivot + redesign shipped
+> This supersedes the dated sections below (kept as history). Mirrors the
+> reorganized auto-memory (`engine-claude-only`, `redesign-clean-dark`).
+
+1. **Engine = Claude ONLY.** The versatile/cheap stack is Claude Code's own:
+   auto model-routing (haiku/sonnet/opus) + the 14 model-tiered subagents +
+   **agent teams** (`lib/teams.js`: Lean default / Excel ops, each injects a
+   delegation hint). **hermes was DEPRECATED as too expensive** — not deleted,
+   just hidden behind a Config toggle (`settings.hermesEnabled`, default off;
+   engine option hidden in the composer, roles off the Agents tab). If ever
+   re-enabled it needs a terminal-launched hub (ACP hangs headless →
+   `HUB_HERMES_ENGINE=oneshot`); for real hermes work use **Hermes Desktop**.
+   ruflo/claude-flow retired long ago. `lib/liveness.js` (orphan reaper + 5s
+   heartbeat → ◉ live / ⚠ stalled / process-gone) is engine-agnostic, covers
+   Claude runs.
+2. **Redesign SHIPPED — clean-dark "amber-agent-orb".** Ported 1:1 from the
+   user's Lovable reference (`amber-agent-orb.lovable.app`) by reading its live
+   computed styles. Exact tokens (`#0c0b0a` / `#17140f` / amber `#e8a33d`) +
+   Bricolage Grotesque / JetBrains Mono / Instrument Serif (all in `/vendor/`).
+   Clean-dark is the DEFAULT (◐ toggles warm). Every tab done: Run, Overview
+   (Instrument-Serif usage hero + plan-usage bars + stat cards), Agents (tier
+   labels + teams), Graph (live crew canvas), list/utility tabs.
+3. **New surfaces:** **Tools tab** (MCP connectors / site file-editor / git —
+   `lib/admin.js`), **Config → Providers/Council** groundwork (specced, not
+   wired), **plan-usage** numbers on Overview (Claude has no usage API →
+   user-maintained in Config, `settings.plan`, always-fresh cache-invalidated).
+4. **Code health:** `app.js` split (611→347 → `overview.js`+`config.js`),
+   `run.js` split (557→471 → `runhistory.js`); every source file back under the
+   500-line cap. Files tab gained image thumbnails + day-grouped uploads (R4).
+5. **⚠ Parallel-run hazard is real:** the user fires acceptEdits runs from the
+   Run tab that commit + leave uncommitted work (one botched a `run.js` refactor
+   and broke the Run tab). Before editing: `git status` + check `/api/runs` for
+   active runs; reconcile, don't clobber (memory `parallel-hub-runs`).
+
+**Next / not yet wired:** N10 Council mode (Claude-only fan-out + synthesis;
+needs `lib/council.js`) and the Providers/Council live-API wiring (paste OpenAI/
+Perplexity keys). See `docs/roadmap.md`.
 
 ## Current state (2026-07-11, end of session)
 All S1–S26 shipped and browser-verified (see roadmap table). **Smoke script
