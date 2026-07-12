@@ -292,7 +292,18 @@ frameworks in wholesale (the hermes lesson). Build only on the user's go-ahead.
   to have it — MCPs tax every run), and whether the GitHub-intake team actually
   needs it over Scrapling + one-time curl. Evaluate before installing.
 
-### N11. Sources library — "what GitHubs power this hub" (user request 2026-07-12)
+### N11. Sources library — "what GitHubs power this hub" ✅ DONE 2026-07-12
+Shipped: **Sources** Library tab (`assets/sources.js`) → `/api/sources`
+(`lib/sources.js`, zero-dep). Collates vendored assets from `vendor/manifest.json`
+(fonts folded to one row per family, icon sprites, CSS — enriched with upstream
+repo links via a `repoMap`) + non-vendored references from `lib/sources.json`
+(adapted skills, agent-tool siblings, queued-to-incorporate). Grouped by kind
+with license badges (a `?` marks a license not confirmed from the repo's LICENSE),
+status pills (deprecated/queued), and clickable repo links. 27 sources / 14 repos.
+Smoke check added. New GitHub-intake pulls land in the manifest or `sources.json`
+and surface here automatically.
+
+<details><summary>original spec</summary>
 A new Library tab (or an Assets-tab section) that lists **every external GitHub
 repo the hub uses or references**, with repo link, license, and what it's used
 for. Data already exists, scattered: `vendor/manifest.json` `source` fields (the
@@ -306,6 +317,7 @@ from manifest `source` + a small curated JSON of the non-vendored references) �
 queued-to-incorporate) with license badges + "used for" text. Zero-dep, reads
 existing manifest; keep the curated reference list in one JSON so it stays
 truthful. Pairs naturally with the GitHub-intake team (new intakes append here).
+</details>
 
 ### N8. iPhone incorporation (user request 2026-07-10 — QUEUED, evaluate options)
 Get the hub properly usable from an iPhone — possibly via Base44 or another

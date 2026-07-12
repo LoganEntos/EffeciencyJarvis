@@ -1,0 +1,94 @@
+{
+  "_note": "Provenance data for the Sources library (N11). Edit this file to keep it truthful. `repoMap` links vendored manifest assets to their upstream GitHub repo (matched by manifest label or file name). `curated` lists the external references that are NOT vendored under vendor/ — adapted skills, agent-tool siblings, and repos queued to incorporate. Licenses marked `verified:false` were not confirmed from the repo's LICENSE file at write time; confirm before relying on them.",
+  "repoMap": {
+    "Lucide": "https://github.com/lucide-icons/lucide",
+    "Tabler": "https://github.com/tabler/tabler-icons",
+    "Bootstrap": "https://github.com/twbs/icons",
+    "Pixelart": "https://github.com/halfmage/pixelarticons",
+    "pattern.min.css": "https://github.com/bansal-io/pattern.css",
+    "modern-normalize.css": "https://github.com/sindresorhus/modern-normalize"
+  },
+  "curated": [
+    {
+      "kind": "skill",
+      "name": "affaan-m/ecc",
+      "repo": "https://github.com/affaan-m/ecc",
+      "license": "MIT",
+      "verified": true,
+      "status": "active",
+      "usedFor": "The 278-skill ECC library in .claude/skills-library/ (18 curated active in .claude/skills/). Not auto-loaded — promotable per its README."
+    },
+    {
+      "kind": "skill",
+      "name": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "license": "MIT",
+      "verified": true,
+      "status": "active",
+      "usedFor": "6 adopted UI skills: ui-ux-pro-max (CSV design database), design, design-system, brand, banner-design, slides."
+    },
+    {
+      "kind": "skill",
+      "name": "ibelick/ui-skills",
+      "repo": "https://github.com/ibelick/ui-skills",
+      "license": "MIT",
+      "verified": false,
+      "status": "active",
+      "usedFor": "Adapted into the local ui-design / frontend polish skills (baseline-ui, anti-slop rules)."
+    },
+    {
+      "kind": "tool",
+      "name": "D4Vinci/Scrapling",
+      "repo": "https://github.com/D4Vinci/Scrapling",
+      "license": "BSD-3-Clause",
+      "verified": false,
+      "status": "active",
+      "usedFor": "The scraper agent's engine — the ONLY MCP wired in .mcp.json (mcp__scrapling__fetch/get/stealthy_fetch). Web fetch for the GitHub-intake team."
+    },
+    {
+      "kind": "tool",
+      "name": "SesameAILabs/csm",
+      "repo": "https://github.com/SesameAILabs/csm",
+      "license": "Apache-2.0",
+      "verified": false,
+      "status": "active",
+      "usedFor": "CSM-1B local neural voice (N9). Runs natively in gitignored .csm/; TTS sidecar at scripts/csm-server.py. Weights via ungated unsloth/csm-1b mirror."
+    },
+    {
+      "kind": "tool",
+      "name": "hermes",
+      "repo": null,
+      "license": "see repo",
+      "verified": false,
+      "status": "deprecated",
+      "usedFor": "Second agentic stack (per-task model tiering). DEPRECATED as too expensive — hidden behind a Config toggle (settings.hermesEnabled, default off). Use Hermes Desktop for hermes work."
+    },
+    {
+      "kind": "incorporate",
+      "name": "unclecode/crawl4ai",
+      "repo": "https://github.com/unclecode/crawl4ai",
+      "license": "Apache-2.0",
+      "verified": false,
+      "status": "queued",
+      "usedFor": "QUEUED — LLM-friendly web crawler/scraper being evaluated as a fetch sibling for the GitHub-intake team (overlaps Scrapling). Python; must NOT bundle into the zero-dep app."
+    },
+    {
+      "kind": "incorporate",
+      "name": "browser-use/browser-harness",
+      "repo": "https://github.com/browser-use/browser-harness",
+      "license": "see repo",
+      "verified": false,
+      "status": "queued",
+      "usedFor": "QUEUED — browser-automation harness on the incorporate list; not yet evaluated."
+    },
+    {
+      "kind": "incorporate",
+      "name": "karpathy/llm-council",
+      "repo": "https://github.com/karpathy/llm-council",
+      "license": "MIT",
+      "verified": false,
+      "status": "queued",
+      "usedFor": "QUEUED — prior art for N10 Council mode (Claude-only fan-out + synthesis)."
+    }
+  ]
+}
