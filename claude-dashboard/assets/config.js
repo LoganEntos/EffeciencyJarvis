@@ -45,6 +45,7 @@ async function renderPlanConfig() {
       weeklyAll: num($('#plWa').value), weeklyFable: num($('#plWf').value), weeklyResets: $('#plWr').value.trim(),
       creditsSpent: num($('#plCs').value), creditsPct: num($('#plCp').value), creditsResets: $('#plCr').value.trim() };
     try { await api('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }) });
+      loaded.overview = false; // invalidate the Overview cache so it re-renders fresh next visit
       $('#plMsg').textContent = '✓ saved — reflected on Overview'; $('#plMsg').style.color = 'var(--green)'; }
     catch (e) { $('#plMsg').textContent = '✗ ' + (e.message || 'failed'); $('#plMsg').style.color = 'var(--red)'; }
   };

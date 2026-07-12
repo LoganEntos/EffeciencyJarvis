@@ -85,7 +85,7 @@ renderers.overview = async function () {
   const planCard = plan.sessionPct != null ? `<div class="card" style="margin:16px 0 20px">
     <div class="flex" style="justify-content:space-between;margin-bottom:12px">
       <div class="l">Plan usage — ${esc(plan.label || '')}</div>
-      <span class="muted" style="font-size:10.5px">edit in Config ⚙</span></div>
+      <span class="muted" style="font-size:10.5px">${plan.updatedAt ? 'updated ' + rel(plan.updatedAt) : 'not set'} · <span id="ovPlanRefresh" style="cursor:pointer" title="refresh from saved values">↻</span> · edit in Config ⚙</span></div>
     ${planBar(`Current session — ${plan.sessionPct}% used · resets in ${esc(plan.sessionResets || '')}`, plan.sessionPct, '')}
     ${planBar(`Weekly · All models — ${plan.weeklyAll}% used · resets ${esc(plan.weeklyResets || '')}`, plan.weeklyAll, '')}
     ${planBar(`Weekly · Fable — ${plan.weeklyFable}% used · resets ${esc(plan.weeklyResets || '')}`, plan.weeklyFable, plan.weeklyFable >= 80 ? 'warn' : '')}
@@ -133,5 +133,6 @@ renderers.overview = async function () {
     <pre id="feed" style="max-height:180px">Loading…</pre>`;
   $('#overview').querySelectorAll('.card.clickable').forEach(c => c.onclick = () => goTab(c.dataset.goto));
   $('#overview').querySelectorAll('.ovrun').forEach(r => r.onclick = () => { goTab('run'); ensureRunUI(); openRun(r.dataset.id); });
+  if ($('#ovPlanRefresh')) $('#ovPlanRefresh').onclick = () => load('overview', true); // re-fetch latest plan numbers
   startFeed();
 };

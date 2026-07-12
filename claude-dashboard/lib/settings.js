@@ -40,7 +40,7 @@ async function handle(req, res, url) {
     try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
     const patch = {};
     if (typeof b.hermesEnabled === 'boolean') patch.hermesEnabled = b.hermesEnabled;
-    if (b.plan && typeof b.plan === 'object') patch.plan = Object.assign({}, load().plan, b.plan);
+    if (b.plan && typeof b.plan === 'object') patch.plan = Object.assign({}, load().plan, b.plan, { updatedAt: new Date().toISOString() });
     U.sendJson(res, save(patch));
     return true;
   }
