@@ -60,10 +60,18 @@ covering all three fix-path items below at once:
    streams the filtered activity lines as `hermes_log` events, so the run's real
    work (model calls, tool use) surfaces live despite `-z` printing only final text.
 
-Verified free (reaper on a synthetic zombie, heartbeat+annotate stalled detection,
-all client render paths, smoke 45/45). **Still to do:** one real paid hermes run to
-confirm `hermes logs agent -f` emits useful tool/step lines (log was plugin-noise at
-boot; live tool-level verbosity unconfirmed). This unblocks R0/R1.
+**Live-verified (2026-07-11, ~$0.06 hermes run):** the heartbeat streamed
+correctly (procAlive/idle/stalled) — STATUS is fully fixed; a working run is now
+visibly distinct from stalled/dead. This unblocks R0/R1.
+
+**Caveat found live — hermes mid-run CONTENT is NOT solved by the log tail:** a
+`-z` run writes only boot plugin-registration to agent.log (no tool/model/step
+lines at default level, no log-level knob). So `hermes logs agent -f` yields
+nothing useful mid-run (its header banner is now filtered); the tail is kept as
+harmless best-effort. **Real per-step hermes visibility needs the `hermes acp`
+(Agent Client Protocol) or `serve` event stream** — parse it like claude's
+stream-json. Fold that into **H4 (gateway)**. Until then: hermes "current work" =
+heartbeat liveness only; claude runs remain fully streamed.
 
 <details><summary>Original blocker writeup (kept for context)</summary>
 

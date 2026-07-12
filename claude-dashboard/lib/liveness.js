@@ -96,11 +96,15 @@ function startHeartbeat(st, broadcast) {
 function stopHeartbeat(st) { if (st && st._hb) { clearInterval(st._hb); st._hb = null; } }
 
 // ---- 4. hermes live log tail -------------------------------------------
-// hermes -z streams nothing, but hermes writes a timestamped activity log;
-// follow it so the run's real work surfaces mid-run. Best-effort: any failure
-// here leaves the run itself untouched. The log is global, so with concurrent
-// hermes runs lines can interleave — acceptable (typically one at a time).
-const LOG_NOISE = /registered .* provider|Plugin discovery complete|hermes_cli\.plugins|Loaded plugin|^\s*$/i;
+// hermes -z streams nothing on stdout, so we follow its activity log as a
+// best-effort mid-run window. NOTE (verified live 2026-07-11): a short -z run
+// logs only boot-time plugin registration to agent.log — no tool/model/step
+// lines at the default level — so this mostly stays quiet and the heartbeat is
+// what proves liveness. It still surfaces warnings/errors and any activity a
+// longer run does emit. Richer per-step content would need the ACP/serve event
+// stream (future, ties into H4), not this file. The log is global, so with
+// concurrent hermes runs lines can interleave — acceptable (usually one).
+const LOG_NOISE = /registered .* provider|Plugin discovery complete|hermes_cli\.plugins|Loaded plugin|Ctrl\+C to stop|\[since=|^-{2,}|^\s*$/i;
 function stripLogPrefix(line) {
   // "2026-07-11 21:04:19,372 INFO hermes_cli.foo: message" -> "message"
   const m = line.match(/^\d{4}-\d\d-\d\d[ T][\d:,]+\s+(?:[A-Z]+\s+)?[\w.]+:\s*(.*)$/);
