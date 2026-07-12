@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const U = require('./util');
+const settings = require('./settings');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
@@ -43,7 +44,9 @@ function agentList() {
     const fm = U.frontmatter(f);
     return { file: path.basename(f), name: fm.name || path.basename(f, '.md'), description: fm.description || '', model: fm.model || '' };
   }).sort((a, b) => a.name.localeCompare(b.name));
-  return hermesAgents().concat(local);
+  // Claude-only by default (the lean stack). hermes roles appear only when the
+  // deprecated paid engine is explicitly re-enabled in Config.
+  return (settings.load().hermesEnabled ? hermesAgents() : []).concat(local);
 }
 
 // The hermes stack's working roles ARE the agent roster now (persona names

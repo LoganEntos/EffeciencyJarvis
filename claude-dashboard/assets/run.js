@@ -10,9 +10,9 @@ function ensureRunUI() {
   $('#run').innerHTML = `
     <h2>Run — work with Claude in this project</h2>
     <div class="runbar">
-      <select id="runEngine" title="engine — claude (this CLI, model+perms below) or hermes (its own model tiering + tool approvals; no resume yet)">
+      <select id="runEngine" title="engine — claude (this CLI, model+perms below). hermes is a deprecated paid second stack, hidden unless enabled in Config">
         <option value="claude">engine: claude</option>
-        <option value="hermes">engine: hermes</option>
+        <option value="hermes" id="hermesOpt" hidden>engine: hermes (deprecated)</option>
       </select>
       <select id="runModel" title="model — auto routes each prompt to the cheapest capable model; or pin a specific Claude">
         <option value="auto">model: auto (routed)</option>
@@ -76,10 +76,26 @@ function ensureRunUI() {
     $('#runRecall').checked = localStorage.getItem('hub.recall') === '1'; // default OFF
   } catch {}
   applyEngineUI();
+  gateHermesEngine();
   $('#runEngine').onchange = e => { try { localStorage.setItem('hub.engine', e.target.value); } catch {} applyEngineUI(); };
   $('#runModel').onchange = e => { try { localStorage.setItem('hub.model', e.target.value); } catch {} };
   $('#runPerm').onchange = e => { try { localStorage.setItem('hub.perm', e.target.value); } catch {} };
   $('#runRecall').onchange = e => { try { localStorage.setItem('hub.recall', e.target.checked ? '1' : '0'); } catch {} };
+}
+
+// hermes is a deprecated paid stack, OFF by default. Reveal the engine option
+// only when Config re-enables it; otherwise force the composer to Claude so a
+// stale localStorage choice can't keep firing paid hermes runs.
+async function gateHermesEngine() {
+  let on = false;
+  try { on = (await api('/api/settings')).hermesEnabled === true; } catch {}
+  const opt = $('#hermesOpt');
+  if (opt) opt.hidden = !on;
+  if (!on && $('#runEngine') && $('#runEngine').value === 'hermes') {
+    $('#runEngine').value = 'claude';
+    try { localStorage.setItem('hub.engine', 'claude'); } catch {}
+    applyEngineUI();
+  }
 }
 
 // hermes governs its own model + tool approvals; grey those controls out so

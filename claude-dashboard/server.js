@@ -22,6 +22,7 @@ const agentgraph = require('./lib/agentgraph');
 const voice = require('./lib/voice');
 const autopilot = require('./lib/autopilot');
 const usage = require('./lib/usage');
+const settings = require('./lib/settings');
 
 const PORT = parseInt(process.argv[2] || process.env.PORT || '5757', 10);
 const HOST = '127.0.0.1';
@@ -146,6 +147,7 @@ const server = http.createServer(async (req, res) => {
     if (await voice.handle(req, res, url)) return;
     if (await autopilot.handle(req, res, url)) return;
     if (await usage.handle(req, res, url)) return;
+    if (await settings.handle(req, res, url)) return;
     if (await files.handle(req, res, url)) return;
     if (await core.handle(req, res, url)) return;
 

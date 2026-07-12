@@ -258,9 +258,13 @@ renderers.overview = async function () {
 };
 
 renderers.agents = async function () {
+  let hermesOn = false;
+  try { hermesOn = (await api('/api/settings')).hermesEnabled === true; } catch {}
   let h = { installed: false };
-  try { h = await api('/api/hermes'); } catch {}
-  const card = h.installed ? `
+  if (hermesOn) { try { h = await api('/api/hermes'); } catch {} }
+  const card = !hermesOn ? `
+    <div class="note" style="margin-bottom:14px">Claude subagent stack — model-tiered specialists (haiku for mechanical work, sonnet for build/review, opus only for architecture/security). This is the hub's lean default. <span class="muted">hermes is a deprecated paid engine, hidden — re-enable in Config if needed.</span></div>`
+    : h.installed ? `
     <div class="row" style="margin-bottom:14px">
       <div class="flex" style="justify-content:space-between">
         <span class="name">⚕ Hermes Agent <span class="muted" style="font-weight:400;font-size:11.5px">v${esc(h.version || '?')} — the hub's agentic stack (claude-flow library retired)</span></span>
@@ -281,6 +285,7 @@ renderers.config = async function () {
   $('#config').innerHTML = `
     <h2>Config</h2>
     <div id="usagePanel"></div>
+    <div id="enginePanel"></div>
     <div id="autopilotPanel"></div>
     <h2 style="font-size:12px">.mcp.json</h2><pre>${esc(JSON.stringify(d.mcp, null, 2))}</pre>
     <h2 style="font-size:12px;margin-top:22px">.claude/settings.json (hooks &amp; more)</h2>
@@ -290,7 +295,28 @@ renderers.config = async function () {
   if (window.HubVoice) HubVoice.renderSettings($('#voiceSettings'));
   renderAutopilot();
   renderUsageConfig();
+  renderEngineConfig();
 };
+
+// Engine pivot: Claude is the lean default. hermes is a deprecated paid second
+// stack, hidden from the Run composer + Agents tab unless re-enabled here.
+async function renderEngineConfig() {
+  const el = $('#enginePanel');
+  if (!el) return;
+  let on = false;
+  try { on = (await api('/api/settings')).hermesEnabled === true; } catch {}
+  el.innerHTML = `<div class="row" style="margin-bottom:22px">
+    <label class="chk" style="align-items:flex-start">
+      <input type="checkbox" id="hermesToggle" ${on ? 'checked' : ''}>
+      <span><b>Enable hermes engine</b> <span class="pill warn">deprecated · paid</span><br>
+      <span class="muted" style="font-size:11.5px">Off by default. Claude (with its model-tiered subagents) is the hub's engine. Turn on only if you specifically need the hermes second stack in the Run composer + Agents tab. Note: hermes ACP streaming needs a terminal-launched hub (set <span class="mono">HUB_HERMES_ENGINE=oneshot</span> for headless).</span></span>
+    </label></div>`;
+  $('#hermesToggle').onchange = async e => {
+    try { await api('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hermesEnabled: e.target.checked }) }); } catch {}
+    // reflect immediately in the Run composer if it's built
+    if (typeof gateHermesEngine === 'function') gateHermesEngine();
+  };
+}
 
 async function renderUsageConfig() {
   const el = $('#usagePanel');
