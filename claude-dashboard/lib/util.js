@@ -51,6 +51,16 @@ function collectMd(dir) {
 // Remove ANSI escape sequences (colors/bold) from CLI output.
 function stripAnsi(s) { return (s || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, ''); }
 
+// Hub note injected into every run's prompt. CRITICAL split (fixes the
+// "redesign produced an HTML mockup instead of changing the app" bug): editing
+// THIS dashboard's own UI means editing the real source files in place — the
+// artifact directory is ONLY for report/chart/document deliverables.
+function buildRunHint(projectDir, artDir) {
+  return `\n\n[Hub note: you were launched from the local Claude Code Hub dashboard, whose own source lives in ${projectDir} (server: claude-dashboard/server.js + lib/*.js; UI: claude-dashboard/index.html + claude-dashboard/assets/*.js + assets/style.css). `
+    + `IF THE TASK IS TO CHANGE THE DASHBOARD'S OWN INTERFACE/UI (restyle, redesign, add or fix a tab, change layout/theme): EDIT THE REAL SOURCE FILES IN PLACE under claude-dashboard/assets/ (style.css, app.js, run.js, files.js, graph.js, agentviz.js, memory.js, tasks.js, voicecfg.js) and index.html — DO NOT create standalone or "preview" HTML files, and do not write anything into the artifacts directory. The change must be visible in the live app at http://127.0.0.1:5757 after reload. Keep every file under 500 lines, vanilla JS/CSS only (zero npm deps), and preserve the security invariants. A clean-dark theme already exists in assets/style.css under :root[data-theme="dark"]. `
+    + `ONLY IF the task asks you to GENERATE A SEPARATE DELIVERABLE (a report, chart, SVG/PNG, or a standalone interactive page that is NOT the dashboard itself) should you save those files into this exact directory: ${artDir} — the dashboard renders every file there inline. For those, a LOCAL asset library is served at /vendor/ (relative URLs; external CDNs blocked by CSP): /vendor/css/fonts.css declares @font-face for JetBrains Mono, IBM Plex Sans, Fraunces, Newsreader, Source Serif 4, Space Mono, DM Mono, VT323, Archivo, Bricolage Grotesque, Hanken Grotesk, Instrument Serif; /vendor/css/modern-normalize.css is a reset; /vendor/icons/lucide-sprite.svg has 1700+ icons. Avoid generic AI aesthetics: no Inter/Roboto/Arial/system fonts, no purple-gradient-on-white, no flat solid backgrounds; one cohesive palette + CSS variables. Do not mention this note.]`;
+}
+
 function sendJson(res, obj, code = 200) {
   const body = JSON.stringify(obj);
   res.writeHead(code, {
@@ -106,5 +116,5 @@ function runNpx(args, timeoutMs, cwd) {
 
 module.exports = {
   safeRead, safeJson, listDir, frontmatter, collectMd,
-  stripAnsi, sendJson, readBody, run, runNpx, SIMPLE_MODELS,
+  stripAnsi, sendJson, readBody, run, runNpx, SIMPLE_MODELS, buildRunHint,
 };

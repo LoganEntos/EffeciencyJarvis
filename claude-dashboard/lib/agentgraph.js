@@ -77,7 +77,12 @@ function buildGraph(id) {
   if (!meta) return null;
   const raw = U.safeRead(path.join(RUNS_DIR, id, 'output.jsonl')) || '';
   const running = meta.status === 'running' || meta.status === 'queued';
-  if (meta.engine === 'hermes') return buildHermesGraph(meta, raw, running);
+  // H4: hermes over ACP emits real stream-json tool telemetry, so it flows
+  // through the claude builder below and shows a LIVE crew. Only legacy -z runs
+  // (hermes_out, no tool events) fall back to the static Maestro+crew ring.
+  if (meta.engine === 'hermes' && !/"tool_use"|"type":"assistant"/.test(raw)) {
+    return buildHermesGraph(meta, raw, running);
+  }
 
   const tools = new Map();   // crew persona -> node
   const agents = new Map();  // tool_use id -> subagent node

@@ -237,6 +237,9 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .logline{align-self:flex-start;max-width:88%;font-family:var(--font-mono);font-size:11px;
   color:var(--dim);line-height:1.5;padding:1px 0 1px 4px;word-break:break-word}
 .logline .logdot{color:var(--green);opacity:.7;margin-right:5px}
+.logline.thought{font-style:italic;opacity:.82}
+.planblk{font-family:var(--font-mono);font-size:11.5px;text-align:left;line-height:1.75;
+  background:var(--accent-soft);border:1px solid var(--accent-dim);border-radius:10px;padding:9px 13px;max-width:82%}
 /* markdown inside assistant bubbles */
 .msg.assistant pre{background:#0b0a08;border:1px solid var(--line);border-radius:8px;
   padding:10px 12px;margin:8px 0;font-size:12px;overflow-x:auto;white-space:pre}

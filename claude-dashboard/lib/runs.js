@@ -12,6 +12,7 @@ const { spawn } = require('child_process');
 const U = require('./util');
 const memory = require('./memory');
 const liveness = require('./liveness');
+const acp = require('./acp');
 const { countArtifacts, listArtifacts, serveArtifact } = require('./artifacts');
 
 const DASH_DIR = path.resolve(__dirname, '..');
@@ -21,10 +22,10 @@ const RUNS_DIR = path.join(DASH_DIR, 'data', 'runs');
 const CLAUDE_EXE = process.env.HUB_CLAUDE_EXE || path.join(
   process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming'),
   'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
-// H2: second engine — hermes-agent one-shot mode (-z prints only the final
-// text; --usage-file writes cost/model accounting). Hermes does its own model
-// tiering + tool approvals, so the hub's model/permission selectors are
-// claude-only. Same spawn invariants: argv array, no shell.
+// H4: second engine — hermes over ACP (hermes acp, JSON-RPC/stdio; see
+// lib/acp.js) for real per-step streaming. Hermes does its own model tiering +
+// tool approvals, so the hub's model/permission selectors are claude-only.
+// Same spawn invariants: argv array, no shell.
 const HERMES_EXE = process.env.HUB_HERMES_EXE || path.join(
   require('os').homedir(), '.hermes', 'venvs', 'hermes', 'Scripts', 'hermes.exe');
 const ENGINES = ['claude', 'hermes'];
@@ -127,13 +128,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   fs.mkdirSync(artDir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'prompt.txt'), prompt, 'utf8');
 
-  // Hub note injected into every run. CRITICAL split (fixes the "redesign
-  // produced an HTML mockup instead of changing the app" bug): editing THIS
-  // dashboard's own UI means editing the real source files in place — the
-  // artifact directory is ONLY for report/chart/document deliverables.
-  const hint = `\n\n[Hub note: you were launched from the local Claude Code Hub dashboard, whose own source lives in ${PROJECT_DIR} (server: claude-dashboard/server.js + lib/*.js; UI: claude-dashboard/index.html + claude-dashboard/assets/*.js + assets/style.css). `
-    + `IF THE TASK IS TO CHANGE THE DASHBOARD'S OWN INTERFACE/UI (restyle, redesign, add or fix a tab, change layout/theme): EDIT THE REAL SOURCE FILES IN PLACE under claude-dashboard/assets/ (style.css, app.js, run.js, files.js, graph.js, agentviz.js, memory.js, tasks.js, voicecfg.js) and index.html — DO NOT create standalone or "preview" HTML files, and do not write anything into the artifacts directory. The change must be visible in the live app at http://127.0.0.1:5757 after reload. Keep every file under 500 lines, vanilla JS/CSS only (zero npm deps), and preserve the security invariants. A clean-dark theme already exists in assets/style.css under :root[data-theme="dark"]. `
-    + `ONLY IF the task asks you to GENERATE A SEPARATE DELIVERABLE (a report, chart, SVG/PNG, or a standalone interactive page that is NOT the dashboard itself) should you save those files into this exact directory: ${artDir} — the dashboard renders every file there inline. For those, a LOCAL asset library is served at /vendor/ (relative URLs; external CDNs blocked by CSP): /vendor/css/fonts.css declares @font-face for JetBrains Mono, IBM Plex Sans, Fraunces, Newsreader, Source Serif 4, Space Mono, DM Mono, VT323, Archivo, Bricolage Grotesque, Hanken Grotesk, Instrument Serif; /vendor/css/modern-normalize.css is a reset; /vendor/icons/lucide-sprite.svg has 1700+ icons. Avoid generic AI aesthetics: no Inter/Roboto/Arial/system fonts, no purple-gradient-on-white, no flat solid backgrounds; one cohesive palette + CSS variables. Do not mention this note.]`;
+  const hint = U.buildRunHint(PROJECT_DIR, artDir);
   // resolve 'auto' before spawning: resumed sessions keep their model,
   // fresh prompts are routed by the heuristic (claude engine only — hermes
   // does its own tiering: main/aux/subagent models from its config.yaml)
@@ -149,13 +144,15 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   let recalled = null;
   if (recall) { try { recalled = memory.recall(prompt); } catch {} }
   const fullPrompt = (recalled ? recalled.block + '\n\n' : '') + prompt + hint;
-  let args;
+  let args = null, acpCfg = null;
   const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'acceptEdits';
   if (engine === 'hermes') {
-    // one-shot headless: final text only on stdout; approvals auto-bypassed
-    // by -z itself (no permission modes); usage.json = cost/model accounting.
-    args = ['-z', fullPrompt, '--usage-file', path.join(dir, 'usage.json')];
-    model = ''; resume = ''; // hermes -z exposes no session id to resume
+    // H4: hermes now runs over ACP (hermes acp, JSON-RPC/stdio) instead of -z,
+    // so its per-step work (text, thoughts, tool calls + results, plan) streams
+    // live. The ACP client (lib/acp.js) drives the handshake; we just stash the
+    // prompt + optional resume id. hermes does its own model tiering + approvals.
+    acpCfg = { prompt: fullPrompt, resume: resume && /^[a-f0-9-]{6,}$/.test(resume) ? resume : '' };
+    model = '';
   } else {
     args = ['-p', fullPrompt, '--output-format', 'stream-json', '--verbose'];
     if (MODELS.includes(model) && model && model !== 'auto') args.push('--model', model);
@@ -169,7 +166,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
     costUsd: null, durationMs: null, routedReason, recallCount: recalled ? recalled.count : 0,
   };
-  const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, dir, out: null };
+  const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, acpCfg, dir, out: null };
   active.set(id, st);
   writeMeta(st);
   if (routedReason) pushLine(st, JSON.stringify({ type: 'hub_status', text: `auto → ${model} (${routedReason})` }));
@@ -183,32 +180,99 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
 }
 
 function launch(st) {
-  let child;
-  const exe = st.meta.engine === 'hermes' ? HERMES_EXE : CLAUDE_EXE;
-  try {
-    child = spawn(exe, st.args, { cwd: PROJECT_DIR, windowsHide: true });
-  } catch (e) {
-    st.meta.status = 'error';
-    st.meta.endedAt = new Date().toISOString();
-    writeMeta(st);
-    broadcast(st, 'done', JSON.stringify(st.meta));
-    return;
-  }
-  st.child = child;
+  if (st.meta.engine === 'hermes') return launchHermesAcp(st);
+  return launchClaude(st);
+}
+
+// Mark a run live: status/timestamps/output stream/heartbeat. Shared by both
+// engines so the liveness layer (heartbeat + reaper + stalled detection) covers
+// them identically.
+function markRunning(st) {
   st.meta.status = 'running';
   st.meta.startedAt = new Date().toISOString();
   st.lastLineAt = Date.now();
   writeMeta(st);
   st.out = fs.createWriteStream(path.join(st.dir, 'output.jsonl'), { flags: 'a' });
-  // liveness: broadcast a heartbeat so an attached client sees the run is
-  // alive (and how long it's been silent) even when nothing is streaming.
   liveness.startHeartbeat(st, broadcast);
-  // hermes -z is silent mid-run — follow its activity log so its real work
-  // (model calls, tool use) shows up as it happens.
-  if (st.meta.engine === 'hermes') {
-    liveness.startHermesTail(st, HERMES_EXE, (s, text) =>
-      pushLine(s, JSON.stringify({ type: 'hermes_log', text })));
+}
+
+// Common terminal handling for a finished run (both engines): error excerpt,
+// persist, episodic memory capture, notify listeners, free the slot.
+function finalizeRun(st) {
+  liveness.stopHeartbeat(st);
+  st.meta.endedAt = st.meta.endedAt || new Date().toISOString();
+  if (st.meta.startedAt && st.meta.durationMs == null) {
+    st.meta.durationMs = Date.parse(st.meta.endedAt) - Date.parse(st.meta.startedAt);
   }
+  if (st.meta.status === 'error' && st.stderr.trim()) {
+    pushLine(st, JSON.stringify({ type: 'hub_stderr', text: st.stderr.trim().slice(0, 4000) }));
+  }
+  if (st.meta.status === 'error' && !st.meta.errorExcerpt) {
+    let ex = st.stderr.trim().slice(0, 300);
+    if (!ex) {
+      try {
+        const last = JSON.parse(st.lines[st.lines.length - 1] || '{}');
+        if (last.type === 'result' && last.result) ex = String(last.result).slice(0, 300);
+      } catch {}
+    }
+    st.meta.errorExcerpt = ex || `exit code ${st.meta.exitCode}`;
+  }
+  if (st.out) st.out.end();
+  writeMeta(st);
+  try { memory.captureRun(st.meta); } catch {} // engram-style episodic capture (rule-based, no LLM)
+  broadcast(st, 'done', JSON.stringify(st.meta));
+  for (const res of st.listeners) { try { res.end(); } catch {} }
+  st.listeners.clear();
+  setTimeout(() => active.delete(st.meta.id), 30000); // grace for late SSE attach
+  dequeueNext();
+}
+
+// hermes over ACP: real per-step streaming (see lib/acp.js). Each ACP event is
+// already shaped like claude's stream-json, so it flows through pushLine into
+// the same Run tab + agent graph rendering.
+function launchHermesAcp(st) {
+  markRunning(st);
+  const cfg = st.acpCfg || { prompt: '', resume: '' };
+  st.acp = acp.run({ exe: HERMES_EXE, cwd: PROJECT_DIR, prompt: cfg.prompt, resume: cfg.resume }, {
+    onEvent: obj => pushLine(st, JSON.stringify(obj)),
+    onSession: sid => { st.meta.sessionId = sid; },
+    onStderr: text => {
+      if (st.stderr.length < 20000) st.stderr += text;
+      if (!st.meta.model) { const m = text.match(/model=([\w./-]+)/); if (m) st.meta.model = m[1]; }
+    },
+    onDone: info => {
+      st.child = null;
+      const u = info.usage || {};
+      st.meta.tokensIn = u.inputTokens ?? null;
+      st.meta.tokensOut = u.outputTokens ?? null;
+      if (st.cancelled || info.stopReason === 'cancelled') st.meta.status = 'cancelled';
+      else if (info.stopReason) st.meta.status = 'done'; // a real turn result
+      else if (info.error) { st.meta.status = 'error'; st.meta.errorExcerpt = String(info.error).slice(0, 300); }
+      else if (info.code) { st.meta.status = 'error'; st.meta.errorExcerpt = `hermes acp exited (code ${info.code}) before completing`; }
+      else st.meta.status = 'done';
+      st.meta.exitCode = info.code ?? (info.error ? 1 : 0);
+      const tok = (st.meta.tokensIn || st.meta.tokensOut)
+        ? ` · ${st.meta.tokensIn || 0}→${st.meta.tokensOut || 0} tok` : '';
+      pushLine(st, JSON.stringify({ type: 'hub_status', text: `hermes done · ${st.meta.model || 'config default'}${tok}` }));
+      finalizeRun(st);
+    },
+  });
+  st.child = st.acp.child;
+}
+
+function launchClaude(st) {
+  let child;
+  try {
+    child = spawn(CLAUDE_EXE, st.args, { cwd: PROJECT_DIR, windowsHide: true });
+  } catch (e) {
+    st.meta.status = 'error';
+    st.meta.endedAt = new Date().toISOString();
+    st.stderr += '\nspawn error: ' + e.message;
+    finalizeRun(st);
+    return;
+  }
+  st.child = child;
+  markRunning(st);
 
   let buf = '';
   child.stdout.on('data', d => {
@@ -218,12 +282,6 @@ function launch(st) {
       const line = buf.slice(0, nl).replace(/\r$/, '');
       buf = buf.slice(nl + 1);
       if (!line.trim()) continue;
-      if (st.meta.engine === 'hermes') {
-        // hermes -z streams plain final text, not stream-json — wrap each
-        // line as a JSON event so the same SSE/history path carries it
-        pushLine(st, JSON.stringify({ type: 'hermes_out', text: U.stripAnsi(line) }));
-        continue;
-      }
       if (line.includes('"type":"result"')) {
         try {
           const r = JSON.parse(line);
@@ -240,47 +298,9 @@ function launch(st) {
   child.stderr.on('data', d => { if (st.stderr.length < 20000) st.stderr += d; });
   child.on('error', e => { st.stderr += '\nspawn error: ' + e.message; });
   child.on('close', (code) => {
-    liveness.stopHeartbeat(st);
-    liveness.stopHermesTail(st);
-    st.meta.endedAt = new Date().toISOString();
     st.meta.exitCode = code;
     st.meta.status = st.cancelled ? 'cancelled' : (code === 0 ? 'done' : 'error');
-    if (st.meta.engine === 'hermes') {
-      // --usage-file is written even on failure; keys are defensive-read
-      // (estimated cost / token counts / model / api_calls per hermes docs)
-      const u = U.safeJson(path.join(st.dir, 'usage.json')) || {};
-      const cost = [u.estimated_cost_usd, u.estimated_cost, u.cost_usd, u.cost]
-        .find(v => typeof v === 'number');
-      if (cost !== undefined) st.meta.costUsd = cost;
-      if (u.model) st.meta.model = String(u.model);
-      if (st.meta.startedAt) st.meta.durationMs = Date.parse(st.meta.endedAt) - Date.parse(st.meta.startedAt);
-      pushLine(st, JSON.stringify({
-        type: 'hub_status',
-        text: `hermes done · ${st.meta.model || 'config default'}${st.meta.costUsd != null ? ' · ~$' + st.meta.costUsd.toFixed(4) : ''}`,
-      }));
-    }
-    if (st.meta.status === 'error' && st.stderr.trim()) {
-      pushLine(st, JSON.stringify({ type: 'hub_stderr', text: st.stderr.trim().slice(0, 4000) }));
-    }
-    if (st.meta.status === 'error') {
-      // surface WHY it failed in history rows, not just that it did
-      let ex = st.stderr.trim().slice(0, 300);
-      if (!ex) {
-        try {
-          const last = JSON.parse(st.lines[st.lines.length - 1] || '{}');
-          if (last.type === 'result' && last.result) ex = String(last.result).slice(0, 300);
-        } catch {}
-      }
-      st.meta.errorExcerpt = ex || `exit code ${code}`;
-    }
-    if (st.out) st.out.end();
-    writeMeta(st);
-    try { memory.captureRun(st.meta); } catch {} // engram-style episodic capture (rule-based, no LLM)
-    broadcast(st, 'done', JSON.stringify(st.meta));
-    for (const res of st.listeners) { try { res.end(); } catch {} }
-    st.listeners.clear();
-    setTimeout(() => active.delete(st.meta.id), 30000); // grace for late SSE attach
-    dequeueNext();
+    finalizeRun(st);
   });
 }
 
@@ -310,6 +330,8 @@ function cancelRun(id) {
   }
   if (st.meta.status !== 'running') return { error: 'run not active' };
   st.cancelled = true;
+  if (st.acp) { st.acp.cancel(); return { ok: true }; } // graceful ACP cancel → close → finalize
+  if (!st.child) return { ok: true };
   // kill the whole tree — the CLI spawns helpers
   spawn('taskkill', ['/pid', String(st.child.pid), '/t', '/f'], { windowsHide: true });
   return { ok: true };

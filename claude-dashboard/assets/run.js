@@ -176,9 +176,12 @@ function renderLine(o) {
       if (!b) continue;
       if (b.type === 'text' && b.text && b.text.trim()) { chat.lastText = b.text.trim(); addEl(mdToHtml(b.text.trim()), 'msg assistant'); }
       else if (b.type === 'tool_use') {
-        const el = addEl(`<details><summary>⚒ ${esc(b.name || 'tool')} <span class="muted">${esc(excerpt(b.input || {}, 90))}</span></summary>
+        // hermes ACP tool calls carry a human title in input.title; prefer it
+        const summ = (b.input && b.input.title) ? b.input.title : excerpt(b.input || {}, 90);
+        const el = addEl(`<details><summary>⚒ ${esc(b.name || 'tool')} <span class="muted">${esc(summ)}</span></summary>
           <pre>${esc(JSON.stringify(b.input || {}, null, 2))}</pre></details>`, 'toolblk');
         if (b.id) toolEls[b.id] = el.querySelector('pre');
+        chat.hermesEl = null; // a tool block ends the current hermes text bubble
       }
     }
     return null;
@@ -212,12 +215,26 @@ function renderLine(o) {
     addEl(`<span class="logdot">›</span> ${esc(o.text)}`, 'logline');
     return null;
   }
-  if (o.type === 'hermes_out') {
-    // hermes -z streams plain text lines — grow them into ONE assistant bubble
+  if (o.type === 'hermes_out' || o.type === 'hermes_text') {
+    // hermes agent text — grow into ONE assistant bubble. -z (hermes_out) sent
+    // whole lines; ACP (hermes_text) sends streaming chunks, so concatenate raw
+    // for chunks and newline-join for legacy lines.
     if (!chat.hermesEl || !chat.hermesEl.isConnected) { chat.hermesEl = addEl('', 'msg assistant'); chat.hermesText = ''; }
-    chat.hermesText += (chat.hermesText ? '\n' : '') + o.text;
+    chat.hermesText += o.type === 'hermes_text' ? o.text : ((chat.hermesText ? '\n' : '') + o.text);
     chat.hermesEl.innerHTML = mdToHtml(chat.hermesText);
     chat.lastText = chat.hermesText.trim(); // feeds voice talk-back like claude runs
+    return null;
+  }
+  if (o.type === 'hermes_thought') { // ACP agent_thought_chunk — dim, ambient
+    addEl(`<span class="logdot">💭</span> ${esc(o.text)}`, 'logline thought');
+    return null;
+  }
+  if (o.type === 'hermes_plan') { // ACP plan update — render as a checklist
+    const rows = (o.entries || []).map(e => {
+      const icon = e.status === 'completed' ? '✅' : (e.status === 'in_progress' ? '🔄' : '⏳');
+      return `${icon} ${esc(e.content || '')}`;
+    }).join('<br>');
+    if (rows) addEl(`<b>plan</b><br>${rows}`, 'msg sys planblk');
     return null;
   }
   return null;
@@ -437,7 +454,7 @@ function renderHistory() {
       <div class="flex" style="justify-content:space-between">
         <span><span class="pill ${pill(m.status)}">${esc(m.status)}</span>${liveBadge(m)}
           <span class="muted" style="font-size:11.5px">${new Date(m.startedAt || m.queuedAt || 0).toLocaleString()}</span></span>
-        <span class="muted" style="font-size:11.5px">${m.engine === 'hermes' ? '⬡ hermes · ' : ''}${m.model ? esc(m.model) + (m.routedReason ? ' (auto)' : '') + ' · ' : ''}${m.durationMs ? (m.durationMs / 1000).toFixed(1) + 's' : ''}${m.costUsd != null ? ' · $' + m.costUsd.toFixed(4) : ''}${m.resumedFrom ? ' · ⟲ resumed' : ''}${m.artifactCount ? ' · ◫ ' + m.artifactCount : ''}
+        <span class="muted" style="font-size:11.5px">${m.engine === 'hermes' ? '⬡ hermes · ' : ''}${m.model ? esc(m.model) + (m.routedReason ? ' (auto)' : '') + ' · ' : ''}${m.durationMs ? (m.durationMs / 1000).toFixed(1) + 's' : ''}${m.costUsd != null ? ' · $' + m.costUsd.toFixed(4) : (m.tokensOut != null ? ' · ' + (m.tokensIn || 0) + '→' + m.tokensOut + ' tok' : '')}${m.resumedFrom ? ' · ⟲ resumed' : ''}${m.artifactCount ? ' · ◫ ' + m.artifactCount : ''}
           <button class="danger delRunBtn" data-id="${esc(m.id)}" title="delete this run from history" style="padding:2px 9px;font-size:10.5px;margin-left:8px">✕</button></span>
       </div>
       <div class="pex">${esc(m.promptExcerpt || '')}</div>
