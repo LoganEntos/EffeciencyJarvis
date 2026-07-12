@@ -200,9 +200,16 @@ function graphStats() {
 function assets() {
   const man = U.safeJson(path.join(DASH_DIR, 'vendor', 'manifest.json'));
   if (!man) return { exists: false, items: [], iconIndex: [] };
-  const iconIndex = U.safeJson(path.join(DASH_DIR, 'vendor', 'icons', 'lucide-index.json')) || [];
-  const tablerIndex = U.safeJson(path.join(DASH_DIR, 'vendor', 'icons', 'tabler-index.json')) || [];
-  return { exists: true, generatedAt: man.generatedAt, items: man.items || [], iconIndex, tablerIndex };
+  // every type:icons manifest entry becomes a browsable set; its name index is a
+  // sibling <base>-index.json (base = filename minus "-sprite.svg").
+  const iconSets = (man.items || []).filter(i => i.type === 'icons').map(it => {
+    const base = path.basename(it.file).replace(/-sprite\.svg$/, '').replace(/\.svg$/, '');
+    const index = U.safeJson(path.join(DASH_DIR, 'vendor', 'icons', base + '-index.json')) || [];
+    return { key: base, label: it.label || base, file: it.file, pfx: it.pfx || '', style: it.style || '', license: it.license, count: index.length, names: index };
+  });
+  // iconIndex kept for backward compat (older clients read the Lucide list directly)
+  const lucide = iconSets.find(s => s.key === 'lucide');
+  return { exists: true, generatedAt: man.generatedAt, items: man.items || [], iconSets, iconIndex: lucide ? lucide.names : [] };
 }
 
 // Serve the raw markdown of one agent/skill/command definition (path-traversal safe).

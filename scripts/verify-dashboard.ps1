@@ -59,6 +59,7 @@ Check "GET vendor traversal blocked" "$base/vendor/..%2Fserver.js" 404
 Check "GET /manifest.webmanifest"  "$base/manifest.webmanifest"
 Check "GET /vendor/icons/hub-icon.svg" "$base/vendor/icons/hub-icon.svg"
 Check "GET /vendor/icons/tabler-sprite.svg" "$base/vendor/icons/tabler-sprite.svg"
+Check "GET /vendor/icons/bootstrap-sprite.svg" "$base/vendor/icons/bootstrap-sprite.svg"
 Check "GET /vendor/css/pattern.min.css" "$base/vendor/css/pattern.min.css"
 Check "GET /api/memory"        "$base/api/memory"
 Check "GET /api/memory/search" "$base/api/memory/search?q=test"
