@@ -40,7 +40,8 @@ h1,h2,h3,.card .n,kbd{font-family:var(--font-mono)}
 
 /* ---- header ---- */
 header{padding:0 22px;height:54px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;
-  background:#151310cc;backdrop-filter:blur(8px);position:sticky;top:0;z-index:40}
+  background:#151310cc;backdrop-filter:blur(8px);position:sticky;top:0;z-index:40;
+  padding-top:env(safe-area-inset-top,0px);height:calc(54px + env(safe-area-inset-top,0px))}
 :root[data-theme="light"] header{background:#fbf8f1cc}
 header h1{font-size:14px;margin:0;font-weight:800;letter-spacing:.6px;white-space:nowrap;text-transform:uppercase}
 header h1 .logo{display:inline-block;width:22px;height:22px;border-radius:5px;background:var(--accent);
@@ -247,34 +248,45 @@ label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:1
   #navToggle,.navOverlay{display:none!important}
   .wrap{min-height:calc(100vh - 48px)}
   nav{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;height:auto;flex-shrink:0;
-    display:flex;flex-direction:row;align-items:stretch;overflow-x:auto;overflow-y:hidden;
+    display:flex;flex-direction:row;align-items:stretch;justify-content:space-around;overflow-x:auto;overflow-y:hidden;
     -webkit-overflow-scrolling:touch;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));
     border-right:none;border-top:1px solid var(--line);background:#151310f2;backdrop-filter:blur(8px);
-    z-index:35;scrollbar-width:none}
+    z-index:35;scrollbar-width:none;scroll-padding-right:6px}
   nav::-webkit-scrollbar{display:none}
   :root[data-theme="light"] nav{background:#fbf8f1f2}
   nav .navlabel{display:none}
-  nav a{flex:0 0 auto;flex-direction:column;justify-content:center;align-items:center;gap:2px;
-    padding:6px 12px;margin:0;border-radius:8px;min-width:58px}
+  nav a{flex:1 0 auto;flex-direction:column;justify-content:center;align-items:center;gap:2px;
+    padding:6px 8px;margin:0;border-radius:8px;min-width:52px;scroll-snap-align:end}
   nav a .ico{width:auto;font-size:17px;opacity:1}
   nav a span.txt{display:block;font-size:9px;letter-spacing:.2px;white-space:nowrap}
   nav a kbd{display:none}
   nav a.active{box-shadow:inset 0 2px 0 var(--accent)}
   main{padding:16px 14px calc(78px + env(safe-area-inset-bottom,0px))}
   /* header: single tight row, status+spend (the "usage" readout) always
-     visible and legible — this was the other half of the complaint. */
-  header{padding:0 10px;height:48px;gap:8px}
+     visible and legible — this was the other half of the complaint.
+     safe-area-inset-top padding (added above, kept here as height base)
+     stops the phone's own status-bar clock/battery from drawing over the
+     hub title — that was the "8:02 overlapping CLAUDE CODE HUB" bug. */
+  header{padding:0 10px;height:48px;gap:8px;
+    padding-top:env(safe-area-inset-top,0px);height:calc(48px + env(safe-area-inset-top,0px))}
   header h1{font-size:11px;letter-spacing:.3px}
   header h1 .logo{width:16px;height:16px;margin-right:5px;vertical-align:-3px}
   header .badge{display:none}
   header #statusBadge{display:inline-flex;align-items:center;font-size:0;padding:6px;border-radius:50%;
     max-width:none}
   header #statusBadge .dot{margin-right:0}
-  header #spendBadge{display:inline-block;max-width:none;padding:4px 10px;font-size:11px;font-weight:600}
+  header #spendBadge{display:inline-block;max-width:120px;padding:4px 10px;font-size:10.5px;font-weight:600;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   header .iconbtn{width:36px;height:36px;font-size:16px}
   .msg,.toolblk{max-width:96%}
   .cards{grid-template-columns:repeat(2,1fr);gap:10px}
   .card .n{font-size:28px}
+  /* Run-history stat row: on desktop this piles on per-model cost chips +
+     a routing-accuracy chip alongside the outcome counts — on a 375px
+     screen that reads as noise ("49 done" swimming next to six other
+     pills). Keep only the outcome chips (all/done/failed/cancelled);
+     hide the per-model + routing chips, they're desktop-density info. */
+  #histStats .pill:nth-child(n+5){display:none}
 }
 
 /* N2 mobile polish: on touch devices, small inline action buttons (run-history

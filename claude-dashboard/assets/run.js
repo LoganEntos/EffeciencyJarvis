@@ -41,7 +41,6 @@ function ensureRunUI() {
         <input type="checkbox" id="runRecall"> ◇ memory recall</label>
       <button id="newChatBtn" class="ghost">＋ New chat</button>
       <span class="pill neutral hidden" id="chatSession" title="follow-up prompts resume this CLI session"></span>
-      <span class="pill neutral hidden" id="spendBadge" title="sum of run costs started today"></span>
     </div>
     <div class="chatlog" id="chatLog"><div class="msg sys">Type a prompt below — the claude CLI runs it inside the project directory and streams back here.</div></div>
     <div class="badgebar" id="runStatus" style="margin-bottom:10px"></div>
@@ -337,15 +336,10 @@ async function refreshHistory() {
   if (!$('#runHistory')) return;
   try { histRuns = await api('/api/runs'); } catch { $('#runHistory').innerHTML = '<div class="muted">History unavailable.</div>'; return; }
   if (!Array.isArray(histRuns)) histRuns = [];
-  // today's spend badge — subscription-usage awareness at a glance
-  const today = new Date().toDateString();
-  let spend = 0, n = 0;
-  for (const m of histRuns) {
-    const t = m.startedAt || m.queuedAt;
-    if (t && new Date(t).toDateString() === today) { n++; spend += m.costUsd || 0; }
-  }
-  const sb = $('#spendBadge');
-  if (sb && n) { sb.textContent = `today: ${n} runs · $${spend.toFixed(2)}`; sb.classList.remove('hidden'); }
+  // (header's own #spendBadge — see app.js updateSpendBadge — already shows
+  // today's run count+spend; a second script used to write a longer string
+  // into that SAME id, which is what produced the unreadable "today: 52
+  // ru…" truncation on narrow phones. Don't duplicate it here.)
   // N4: routing-accuracy chip (auto-routed runs only; suspects in the tooltip)
   try { routing = await api('/api/routing'); } catch { routing = null; }
   renderHistStats();
