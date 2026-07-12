@@ -142,7 +142,23 @@ function xlsxInfo(full) {
   return { sheetCount: sheets.length, sheets };
 }
 
+// R4: inline image preview (thumbnails in the Files tab). Restricted to a
+// known-safe image allowlist and served WITHOUT Content-Disposition:attachment
+// so <img> can render it; <img> never executes scripts even for image/svg+xml.
+const IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' };
+
 async function handle(req, res, url) {
+  if (url.pathname === '/api/files/view' && req.method === 'GET') {
+    const f = inboxFile(url.searchParams.get('name') || '');
+    if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    const ext = (f.safe.split('.').pop() || '').toLowerCase();
+    const ctype = IMAGE_TYPES[ext];
+    if (!ctype) { U.sendJson(res, { error: 'not a previewable image' }, 400); return true; }
+    const st = fs.statSync(f.full);
+    res.writeHead(200, { 'Content-Type': ctype, 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60' });
+    fs.createReadStream(f.full).pipe(res);
+    return true;
+  }
   if (url.pathname === '/api/files/xlsx' && req.method === 'GET') {
     const f = inboxFile(url.searchParams.get('name') || '');
     if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }

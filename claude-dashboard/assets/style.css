@@ -299,6 +299,12 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .dropzone{border:2px dashed var(--line2);border-radius:var(--r);padding:34px;text-align:center;
   color:var(--muted);margin-bottom:18px;transition:border-color .15s,background .15s;cursor:pointer}
 .dropzone.drag{border-color:var(--accent);background:var(--accent-soft);color:var(--txt)}
+/* R4: day-grouped uploads + image thumbnails, so >10 files stay orientable */
+.file-daygroup{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.6px;
+  margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.file-daygroup:first-child{margin-top:0}
+.file-thumb{width:32px;height:32px;object-fit:cover;border-radius:4px;border:1px solid var(--line);
+  margin-right:9px;flex-shrink:0;background:var(--panel2)}
 
 /* ---- Memory tab: Obsidian-style vault (list + tag cloud | note + backlinks) ---- */
 .mem-tagcloud{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}

@@ -45,6 +45,20 @@ async function uploadFiles(fileList, overwrite) {
   await refreshFiles();
 }
 
+const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
+
+// R4: day-bucket label for grouping uploads — Today / Yesterday / weekday / date
+function dayLabel(iso) {
+  if (!iso) return 'Undated';
+  const d = new Date(iso), now = new Date();
+  const startOf = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days > 1 && days < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+}
+
 async function refreshFiles() {
   const el = $('#fileList');
   if (!el) return;
@@ -52,11 +66,19 @@ async function refreshFiles() {
   try { list = await api('/api/files'); } catch { el.innerHTML = '<div class="muted">Inbox unavailable.</div>'; return; }
   if (!Array.isArray(list) || !list.length) { el.innerHTML = '<div class="muted">Inbox is empty — drop a workbook or document above.</div>'; return; }
   const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
-  el.innerHTML = list.map(f => `
+  let lastGroup = null, html = '';
+  for (const f of list) {
+    const group = dayLabel(f.modified);
+    if (group !== lastGroup) { html += `<div class="file-daygroup">${esc(group)}</div>`; lastGroup = group; }
+    const isImg = IMG_RE.test(f.name);
+    html += `
     <div class="row">
       <div class="flex" style="justify-content:space-between">
-        <span class="name mono">${esc(f.name)}</span>
-        <span class="muted" style="font-size:11.5px">${fmt(f.size)} · ${f.modified ? new Date(f.modified).toLocaleString() : ''}</span>
+        <span class="flex" style="min-width:0">
+          ${isImg ? `<img class="file-thumb" src="/api/files/view?name=${encodeURIComponent(f.name)}" alt="" loading="lazy">` : ''}
+          <span class="name mono">${esc(f.name)}</span>
+        </span>
+        <span class="muted" style="font-size:11.5px;white-space:nowrap">${fmt(f.size)} · ${f.modified ? new Date(f.modified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
       </div>
       <div class="flex" style="margin-top:8px">
         <button class="ghost procBtn" data-path="${esc(f.path)}" data-name="${esc(f.name)}">▷ Process with Claude</button>
@@ -65,7 +87,9 @@ async function refreshFiles() {
         <button class="danger delBtn" data-name="${esc(f.name)}" style="padding:6px 12px;font-size:11.5px">delete</button>
       </div>
       <div class="xlsxInfo" data-for="${esc(f.name)}"></div>
-    </div>`).join('');
+    </div>`;
+  }
+  el.innerHTML = html;
   el.querySelectorAll('.procBtn').forEach(b => b.onclick = () =>
     prefillRun(`Process the uploaded file at ${b.dataset.path} — `));
   // N6: zero-dep workbook preview — sheet names + grid dimensions, no values

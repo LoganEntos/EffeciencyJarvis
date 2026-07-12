@@ -233,6 +233,40 @@ more efficient at the initial sweep), then hand maintenance to Opus 4.8.
 Shape TBD: likely `data/breakdown.json` + a Library tab section; refresh via a
 scheduled run (S17). **User said: to-do list only for now.**
 
+### N10. Council mode (user link 2026-07-12: karpathy/llm-council — SCOPED, not built yet)
+Prior art: llm-council fans a query out to several LLMs, has each anonymously
+rank the others' answers, then a "Chairman" model synthesizes a final answer.
+Mapped onto the hub (Claude-only, no cross-provider keys — see
+`engine-claude-only` memory): a "Council" run mode fires the same prompt to 2-3
+parallel Claude model tiers (e.g. haiku + sonnet + opus, or auto vs pinned),
+renders each answer in a tab (same shape as run history), then a cheap model
+(haiku) synthesizes/picks the best into one final reply. **Blocked on scope,
+not on the idea:** `lib/runs.js` is already at 472/500 lines with no headroom
+for concurrent-process orchestration, and `assets/run.js` is already over the
+500-line cap (557 — see the split below). Do this AFTER both are split:
+add `lib/council.js` (spawn N runs via the existing argv-array run primitives,
+fan-in) + `assets/council.js` (tabbed responses + synthesis). Matches the
+already-planned "Council" panel referenced in `redesign-clean-dark` memory.
+
+### N11. assets/run.js split (2026-07-12 self-audit — 🔜 next, mechanical)
+`assets/run.js` is 557 lines, over the repo's 500-line hard cap (CLAUDE.md).
+Split along the S16-established pattern (`app.js` 611→347 via
+`overview.js`+`config.js`, commit bf2f8f0): pull the run-history rendering
+(filter chips, stat pills, artifact rendering, per-run delete) into a new
+`assets/runhistory.js`, leave the composer + SSE streaming + liveness badges
+in `run.js`. Zero behavior change — pure file split.
+
+### Declined 2026-07-12: browser-use/browser-harness (user link)
+CDP browser harness that lets an agent write its own Playwright-style helpers
+against a real Chrome instance (uv/Python 3.12 install, optional Browser Use
+Cloud account for stealth/sub-agents). **Not adopted** — the `scrapling` MCP
+already installed in `.mcp.json` covers the hub's actual browser-automation
+needs (screenshot, fetch, stealthy fetch, persistent sessions) for verifying
+UI changes and scraping reference pages, at zero additional install/token
+tax. Revisit only if a task needs the agent to *write and persist* reusable
+site-specific automation skills across sessions — scrapling has no
+skill-authoring loop.
+
 ### N8. iPhone incorporation (user request 2026-07-10 — QUEUED, evaluate options)
 Get the hub properly usable from an iPhone — possibly via Base44 or another
 app-builder, possibly without one. Options to weigh when picked up:
