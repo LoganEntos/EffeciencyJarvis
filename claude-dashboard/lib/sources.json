@@ -5,7 +5,7 @@
     "Tabler": "https://github.com/tabler/tabler-icons",
     "Bootstrap": "https://github.com/twbs/icons",
     "Pixelart": "https://github.com/halfmage/pixelarticons",
-    "pattern.min.css": "https://github.com/bansal-io/pattern.css",
+    "pattern.min.css": "https://github.com/bansal/pattern.css",
     "modern-normalize.css": "https://github.com/sindresorhus/modern-normalize"
   },
   "curated": [
