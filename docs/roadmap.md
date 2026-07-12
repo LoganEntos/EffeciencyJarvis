@@ -248,13 +248,13 @@ add `lib/council.js` (spawn N runs via the existing argv-array run primitives,
 fan-in) + `assets/council.js` (tabbed responses + synthesis). Matches the
 already-planned "Council" panel referenced in `redesign-clean-dark` memory.
 
-### N11. assets/run.js split (2026-07-12 self-audit — 🔜 next, mechanical)
-`assets/run.js` is 557 lines, over the repo's 500-line hard cap (CLAUDE.md).
-Split along the S16-established pattern (`app.js` 611→347 via
-`overview.js`+`config.js`, commit bf2f8f0): pull the run-history rendering
-(filter chips, stat pills, artifact rendering, per-run delete) into a new
-`assets/runhistory.js`, leave the composer + SSE streaming + liveness badges
-in `run.js`. Zero behavior change — pure file split.
+### N11. assets/run.js split ✅ DONE 2026-07-12
+`run.js` was 557 lines (over the 500 cap). Split per the `app.js` pattern:
+the run-history list (fetch, filter chips, stat pills, run rows + replay/delete)
+moved to **`assets/runhistory.js`** (91 lines); composer + SSE streaming +
+liveness badges + artifacts stay in `run.js` (now 471). Loaded after run.js;
+zero behavior change — verified (history renders, filter works, no errors).
+(A parallel run had attempted this split and left it broken; redone cleanly.)
 
 ### Declined 2026-07-12: browser-use/browser-harness (user link)
 CDP browser harness that lets an agent write its own Playwright-style helpers
