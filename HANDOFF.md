@@ -62,7 +62,8 @@ scripts/csm-server.py    CSM-1B TTS sidecar (127.0.0.1:8790; csm-requirements.tx
 scripts/verify-dashboard.ps1   endpoint smoke test (41 checks)
 scripts/install-autostart.ps1  user-run logon task
 ```
-Nav order: Run · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Config.
+Nav order: Run · **Live** · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Tools · Config.
+(`assets/live.js` = Live tab; `assets/admin.js` = Tools tab; `assets/teams.js` = teams UI on the Agents tab.)
 Graph tab: "Agents" live crew view by default (persona names: Maestro/Poet/Dart
 models, Scout/Scribe/Wrench/etc tool crews). Codebase map behind a chip, with
 its own Modules (file-level, default) / All-symbols sub-views.
@@ -162,6 +163,59 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
 - Optional: accept the `sesame/csm-1b` terms on HF + set HF_TOKEN to pull the
   official weights instead of the mirror.
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
+
+## ⚡ CURRENT STATE (2026-07-12, latest) — Live tab, Assets library, efficiency Overview, GitHub-intake team
+> Newest section — supersedes everything below (kept as history). This session's
+> commits: Tabler+pattern.css vendor (`390bc35`), Bootstrap Icons + browsable
+> Assets (`44b6b93`), Pixelarticons + sortable sets (`254b0b9`), Overview
+> money→efficiency+context (`eb3f319`), Live tab (`0ce1531`), Live cursor
+> (`cfcf3fb`), Teams/GitHub-intake + team-display + bronze (`fd9d0cb`). Smoke green.
+
+1. **Live tab — watch Claude Code run in real time (mobile-first).** New tab
+   (`assets/live.js`) tails the newest `~/.claude/projects/…` transcript (ANY
+   Claude Code session — hub-launched OR a terminal `claude` in this project),
+   polling `/api/sessions` + `/api/session-tail` every 2 s while visible,
+   auto-following the tail; session picker + Auto(newest) mode; blinking amber
+   cursor while active. **Header ● Live badge** (green pulsing dot) shows
+   active/idle from every tab (incl. mobile) and taps through to Live. No new
+   endpoint. Verified live streaming its own tool calls at desktop + 375 px.
+2. **Assets library = a real, browsable, sortable icon/pattern catalog.** Four
+   vendored icon sprites now (all MIT/permissive, LOCAL, zero runtime CDN):
+   Lucide 1746 (ISC) · Tabler 5093 · Bootstrap 2078 · Pixelart 877 = ~9.8k
+   icons, + pattern.css (14 bg patterns × 4 sizes). `assetlib.js` is
+   **manifest-driven**: any `type:icons` entry in `vendor/manifest.json` with a
+   sibling `<base>-index.json` auto-surfaces. Assets tab: sticky jump-nav,
+   set **toggle**, **sort sets** (name/count/size), per-set icon A→Z/Z→A,
+   live result count, pattern size toggle, click-to-copy. `core.js` returns a
+   generic `iconSets[]`; `lib/util.js` run hint advertises all four sprites.
+3. **Overview = efficiency + context, NO monetary values.** Hero shows
+   context-window utilization of the current chat (latest run) vs the model's
+   window (all Claude = 200K); "Current chat · analytics" card (model/tier,
+   window, tokens in→out, memories, duration, routing reason); efficiency stat
+   cards (Success / Routing / Lean-models / Avg run / Active) + model-mix bar
+   replace the old $ cards/breakdown. **`runs.js` now captures `result.usage`
+   → `tokensIn` (input+cache) / `tokensOut`**, so context analytics fills in for
+   all Claude CLI runs going forward (was dropped before → most history has none).
+4. **Agent teams: GitHub-intake team is ACTIVE.** `lib/teams.js` BUILTINS gained
+   **`github` "GitHub intake"** (agents: scraper, web-researcher, backend-builder,
+   json-wrangler, librarian, code-reviewer) — hint steers: eval repo+LICENSE →
+   fetch (Scrapling MCP / one-time curl, NO runtime CDN) → vendor locally under
+   `vendor/` + update `manifest.json` → review. **It is the currently-selected
+   active team** (`settings.active='github'`). The **scraper = Scrapling** (the
+   ONLY MCP in `.mcp.json`, `scraper` haiku agent); "774x/774b" the user asked
+   about does not exist anywhere in the app.
+5. **Active team is now shown on Run / Sessions / Tasks.** `runs.js` records the
+   active team name in run `meta.team`; `tasks.js` enrich surfaces it. Displayed
+   as: per-run pill in Run history, per-thread pill on Sessions rows (mapped by
+   `sessionId`→run), active-team header pill on Sessions + Tasks. (Old runs
+   pre-date `meta.team`, so their pills are blank — populates going forward.)
+6. **Transcript tool lines dimmed amber→bronze/grey** (`--bronze` var, all
+   themes) so Claude's messages (amber accent) read distinctly from tool calls
+   in the Live/Overview/Sessions feeds. `KIND_COLOR.tool = var(--bronze)`.
+7. **Browser-pane tooling flaky all session:** screenshots + long multi-await
+   `javascript_tool` calls TIME OUT on this heavy SPA (esp. after big sprite
+   parses) — verification done via single-shot computed-style reads instead
+   (reliable). Not an app bug.
 
 ## ⚡ CURRENT STATE (2026-07-12, late) — Claude-only pivot + redesign shipped
 > This supersedes the dated sections below (kept as history). Mirrors the
