@@ -8,7 +8,7 @@ const SRC_GROUPS = [
   { kind: 'vendored', title: 'Vendored assets', sub: 'downloaded once into /vendor/ — fonts, icon sprites, CSS. No runtime CDN.' },
   { kind: 'skill', title: 'Adapted skills', sub: 'open-source skill libraries adapted into .claude/skills/.' },
   { kind: 'tool', title: 'Agent tools', sub: 'engines the hub drives — the Scrapling MCP, CSM voice, hermes (deprecated).' },
-  { kind: 'incorporate', title: 'Queued to incorporate', sub: 'on the intake list — evaluate before wiring in.' },
+  { kind: 'incorporate', title: 'Intake list', sub: 'candidate repos — queued = evaluate before wiring in; declined = evaluated, not adopted.' },
 ];
 
 // license → badge tone. Permissive/OFL = ok(amber-green), unknown = neutral.
@@ -25,6 +25,7 @@ function licenseBadge(s) {
 
 function statusBadge(s) {
   if (s.status === 'deprecated') return '<span class="pill warn" style="font-size:10px">deprecated</span>';
+  if (s.status === 'declined') return '<span class="pill err" style="font-size:10px">declined</span>';
   if (s.status === 'queued') return '<span class="pill neutral" style="font-size:10px">queued</span>';
   return '';
 }

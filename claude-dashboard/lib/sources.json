@@ -69,8 +69,8 @@
       "repo": "https://github.com/unclecode/crawl4ai",
       "license": "Apache-2.0",
       "verified": true,
-      "status": "queued",
-      "usedFor": "QUEUED — LLM-friendly web crawler/scraper being evaluated as a fetch sibling for the GitHub-intake team (overlaps Scrapling). Python; must NOT bundle into the zero-dep app."
+      "status": "declined",
+      "usedFor": "EVALUATED → SKIP (2026-07-12) — LLM-friendly web crawler/scraper; overlaps Scrapling heavily and a 2nd always-on scraper MCP taxes every run. Not installed. Revisit only as an on-demand CLI if a deep-crawl/RAG-ingestion feature is greenlit. See docs/crawl4ai-evaluation.md."
     },
     {
       "kind": "incorporate",
@@ -89,6 +89,33 @@
       "verified": true,
       "status": "queued",
       "usedFor": "QUEUED — prior art for N10 Council mode (Claude-only fan-out + synthesis). ⚠ NO license declared (all rights reserved) — cannot be vendored/adapted as-is; use only as reference, or ask the author to add a license."
+    },
+    {
+      "kind": "incorporate",
+      "name": "open-jarvis/OpenJarvis",
+      "repo": "https://github.com/open-jarvis/OpenJarvis",
+      "license": "Apache-2.0",
+      "verified": true,
+      "status": "queued",
+      "usedFor": "QUEUED — user flagged \"add this in\" (2026-07-12 thread). 'Personal AI, on personal devices' — a local personal-assistant project. Not yet evaluated; assess overlap with the hub's own local-assistant surface (voice + runs) before incorporating."
+    },
+    {
+      "kind": "incorporate",
+      "name": "zcaceres/markdownify-mcp",
+      "repo": "https://github.com/zcaceres/markdownify-mcp",
+      "license": "MIT",
+      "verified": true,
+      "status": "queued",
+      "usedFor": "QUEUED (roadmap Q2) — MCP that converts PDF/DOCX/XLSX/images → markdown before a run reads them (fewer tokens per document task). Needs pnpm + uv. Caveat: it's an MCP → schemas tax every run; add only when document workflows are active, and scope it out of lean runs."
+    },
+    {
+      "kind": "incorporate",
+      "name": "eyaltoledano/claude-task-master",
+      "repo": "https://github.com/eyaltoledano/claude-task-master",
+      "license": "MIT + Commons Clause (source-available)",
+      "verified": true,
+      "status": "declined",
+      "usedFor": "EVALUATED → declined as an always-on MCP (roadmap Q3) — taxes every run; the hub-native task queue (lib/tasks.js) already covers PRD→task decomposition. CLI-only on demand if ever wanted. NB: MIT + Commons Clause restricts selling / paid hosting (fine for this local personal tool)."
     }
   ]
 }

@@ -289,6 +289,12 @@ frameworks in wholesale (the hermes lesson). Build only on the user's go-ahead.
   **Not installed.** Revisit only as an *on-demand CLI* (never an always-on MCP)
   IF a deep-crawl / docs→markdown RAG-ingestion feature is greenlit. Full
   rationale + capability table: `docs/crawl4ai-evaluation.md`.
+- **open-jarvis/OpenJarvis** (user flagged "add this in", 2026-07-12 — surfaced by
+  a memory/thread sweep 2026-07-12; was previously untracked). Apache-2.0.
+  *"Personal AI, on personal devices."* A local personal-assistant project.
+  **Not yet evaluated** — assess what it offers over the hub's own local-assistant
+  surface (voice + runs + memory) and whether any idea is worth porting natively
+  (zero-dep) before incorporating. Now tracked in the Sources tab (intake list).
 
 ### N11. Sources library — "what GitHubs power this hub" ✅ DONE 2026-07-12
 Shipped: **Sources** Library tab (`assets/sources.js`) → `/api/sources`
