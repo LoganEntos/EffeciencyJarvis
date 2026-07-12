@@ -46,10 +46,43 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ---
 
+## 🚨 SERIOUS BLOCKER — Hermes runs are INVISIBLE while active (user-flagged 2026-07-11)
+
+**The problem (elevated to a top priority by the user):** a running Hermes run
+shows **no live progress at all** — you cannot see what it is doing, whether
+it is working, stalled, or dead. Root cause: the hub spawns hermes in `-z`
+one-shot mode, which by design prints **only the final text at completion** —
+zero streaming, no tool events, no step log. So its `output.jsonl` stays empty
+for the entire run.
+
+**Why this is serious, not cosmetic:**
+- **Indistinguishable from failure.** On 2026-07-12 the redesign build ran 6+
+  minutes with an empty output file — identical on screen to two ZOMBIE runs
+  still marked "running" from crashes hours earlier (18:40 and 23:04, no
+  usage.json, process long dead). Working, stalled, and dead all look the same.
+- **Blocks R0 + R1** — you can't build an efficiency dashboard or a truthful
+  live agent graph for an engine that emits no telemetry. Everything
+  Hermes-first depends on fixing this FIRST.
+- **Trust.** We're handing Hermes multi-minute autonomous builds of the app
+  itself; flying blind on those is unacceptable.
+
+**Fix path (investigate, in order):**
+1. Does `hermes` have a **streaming / JSON event mode** (not `-z`)? Check
+   `hermes chat`, `--tui`, verbose/`--dev`, `--pass-session-id`, or the
+   gateway/`serve`/ACP event streams. If any emits structured turn/tool events,
+   switch the run engine to that and parse it like claude's stream-json.
+2. If not: poll `hermes`'s own session store (it has FTS5 session memory /
+   `hermes sessions`) mid-run for the live transcript, and surface a heartbeat.
+3. Minimum viable now: a **liveness/zombie guard** — mark a "running" run as
+   stalled/dead when its process is gone or it's produced nothing for N minutes,
+   so zombies stop masquerading as active (this alone removes the worst
+   confusion and should ship regardless).
+
 ## 🗣️ USER REVIEW BACKLOG (2026-07-11 walkthrough) — highest priority
 
 Direction shift: **Hermes is now the default/always-on engine.** Everything
 below is framed by that — Hermes efficiency + observability is the theme.
+**Observability is gated by the SERIOUS BLOCKER above — fix it first.**
 
 **R0. Hermes-first + efficiency metrics (PRIORITY 1).** Make hermes the default
 engine. Build REAL efficiency tracking on Overview — the current mockup metrics
