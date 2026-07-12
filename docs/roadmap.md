@@ -46,6 +46,26 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ---
 
+## ✅ SHIPPED — hermes per-step streaming over ACP (2026-07-12, commit 7b1eac2)
+
+hermes now runs over **`hermes acp`** (JSON-RPC/stdio) instead of `-z`, so its
+real work streams live — agent text, thoughts, tool calls + results, plan — into
+the same Run-tab + agent-graph rendering as claude (real live crew). Model +
+token usage captured; acp session id returned (future resume). `lib/acp.js` is
+the client; **verified live end-to-end** (text run + Bash-tool run, both stream +
+complete with token accounting) when the hub is **terminal-launched**.
+
+**⚠ KNOWN LIMITATION — headless-spawn hang (Windows).** ACP completes the
+handshake + logs `conversation turn`, then the nous inference (hermes worker
+thread) HANGS — but ONLY when the hub **server** runs headless (the preview/dev
+tool, and the Task Scheduler autostart). Terminal-launched (`node
+claude-dashboard/server.js`, the documented path) works. A **75s stall watchdog**
+fails headless runs with a clear "launch from a terminal" message instead of
+hanging forever. `-z` used to work headless, so it's ACP-worker-thread specific.
+Next options: an asyncio env-var fix, `hermes serve` gateway, or a
+`HUB_HERMES_ENGINE=oneshot` fallback for headless. See memory
+`hermes-acp-headless-hang`.
+
 ## ✅ RESOLVED — Hermes/agent runs are now visible mid-run (fixed 2026-07-11, commit cebfe6a)
 
 **Fixed** via `lib/liveness.js` (wired into `runs.js`; UI in `run.js`/`style.css`),

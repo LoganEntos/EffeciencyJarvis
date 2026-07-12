@@ -163,6 +163,24 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
   official weights instead of the mirror.
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
 
+## ⚡ Latest session (2026-07-12) — agent-stack visibility + hermes ACP streaming
+Two things shipped; **run the hub from a TERMINAL** (`node claude-dashboard/server.js`),
+not headless — see the caveat below.
+1. **Run STATUS visible (commit cebfe6a)** — `lib/liveness.js`: orphan reaper
+   (kills zombie "running" rows on boot + every 60s), a 5s heartbeat, and Run-tab
+   `◉ running`/`⚠ stalled`/`process gone` badges for BOTH stacks. Artifact serving
+   split to `lib/artifacts.js`; the run-hint moved to `util.buildRunHint`.
+2. **hermes CONTENT via ACP (commit 7b1eac2)** — hermes now runs over `hermes acp`
+   (JSON-RPC/stdio) not `-z`, streaming real text/thoughts/tool-calls/results/plan
+   into the Run tab + a live agent-graph crew; captures model + tokens. `lib/acp.js`
+   is the client. **Verified live terminal-launched** (text + Bash-tool runs).
+   **⚠ KNOWN ISSUE:** ACP HANGS on the inference call when the hub SERVER is
+   launched HEADLESS (the preview/dev tool + the Task Scheduler autostart) — a
+   Windows worker-thread quirk. A 75s watchdog fails such runs with a clear
+   "launch from a terminal" message. Fix options + full detail: roadmap top +
+   memory `hermes-acp-headless-hang`. **The autostart task will hit this — either
+   run the hub from a terminal, or fix headless before relying on autostart.**
+
 ## Current state (2026-07-11, end of session)
 All S1–S26 shipped and browser-verified (see roadmap table). **Smoke script
 green (41 checks).** This session's commits: all-Claude-versions model picker
