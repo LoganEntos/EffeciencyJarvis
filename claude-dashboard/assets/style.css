@@ -300,6 +300,27 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
   color:var(--muted);margin-bottom:18px;transition:border-color .15s,background .15s;cursor:pointer}
 .dropzone.drag{border-color:var(--accent);background:var(--accent-soft);color:var(--txt)}
 
+/* ---- Memory tab: Obsidian-style vault (list + tag cloud | note + backlinks) ---- */
+.mem-tagcloud{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.tag-pill{font-family:var(--font-mono);font-size:10.5px;padding:3px 9px;border-radius:20px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line);color:var(--muted);transition:border-color .12s,color .12s}
+.tag-pill:hover{border-color:var(--accent-dim);color:var(--accent)}
+.tag-pill b{font-weight:600;color:var(--accent);margin-left:3px}
+.mem-wrap{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:16px;align-items:start}
+.mem-list{max-height:64vh;overflow:auto;padding-right:2px}
+.mem-item{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;
+  margin-bottom:6px;cursor:pointer;transition:border-color .12s,background .12s}
+.mem-item:hover{border-color:var(--line2);background:var(--panel2)}
+.mem-item.active{border-color:var(--accent-dim);background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.mem-snippet{font-size:11.5px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-detail{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;
+  min-height:120px;position:sticky;top:16px}
+.mem-backlinks{border-top:1px solid var(--line);padding-top:2px}
+.mem-backlink{display:flex;justify-content:space-between;gap:10px;padding:7px 0;cursor:pointer;
+  font-size:12px;color:var(--txt);border-bottom:1px solid var(--line)}
+.mem-backlink:last-child{border-bottom:none}
+.mem-backlink:hover span:first-child{color:var(--accent)}
+
 @media (max-width:760px){
   /* M1 mobile rebuild (2026-07-11): the old collapsed-rail + hamburger
      pattern went fully invisible if the JS toggle ever failed to stick —
@@ -365,6 +386,11 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
   /* session/memory metadata (timestamps, sizes, scores) was low-contrast
      var(--dim) text at 11px on a near-black background — bump legibility. */
   .row .muted{color:var(--muted)}
+  /* Memory vault: the two-pane list+detail layout needs real width for the
+     side-by-side read; stack list above detail on phones instead. */
+  .mem-wrap{grid-template-columns:1fr}
+  .mem-list{max-height:40vh}
+  .mem-detail{position:static}
 }
 
 /* N2 mobile polish: on touch devices, small inline action buttons (run-history

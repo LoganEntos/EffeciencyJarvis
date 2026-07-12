@@ -345,5 +345,6 @@ function boot() {
   };
   let bootTab = 'run';
   try { const t = localStorage.getItem('hub.tab'); if (t && TABS.includes(t) && renderers[t]) bootTab = t; } catch {}
+  try { const qt = new URLSearchParams(location.search).get('tab'); if (qt && TABS.includes(qt) && renderers[qt]) bootTab = qt; } catch {}
   goTab(bootTab);
 }
