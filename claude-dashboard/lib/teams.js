@@ -42,6 +42,19 @@ const BUILTINS = [
       + '(inbox/file triage). Use the xlsx / apply-oos-formatting / vpp-theme-format skills for spreadsheet '
       + 'formatting. Route mechanical formatting to haiku-tier agents; reserve sonnet for analysis.',
   },
+  {
+    id: 'ui', name: 'UI / frontend', builtin: true,
+    description: 'Front-end design + polish on the hub UI — the amber-agent-orb system, then accessibility + motion-performance.',
+    agents: ['ui-designer', 'code-reviewer'],
+    skills: ['frontend-design', 'baseline-ui', 'fixing-accessibility', 'fixing-motion-performance'],
+    hint: 'This session is UI / front-end work on the dashboard. START with the /frontend-design skill '
+      + '(it sets the amber-agent-orb design system + the ZERO-DEP vanilla JS/CSS stack), then run the polish '
+      + 'loop on the files you touch: /baseline-ui → /fixing-accessibility → /fixing-motion-performance. '
+      + 'Prefer the ui-designer specialist and have code-reviewer check the diff. Edit the real source in place '
+      + '(assets/*.js, style.css, index.html) — NEVER build preview/mockup HTML. Keep one accent per view, reuse '
+      + 'the existing CSS-variable tokens + components, respect prefers-reduced-motion and never leave an rAF loop '
+      + 'running unbounded, and never add npm/React/Tailwind.',
+  },
 ];
 
 const okId = id => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id);
