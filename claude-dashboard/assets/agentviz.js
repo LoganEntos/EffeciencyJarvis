@@ -92,7 +92,7 @@ function drawLoop() {
   holder.innerHTML = '';
   const canvas = document.createElement('canvas');
   canvas.width = W * DPR; canvas.height = H * DPR;
-  canvas.style.cssText = `width:100%;height:${H}px;display:block;background:transparent;border:1px solid var(--line);border-radius:10px;cursor:default`;
+  canvas.style.cssText = `width:100%;height:${H}px;display:block;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:default`;
   holder.appendChild(canvas);
   const ctx = canvas.getContext('2d');
   ctx.scale(DPR, DPR);
@@ -100,6 +100,8 @@ function drawLoop() {
   const ACCENT = css.getPropertyValue('--accent').trim() || '#e8a33d';
   const GREEN = css.getPropertyValue('--green').trim() || '#4bc47a';
   const LINE = css.getPropertyValue('--line').trim() || '#2a251d';
+  const LINE2 = css.getPropertyValue('--line2').trim() || '#ffffff24';
+  const PANEL = css.getPropertyValue('--panel').trim() || '#17140f';
   const MUTED = css.getPropertyValue('--muted').trim() || '#a89e8a';
   const TXT = css.getPropertyValue('--txt').trim() || '#ece7dc';
   const radius = n => n.kind === 'root' ? 34 : 20 + Math.min(8, (n.count || 1) * 1.5);
@@ -140,11 +142,11 @@ function drawLoop() {
       const target = g.nodes.find(n => n.id === l.target);
       const act = target && target.active;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = act ? ACCENT : LINE;
-      ctx.lineWidth = act ? 1.6 : 1;
+      ctx.strokeStyle = act ? ACCENT : LINE2;
+      ctx.lineWidth = act ? 1.6 : 0.8;
       ctx.setLineDash(act ? [6, 6] : []);
       ctx.lineDashOffset = act ? -(t / 40) % 12 : 0;
-      ctx.globalAlpha = act ? .9 : .8;
+      ctx.globalAlpha = act ? .9 : .55;
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -159,7 +161,7 @@ function drawLoop() {
         ctx.shadowColor = c; ctx.shadowBlur = n.active ? 18 + pulse * 14 : 12;
       }
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 6.2832);
-      ctx.fillStyle = '#151310'; ctx.fill();
+      ctx.fillStyle = PANEL; ctx.fill();
       ctx.lineWidth = n.id === aviz.sel ? 3 : n.kind === 'root' ? 2.2 : 1.4;
       ctx.strokeStyle = n === aviz.hover ? TXT : c;
       ctx.stroke();
@@ -174,6 +176,12 @@ function drawLoop() {
         ctx.font = '500 9.5px "JetBrains Mono",Consolas,monospace';
         ctx.fillStyle = MUTED;
         ctx.fillText('×' + n.count, p.x, p.y + r + 28);
+      }
+      // root: model sub-label under the persona, à la "Poet · sonnet-5"
+      if (n.kind === 'root' && aviz.graph.run && aviz.graph.run.model) {
+        ctx.font = '500 10px "JetBrains Mono",Consolas,monospace';
+        ctx.fillStyle = MUTED;
+        ctx.fillText('· ' + aviz.graph.run.model, p.x, p.y + r + 30);
       }
     }
     ctx.globalAlpha = 1;
