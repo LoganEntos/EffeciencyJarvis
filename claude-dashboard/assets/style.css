@@ -67,11 +67,13 @@ nav{width:196px;border-right:1px solid var(--line);padding:16px 10px;flex-shrink
 nav .navlabel{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);padding:2px 14px 8px;
   font-family:var(--font-mono);font-weight:200}
 nav a{display:flex;align-items:center;gap:11px;padding:9px 14px;margin:1px 0;color:var(--muted);cursor:pointer;
-  border-radius:8px;user-select:none;font-size:13.5px;transition:background .12s,color .12s;position:relative}
+  border-radius:8px;user-select:none;font-size:13.5px;transition:background .12s,color .12s;position:relative;
+  -webkit-tap-highlight-color:transparent}
 nav a .ico{width:18px;text-align:center;font-size:14px;opacity:.85}
 nav a kbd{margin-left:auto;font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:4px;
   padding:1px 5px;background:#ffffff05}
 nav a:hover{color:var(--txt);background:#ffffff08}
+nav a:active{background:#ffffff10}
 nav a.active{color:var(--accent);background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
 nav a.active kbd{color:var(--muted);border-color:var(--accent-dim)}
 
@@ -163,6 +165,7 @@ a.link{color:var(--accent)}
 #overlay .close{background:#ffffff0d;border:1px solid var(--line);padding:6px 14px;color:var(--muted)}
 #overlay .close:hover{color:var(--txt)}
 label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12px;cursor:pointer;user-select:none}
+label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accent)}
 .gtip{position:fixed;z-index:60;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;
   padding:8px 12px;font-size:12px;line-height:1.5;color:var(--txt);pointer-events:none;
   box-shadow:0 8px 28px #000a;max-width:340px}
@@ -287,6 +290,21 @@ label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:1
      pills). Keep only the outcome chips (all/done/failed/cancelled);
      hide the per-model + routing chips, they're desktop-density info. */
   #histStats .pill:nth-child(n+5){display:none}
+  /* runbar: engine/model/perms selects + memory-recall checkbox used to wrap
+     into a cramped multi-line mess with a barely-visible checkbox icon.
+     Give each control full-width rows so every label + control is legible
+     and tappable without squinting (mobile "config area is cramped" report). */
+  .runbar{flex-direction:column;align-items:stretch;gap:8px}
+  .runbar select{width:100%}
+  .runbar label.chk{padding:8px 2px;font-size:13px}
+  .runbar #newChatBtn{width:100%}
+  /* delete/danger text buttons on Files/Memory/Sessions rows read as plain
+     dim text on dark backgrounds — give them a real button shape so they're
+     obviously tappable (matches button.danger elsewhere in the app). */
+  .row .danger{background:#e0525222;border:1px solid #e0525255;border-radius:6px;padding:7px 12px!important}
+  /* session/memory metadata (timestamps, sizes, scores) was low-contrast
+     var(--dim) text at 11px on a near-black background — bump legibility. */
+  .row .muted{color:var(--muted)}
 }
 
 /* N2 mobile polish: on touch devices, small inline action buttons (run-history

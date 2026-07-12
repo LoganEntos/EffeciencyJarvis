@@ -74,7 +74,9 @@ async function fetchAgentGraph() {
 function layoutNodes(W, H) {
   const g = aviz.graph;
   const ring = g.nodes.filter(n => n.kind !== 'root');
-  const cx = W / 2, cy = H / 2, rx = Math.min(W / 2 - 110, 330), ry = H / 2 - 78;
+  const cx = W / 2, cy = H / 2;
+  const rx = Math.min(W / 2 - (W < 500 ? 58 : 110), W < 500 ? 140 : 330);
+  const ry = H / 2 - (W < 500 ? 56 : 78);
   const pos = { run: { x: cx, y: cy } };
   ring.forEach((n, i) => {
     const a = -Math.PI / 2 + (i * 2 * Math.PI) / ring.length;
@@ -86,7 +88,7 @@ function layoutNodes(W, H) {
 function drawLoop() {
   const holder = $('#avCanvas');
   if (!holder) return;
-  const W = holder.clientWidth || 800, H = 440, DPR = window.devicePixelRatio || 1;
+  const W = holder.clientWidth || 800, H = window.innerWidth <= 760 ? 320 : 440, DPR = window.devicePixelRatio || 1;
   holder.innerHTML = '';
   const canvas = document.createElement('canvas');
   canvas.width = W * DPR; canvas.height = H * DPR;
@@ -167,11 +169,11 @@ function drawLoop() {
       ctx.fillText(n.icon, p.x, p.y + 1);
       ctx.font = `${n.kind === 'root' ? '800 12.5' : '500 11'}px "JetBrains Mono",Consolas,monospace`;
       ctx.fillStyle = n === aviz.hover || n.id === aviz.sel ? TXT : c;
-      ctx.fillText(n.persona, p.x, p.y + r + 13);
+      ctx.fillText(n.persona, p.x, p.y + r + 15);
       if (n.count > 1) {
         ctx.font = '500 9.5px "JetBrains Mono",Consolas,monospace';
         ctx.fillStyle = MUTED;
-        ctx.fillText('×' + n.count, p.x, p.y + r + 26);
+        ctx.fillText('×' + n.count, p.x, p.y + r + 28);
       }
     }
     ctx.globalAlpha = 1;

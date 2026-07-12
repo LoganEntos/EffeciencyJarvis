@@ -45,7 +45,7 @@ function ensureRunUI() {
     <div class="chatlog" id="chatLog"><div class="msg sys">Type a prompt below — the claude CLI runs it inside the project directory and streams back here.</div></div>
     <div class="badgebar" id="runStatus" style="margin-bottom:10px"></div>
     <div class="composer">
-      <textarea id="promptIn" placeholder="Ask Claude to do something in this project… (Enter to send, Shift+Enter for a new line)"></textarea>
+      <textarea id="promptIn" placeholder="Ask Claude to do something in this project…"></textarea>
       <div class="btns">
         <button id="sendBtn">Send ▷</button>
         <button id="cancelBtn" class="danger hidden">Cancel ✕</button>

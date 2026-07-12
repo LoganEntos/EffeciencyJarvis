@@ -42,10 +42,15 @@ function spendToday(runs) {
   return runs.filter(m => new Date(m.startedAt || m.queuedAt || 0).toDateString() === today)
     .reduce((s, m) => s + (m.costUsd || 0), 0);
 }
+// Compact on phones — "today" was the part getting clipped by the 120px
+// mobile max-width (screenshot bug: "$58.11 to..."). Number alone always fits.
 async function updateSpendBadge() {
   const el = $('#spendBadge');
   if (!el) return;
-  try { el.textContent = `$${spendToday(await api('/api/runs')).toFixed(2)} today`; } catch {}
+  try {
+    const spend = spendToday(await api('/api/runs'));
+    el.textContent = window.innerWidth <= 760 ? `$${spend.toFixed(2)}` : `$${spend.toFixed(2)} today`;
+  } catch {}
 }
 let serverOk = true, reconnectTimer = null;
 function setAuthBadge(d) {
@@ -156,7 +161,7 @@ renderers.overview = async function () {
   const today = new Date().toDateString();
   const tRuns = runs.filter(m => new Date(m.startedAt || m.queuedAt || 0).toDateString() === today);
   const spend = spendToday(runs);
-  if ($('#spendBadge')) $('#spendBadge').textContent = `$${spend.toFixed(2)} today`;
+  if ($('#spendBadge')) $('#spendBadge').textContent = window.innerWidth <= 760 ? `$${spend.toFixed(2)}` : `$${spend.toFixed(2)} today`;
   const finished = runs.filter(m => ['done', 'error', 'cancelled'].includes(m.status));
   const errors = runs.filter(m => m.status === 'error');
   const okRate = finished.length ? Math.round(100 * finished.filter(m => m.status === 'done').length / finished.length) : null;
@@ -172,7 +177,7 @@ renderers.overview = async function () {
     modelCosts[m] += r.costUsd || 0;
   });
   const costBreakdown = Object.entries(modelCosts).map(([m, c]) =>
-    `<span class="muted" style="font-size:11.5px">${esc(m)}: $${c.toFixed(3)}</span>`).join(' · ');
+    `<span class="pill neutral" style="font-size:11px">${esc(m)}: $${c.toFixed(3)}</span>`).join('');
 
   $('#overview').innerHTML = `
     <h2>Overview — product cockpit</h2>

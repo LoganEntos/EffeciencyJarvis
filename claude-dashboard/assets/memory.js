@@ -75,9 +75,9 @@ async function loadMemory() {
   }
   el.innerHTML = items.map(m => `
     <div class="row">
-      <div class="flex" style="justify-content:space-between">
-        <span class="name">${MEM_ICON[m.type] || '◇'} ${esc(m.title || '(untitled)')}</span>
-        <span class="muted" style="font-size:11px">${esc(m.type)}${m._score ? ' · ' + m._score.toFixed(1) : ''} · ${rel(m.createdAt)}</span>
+      <div class="flex" style="justify-content:space-between;flex-wrap:wrap">
+        <span class="name" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${MEM_ICON[m.type] || '◇'} ${esc(m.title || '(untitled)')}</span>
+        <span class="muted" style="font-size:11px;white-space:nowrap">${esc(m.type)}${m._score ? ' · ' + m._score.toFixed(1) : ''} · ${rel(m.createdAt)}</span>
       </div>
       <div class="pex" style="white-space:normal">${esc(m.text || '')}</div>
       <div class="flex" style="margin-top:7px">
