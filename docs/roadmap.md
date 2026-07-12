@@ -256,16 +256,29 @@ liveness badges + artifacts stay in `run.js` (now 471). Loaded after run.js;
 zero behavior change — verified (history renders, filter works, no errors).
 (A parallel run had attempted this split and left it broken; redone cleanly.)
 
-### Declined 2026-07-12: browser-use/browser-harness (user link)
-CDP browser harness that lets an agent write its own Playwright-style helpers
-against a real Chrome instance (uv/Python 3.12 install, optional Browser Use
-Cloud account for stealth/sub-agents). **Not adopted** — the `scrapling` MCP
-already installed in `.mcp.json` covers the hub's actual browser-automation
-needs (screenshot, fetch, stealthy fetch, persistent sessions) for verifying
-UI changes and scraping reference pages, at zero additional install/token
-tax. Revisit only if a task needs the agent to *write and persist* reusable
-site-specific automation skills across sessions — scrapling has no
-skill-authoring loop.
+## 📥 GitHubs to incorporate (user-curated, not built yet)
+
+External repos the user has flagged to fold into the hub. Incorporate the
+IDEA/method natively (zero-dep, in the hub's stack) — do NOT drop foreign
+frameworks in wholesale (the hermes lesson). Build only on the user's go-ahead.
+
+- **karpathy/llm-council → Council mode** — see N10 below (3-stage panel:
+  opinions → peer review → chairman synthesis). Member set still TBD (user has
+  Claude + hermes via subs; ChatGPT/Perplexity would need API keys).
+- **browser-use/browser-harness** (2026-07-12, user reversed the earlier
+  decline — INCLUDE). Tagline: *"Connect an LLM directly to your real browser
+  with a thin, editable CDP harness."* Python 3.12 / `uv`, ~1k lines, connects
+  to a local Chrome via CDP (`--remote-debugging-port`); **self-healing** — the
+  agent writes + persists its own reusable browser-helper code as a **skill**
+  (`browser-harness skill`). Optional Browser Use Cloud free tier (3 concurrent
+  browsers) for stealth/headless. **Why it's back in scope:** its
+  skill-authoring loop is the capability `scrapling` lacks — the agent building
+  and keeping reusable site-specific automation across sessions. **How to
+  incorporate:** it's Python (violates the app's zero-dep runtime), so run it
+  as a **sibling tool the hub drives** (like Hermes Desktop / the CSM sidecar),
+  or port just the CDP-harness pattern into a hub skill — decide at build time.
+  Needs a real Chrome with remote debugging; no cloud account required for local
+  use.
 
 ### N8. iPhone incorporation (user request 2026-07-10 — QUEUED, evaluate options)
 Get the hub properly usable from an iPhone — possibly via Base44 or another
