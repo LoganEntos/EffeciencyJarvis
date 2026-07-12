@@ -275,7 +275,8 @@ renderers.agents = async function () {
       </div>
     </div>` : `
     <div class="note" style="margin-bottom:14px">Hermes stack not detected — see <span class="mono">docs/hermes-adoption.md</span>.</div>`;
-  return listView('#agents', 'Agents', '/api/agents', 'agents', card);
+  await listView('#agents', 'Agents', '/api/agents', 'agents', card + '<div id="teamsPanel"></div>');
+  if (window.HubTeams) HubTeams.renderInto($('#teamsPanel'));
 };
 renderers.skills = function () { return listView('#skills', 'Skills', '/api/skills', 'skills'); };
 renderers.commands = function () { return listView('#commands', 'Commands', '/api/commands', 'commands'); };

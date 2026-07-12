@@ -13,6 +13,7 @@ const U = require('./util');
 const memory = require('./memory');
 const liveness = require('./liveness');
 const hermes = require('./hermes');
+const teams = require('./teams');
 const { countArtifacts, listArtifacts, serveArtifact } = require('./artifacts');
 
 const DASH_DIR = path.resolve(__dirname, '..');
@@ -143,7 +144,11 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   // few hundred prompt tokens, so it only happens when the caller asked.
   let recalled = null;
   if (recall) { try { recalled = memory.recall(prompt); } catch {} }
-  const fullPrompt = (recalled ? recalled.block + '\n\n' : '') + prompt + hint;
+  // Active agent-team steering (empty for the default "Lean" team, so normal
+  // runs stay token-neutral). Injected between the user's prompt and the hub note.
+  let team = null;
+  try { team = teams.activeHint(); } catch {}
+  const fullPrompt = (recalled ? recalled.block + '\n\n' : '') + prompt + (team ? team.text : '') + hint;
   let args = null, hermesCfg = null;
   const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'acceptEdits';
   if (engine === 'hermes') {
@@ -170,6 +175,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   writeMeta(st);
   if (routedReason) pushLine(st, JSON.stringify({ type: 'hub_status', text: `auto → ${model} (${routedReason})` }));
   if (recalled) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◇ memory recall: ${recalled.count} relevant memor${recalled.count === 1 ? 'y' : 'ies'} injected` }));
+  if (team) pushLine(st, JSON.stringify({ type: 'hub_status', text: `⛬ team: ${team.name} — steering delegation to its specialists` }));
   if (runningCount() < MAX_ACTIVE) launch(st);
   else {
     queue.push(id);
