@@ -36,17 +36,16 @@ function keywords(s, n = 8) {
 }
 
 // ---------- capture (episodic, from a finished run) ----------
-function captureRun(meta, promptText) {
-  if (!meta || !meta.id) return;
-  const list = load();
-  if (list.some(m => m.sourceRunId === meta.id)) return; // dedupe
+// C4: captureRun() and reindexRuns() built the identical episodic-record
+// object twice — extracted so a shape change only needs one edit.
+function buildEpisodicRecord(meta, promptText) {
   const prompt = (promptText
     || U.safeRead(path.join(RUNS_DIR, meta.id, 'prompt.txt'))
     || meta.promptExcerpt || '').toString();
   const outcome = meta.status === 'done' ? 'succeeded'
     : meta.status === 'error' ? 'FAILED: ' + (meta.errorExcerpt || 'error') : (meta.status || 'ran');
   const importance = meta.status === 'error' ? 0.8 : (meta.artifactCount ? 0.6 : 0.4);
-  list.unshift({
+  return {
     id: newId(), type: 'episodic',
     title: (meta.promptExcerpt || prompt).slice(0, 80),
     text: `Run ${outcome} on ${(meta.model || 'default')}. Prompt: ${prompt.slice(0, 400)}`,
@@ -54,7 +53,14 @@ function captureRun(meta, promptText) {
     createdAt: meta.startedAt || meta.queuedAt || new Date().toISOString(),
     sourceRunId: meta.id,
     fields: { status: meta.status, model: meta.model, costUsd: meta.costUsd, artifactCount: meta.artifactCount || 0, error: meta.errorExcerpt || null },
-  });
+  };
+}
+
+function captureRun(meta, promptText) {
+  if (!meta || !meta.id) return;
+  const list = load();
+  if (list.some(m => m.sourceRunId === meta.id)) return; // dedupe
+  list.unshift(buildEpisodicRecord(meta, promptText));
   save(list.slice(0, 2000));
   if (meta.status === 'error') distill(); // failures may complete a pattern
 }
@@ -68,18 +74,7 @@ function reindexRuns() {
     if (!e.isDirectory() || have.has(e.name)) continue;
     const meta = U.safeJson(path.join(RUNS_DIR, e.name, 'meta.json'));
     if (!meta) continue;
-    const prompt = U.safeRead(path.join(RUNS_DIR, e.name, 'prompt.txt')) || '';
-    const outcome = meta.status === 'done' ? 'succeeded'
-      : meta.status === 'error' ? 'FAILED: ' + (meta.errorExcerpt || 'error') : (meta.status || 'ran');
-    list.push({
-      id: newId(), type: 'episodic',
-      title: (meta.promptExcerpt || prompt).slice(0, 80),
-      text: `Run ${outcome} on ${(meta.model || 'default')}. Prompt: ${prompt.slice(0, 400)}`,
-      tags: keywords(prompt), importance: meta.status === 'error' ? 0.8 : (meta.artifactCount ? 0.6 : 0.4),
-      createdAt: meta.startedAt || meta.queuedAt || new Date().toISOString(),
-      sourceRunId: e.name,
-      fields: { status: meta.status, model: meta.model, costUsd: meta.costUsd, artifactCount: meta.artifactCount || 0, error: meta.errorExcerpt || null },
-    });
+    list.push(buildEpisodicRecord(Object.assign({ id: e.name }, meta)));
     added++;
   }
   list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));

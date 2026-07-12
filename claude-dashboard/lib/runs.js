@@ -506,4 +506,4 @@ function getRunMeta(id) {
   return Object.assign({ artifactCount: countArtifacts(id) }, meta);
 }
 
-module.exports = { handle, startRun, getRunMeta, runningCount, queueLength: () => queue.length };
+module.exports = { handle, startRun, getRunMeta, runningCount, listRuns, queueLength: () => queue.length };

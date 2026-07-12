@@ -57,6 +57,20 @@ function toolPersona(name) {
 
 const short = (v, n) => { const s = typeof v === 'string' ? v : JSON.stringify(v || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
 
+// C7: both graph builders append the same "Gallery" artifacts node + the same
+// star-topology links (everything -> root) — shared here instead of copied.
+function makeArtifactsNode(meta) {
+  if (!meta.artifactCount) return null;
+  return {
+    id: 'artifacts', kind: 'artifacts', persona: 'Gallery', icon: '🖼️',
+    label: `${meta.artifactCount} artifact${meta.artifactCount === 1 ? '' : 's'}`,
+    count: meta.artifactCount, active: false, detail: 'files the run produced — rendered in the Run tab',
+  };
+}
+function starLinks(nodes) {
+  return nodes.filter(n => n.id !== 'run').map(n => ({ source: 'run', target: n.id }));
+}
+
 function buildGraph(id) {
   if (!okId(id)) return null;
   const meta = runs.getRunMeta(id);
@@ -122,12 +136,9 @@ function buildGraph(id) {
     status: meta.status, active: running, count: 1,
   };
   const nodes = [root, ...tools.values(), ...agents.values()];
-  if (meta.artifactCount) nodes.push({
-    id: 'artifacts', kind: 'artifacts', persona: 'Gallery', icon: '🖼️',
-    label: `${meta.artifactCount} artifact${meta.artifactCount === 1 ? '' : 's'}`,
-    count: meta.artifactCount, active: false, detail: 'files the run produced — rendered in the Run tab',
-  });
-  const links = nodes.filter(n => n.id !== 'run').map(n => ({ source: 'run', target: n.id }));
+  const artNode = makeArtifactsNode(meta);
+  if (artNode) nodes.push(artNode);
+  const links = starLinks(nodes);
   return { run: meta, nodes, links };
 }
 
@@ -158,12 +169,9 @@ function buildHermesGraph(meta, raw, running) {
     count: 1, active: running, detail: 'hermes auxiliary — exact usage is not exposed by one-shot mode',
   }));
   const nodes = [root, ...crew];
-  if (meta.artifactCount) nodes.push({
-    id: 'artifacts', kind: 'artifacts', persona: 'Gallery', icon: '🖼️',
-    label: `${meta.artifactCount} artifact${meta.artifactCount === 1 ? '' : 's'}`,
-    count: meta.artifactCount, active: false, detail: 'files the run produced — rendered in the Run tab',
-  });
-  const links = nodes.filter(n => n.id !== 'run').map(n => ({ source: 'run', target: n.id }));
+  const artNode = makeArtifactsNode(meta);
+  if (artNode) nodes.push(artNode);
+  const links = starLinks(nodes);
   return { run: meta, nodes, links };
 }
 

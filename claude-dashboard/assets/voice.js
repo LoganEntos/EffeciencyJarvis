@@ -128,10 +128,10 @@
     btn.id = 'voiceOrb';
     btn.className = 'iconbtn';
     btn.title = orbTitle();
-    btn.style.cssText = 'padding:0;width:38px;height:38px;display:inline-grid;place-items:center';
+    btn.style.cssText = 'padding:0;width:32px;height:32px;display:inline-grid;place-items:center';
     const cv = document.createElement('canvas');
     const DPR = window.devicePixelRatio || 1;
-    cv.width = 30 * DPR; cv.height = 30 * DPR; cv.style.cssText = 'width:30px;height:30px';
+    cv.width = 26 * DPR; cv.height = 26 * DPR; cv.style.cssText = 'width:26px;height:26px';
     btn.appendChild(cv);
     const ref = $('#refreshTab');
     ref.parentNode.insertBefore(btn, ref);
@@ -169,32 +169,34 @@
     V.raf = requestAnimationFrame(loop);
     const ctx = V.ctx; if (!ctx) return;
     const t = (performance.now() - V.t0) / 1000;
-    const amber = css('--accent', '#e8a33d'), green = css('--green', '#4bc47a');
+    const amber = css('--accent', '#e8a33d'), listen = css('--amber', '#e0a63f');
     const muted = css('--muted', '#a89e8a');
-    ctx.clearRect(0, 0, 30, 30);
-    const cx = 15, cy = 15;
-    let color = muted, base = 6.5, pulse = 0;
-    if (V.state === 'listening') { color = green; pulse = 2.4 * (0.5 + 0.5 * Math.sin(t * 7)); base = 6.5; }
-    else if (V.state === 'thinking') { color = amber; pulse = 2.2 * (0.5 + 0.5 * Math.sin(t * 4)); }
-    else if (V.state === 'speaking') { color = amber; pulse = 3.2 * Math.abs(Math.sin(t * 11)); }
-    else { color = SR ? amber : muted; pulse = 0.8 * (0.5 + 0.5 * Math.sin(t * 1.6)); } // idle breath
+    ctx.clearRect(0, 0, 26, 26);
+    const cx = 13, cy = 13;
+    let color = muted, base = 5.6, pulse = 0;
+    // "listening" uses the amber listen-tone, not green — green is reserved for
+    // success states elsewhere in the app (U4: this orb used to paint green here).
+    if (V.state === 'listening') { color = listen; pulse = 2.1 * (0.5 + 0.5 * Math.sin(t * 7)); base = 5.6; }
+    else if (V.state === 'thinking') { color = amber; pulse = 1.9 * (0.5 + 0.5 * Math.sin(t * 4)); }
+    else if (V.state === 'speaking') { color = amber; pulse = 2.8 * Math.abs(Math.sin(t * 11)); }
+    else { color = SR ? amber : muted; pulse = 0.7 * (0.5 + 0.5 * Math.sin(t * 1.6)); } // idle breath
     // outer ring
-    ctx.beginPath(); ctx.arc(cx, cy, base + pulse + 3.2, 0, 6.2832);
-    ctx.strokeStyle = color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, base + pulse + 2.8, 0, 6.2832);
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.1; ctx.stroke();
     // core
     ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(cx, cy, base + pulse, 0, 6.2832);
-    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = V.state === 'idle' ? 3 : 9;
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = V.state === 'idle' ? 3 : 8;
     ctx.fill(); ctx.shadowBlur = 0;
     // mic notch when idle+ready so it reads as a mic
     if (V.state === 'idle' && SR) {
       ctx.fillStyle = css('--bg', '#0e0d0b'); ctx.globalAlpha = 0.9;
-      ctx.fillRect(cx - 1.3, cy - 3, 2.6, 5); ctx.globalAlpha = 1;
+      ctx.fillRect(cx - 1.1, cy - 2.6, 2.2, 4.3); ctx.globalAlpha = 1;
     }
     // persistent outer ring while on a hands-free call — the "line is open" tell
     if (V.call) {
-      ctx.beginPath(); ctx.arc(cx, cy, 13, 0, 6.2832);
-      ctx.strokeStyle = green; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 3);
-      ctx.lineWidth = 1.4; ctx.setLineDash([3, 3]); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, 11.3, 0, 6.2832);
+      ctx.strokeStyle = listen; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 3);
+      ctx.lineWidth = 1.3; ctx.setLineDash([3, 3]); ctx.stroke();
       ctx.setLineDash([]); ctx.globalAlpha = 1;
     }
   }

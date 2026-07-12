@@ -100,7 +100,7 @@ async function handle(req, res, url) {
     try { b = JSON.parse(await U.readBody(req, 32 * 1024) || '{}'); } catch {}
     const title = (b.title || '').toString().trim().slice(0, 200);
     const prompt = (b.prompt || '').toString().trim().slice(0, 20000);
-    const model = ['auto', '', 'sonnet', 'opus', 'haiku'].includes(b.model) ? b.model : 'auto';
+    const model = U.SIMPLE_MODELS.includes(b.model) ? b.model : 'auto';
     if (!prompt) { U.sendJson(res, { error: 'prompt required' }, 400); return true; }
     enqueue({ title, prompt, model });
     U.sendJson(res, { ok: true });

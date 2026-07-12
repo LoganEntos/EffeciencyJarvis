@@ -217,6 +217,23 @@ function renderLine(o) {
   return null;
 }
 
+// C8: the "queued/running" status-timer + live-stream attach was duplicated
+// between sendPrompt() (new run) and openRun() (reattach to one still going).
+// Shared here so the label/timer logic only lives in one place.
+function attachLiveRun(id, { startedAtMs, queued, seen } = {}) {
+  chat.runId = id; chat.running = true; chat.seen = seen != null ? seen : -1;
+  chat.t0 = startedAtMs || Date.now();
+  chat.queued = !!queued;
+  $('#sendBtn').disabled = true;
+  $('#cancelBtn').classList.remove('hidden');
+  clearInterval(chat.timer);
+  chat.timer = setInterval(() => {
+    const label = chat.queued ? 'queued — waiting for a slot' : `running · ${Math.round((Date.now() - chat.t0) / 1000)}s`;
+    $('#runStatus').innerHTML = `<span class="pill warn">${label}</span><span class="muted mono">${esc(chat.runId)}</span>`;
+  }, 1000);
+  attachStream(id);
+}
+
 // ---- live run flow ----
 async function sendPrompt() {
   const ta = $('#promptIn');
@@ -233,15 +250,7 @@ async function sendPrompt() {
   ta.value = '';
   addMsg(prompt, 'user');
   chat.hermesEl = null; chat.hermesText = ''; // fresh bubble per hermes reply
-  chat.runId = r.id; chat.running = true; chat.seen = -1; chat.t0 = Date.now();
-  chat.queued = !!r.queued;
-  $('#sendBtn').disabled = true;
-  $('#cancelBtn').classList.remove('hidden');
-  chat.timer = setInterval(() => {
-    const label = chat.queued ? 'queued — waiting for a slot' : `running · ${Math.round((Date.now() - chat.t0) / 1000)}s`;
-    $('#runStatus').innerHTML = `<span class="pill warn">${label}</span><span class="muted mono">${esc(chat.runId)}</span>`;
-  }, 1000);
-  attachStream(r.id);
+  attachLiveRun(r.id, { startedAtMs: Date.now(), queued: r.queued });
   if (window.HubVoice) HubVoice.onRunStart();
 }
 
@@ -422,15 +431,11 @@ async function openRun(id) {
   }
   if (t.meta && (t.meta.status === 'running' || t.meta.status === 'queued')) {
     // still-active run (e.g. opened from another tab) — attach live
-    chat.queued = t.meta.status === 'queued';
-    chat.runId = id; chat.running = true; chat.seen = (t.lines || []).length - 1; chat.t0 = Date.parse(t.meta.startedAt) || Date.now();
-    $('#sendBtn').disabled = true;
-    $('#cancelBtn').classList.remove('hidden');
-    chat.timer = setInterval(() => {
-      const label = chat.queued ? 'queued — waiting for a slot' : `running · ${Math.round((Date.now() - chat.t0) / 1000)}s`;
-      $('#runStatus').innerHTML = `<span class="pill warn">${label}</span><span class="muted mono">${esc(id)}</span>`;
-    }, 1000);
-    attachStream(id);
+    attachLiveRun(id, {
+      queued: t.meta.status === 'queued',
+      startedAtMs: Date.parse(t.meta.startedAt) || Date.now(),
+      seen: (t.lines || []).length - 1,
+    });
     return;
   }
   await showArtifacts(id);

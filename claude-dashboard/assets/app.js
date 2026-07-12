@@ -150,11 +150,47 @@ function rel(t) {
   return Math.round(s / 86400) + 'd ago';
 }
 
+// R0: usage-remaining gauge — a plain ring built from conic-gradient (no
+// canvas/svg dependency), muted-gold on clean-dark. pct is 0-100 "used".
+function usageRing(pct, size) {
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const danger = p >= 90;
+  const warn = p >= 70 && !danger;
+  const color = danger ? 'var(--red)' : (warn ? 'var(--amber)' : 'var(--accent)');
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;
+    background:conic-gradient(${color} ${p * 3.6}deg, var(--line) 0deg);
+    display:flex;align-items:center;justify-content:center;position:relative">
+    <div style="width:${size - 16}px;height:${size - 16}px;border-radius:50%;background:var(--panel);
+      display:flex;align-items:center;justify-content:center;flex-direction:column">
+      <span class="mono" style="font-size:${size > 100 ? 20 : 15}px;font-weight:700;color:${color}">${pct == null ? '—' : p + '%'}</span>
+      <span class="mono" style="font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase">used</span>
+    </div></div>`;
+}
+
+function usageGaugeCard(label, u) {
+  if (u.budget == null) {
+    return `<div class="card" style="grid-column:span 1">
+      <div class="l" style="margin-bottom:10px">${esc(label)}</div>
+      <div class="muted" style="font-size:12px;line-height:1.5">No budget set — spend so far: <span class="mono">$${u.spend.toFixed(2)}</span>.
+        Set a limit in Config to see remaining / burn-rate / projection.</div>
+    </div>`;
+  }
+  return `<div class="card" style="display:flex;gap:16px;align-items:center">
+    ${usageRing(u.pctUsed, 84)}
+    <div style="min-width:0">
+      <div class="l" style="margin-bottom:6px">${esc(label)}</div>
+      <div class="mono" style="font-size:19px;font-weight:700;color:var(--txt)">$${Math.max(0, u.remaining).toFixed(2)} <span class="muted" style="font-size:11px;font-weight:400">left of $${u.budget.toFixed(2)}</span></div>
+      <div class="muted" style="font-size:11.5px;margin-top:4px">burn ${'$' + u.burnPerHour.toFixed(3)}/hr · ${esc(u.projection || '')}</div>
+    </div>
+  </div>`;
+}
+
 renderers.overview = async function () {
-  const [d, runs, files] = await Promise.all([
+  const [d, runs, files, usageData] = await Promise.all([
     api('/api/overview'),
     api('/api/runs').catch(() => []),
     api('/api/files').catch(() => []),
+    api('/api/usage').catch(() => null),
   ]);
   $('#projBadge').textContent = d.project;
   $('#nodeBadge').textContent = 'Node ' + d.nodeVersion;
@@ -165,7 +201,6 @@ renderers.overview = async function () {
   const finished = runs.filter(m => ['done', 'error', 'cancelled'].includes(m.status));
   const errors = runs.filter(m => m.status === 'error');
   const okRate = finished.length ? Math.round(100 * finished.filter(m => m.status === 'done').length / finished.length) : null;
-  const artifacts = runs.reduce((s, m) => s + (m.artifactCount || 0), 0);
   const apiPill = d.hasApiKey ? '<span class="pill ok">auth ready</span>' : '<span class="pill warn">no auth — runs can\'t execute</span>';
   const memPill = d.engramCount ? `<span class="pill ok">engram: ${d.engramCount} memories</span>` : '<span class="pill warn">memory empty — runs auto-capture</span>';
 
@@ -179,18 +214,27 @@ renderers.overview = async function () {
   const costBreakdown = Object.entries(modelCosts).map(([m, c]) =>
     `<span class="pill neutral" style="font-size:11px">${esc(m)}: $${c.toFixed(3)}</span>`).join('');
 
+  const usageHero = usageData ? `
+    <h2>Usage remaining</h2>
+    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-bottom:18px">
+      ${usageGaugeCard('Today', usageData.today)}
+      ${usageGaugeCard('This week', usageData.week)}
+    </div>
+    ${!usageData.configured ? '<div class="note" style="margin-bottom:22px">No usage limits set yet — proxy is $ spend against a budget you choose (real plan-quota telemetry is a separate wiring task). Set a daily/weekly limit in <span class="mono">Config</span>.</div>' : ''}
+  ` : '';
+
   $('#overview').innerHTML = `
-    <h2>Overview — product cockpit</h2>
+    <h2>Overview</h2>
+    ${usageHero}
+    <h2 style="margin-top:8px">Other signals</h2>
     <div class="cards">
       <div class="card"><div class="n" style="color:var(--accent)">${tRuns.length}</div><div class="l">Runs today</div></div>
-      <div class="card" style="border-color:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--accent-soft)"><div class="n" style="color:var(--accent);text-shadow:0 0 16px var(--accent-dim)">\$${spend.toFixed(2)}</div><div class="l">Spend today</div></div>
       <div class="card"><div class="n">${okRate === null ? '—' : okRate + '%'}</div><div class="l">Success rate</div></div>
       <div class="card" ${errors.length ? 'style="border-color:#e0525255"' : ''}><div class="n" ${errors.length ? 'style="color:#e05252;text-shadow:none"' : ''}>${errors.length}</div><div class="l">Failed runs</div></div>
-      <div class="card"><div class="n">${artifacts}</div><div class="l">Artifacts</div></div>
       <div class="card"><div class="n">${files.length || 0}</div><div class="l">Inbox files</div></div>
     </div>
     ${costBreakdown ? `<div style="padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:22px">
-      <div style="color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Cost breakdown today</div>
+      <div style="color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Cost breakdown today (by model)</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap">${costBreakdown}</div>
     </div>` : ''}
     <div class="flex" style="margin-bottom:22px">${memPill}${apiPill}
@@ -236,6 +280,7 @@ renderers.config = async function () {
   const d = await api('/api/config');
   $('#config').innerHTML = `
     <h2>Config</h2>
+    <div id="usagePanel"></div>
     <div id="autopilotPanel"></div>
     <h2 style="font-size:12px">.mcp.json</h2><pre>${esc(JSON.stringify(d.mcp, null, 2))}</pre>
     <h2 style="font-size:12px;margin-top:22px">.claude/settings.json (hooks &amp; more)</h2>
@@ -244,7 +289,36 @@ renderers.config = async function () {
     <div id="voiceSettings"></div>`;
   if (window.HubVoice) HubVoice.renderSettings($('#voiceSettings'));
   renderAutopilot();
+  renderUsageConfig();
 };
+
+async function renderUsageConfig() {
+  const el = $('#usagePanel');
+  if (!el) return;
+  let u;
+  try { u = await api('/api/usage'); } catch { el.innerHTML = '<div class="note">Usage status unavailable.</div>'; return; }
+  el.innerHTML = `
+    <h2 style="font-size:12px">Usage limits <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— drives the Overview hero gauges (today &amp; this week). This is a $-spend proxy against a budget YOU set; wiring the real plan-quota API is a separate task.</span></h2>
+    <div class="flex" style="margin-bottom:14px">
+      <label class="mono" style="font-size:12px;color:var(--muted)">Daily budget $
+        <input id="dailyBudget" type="number" min="0" step="0.5" value="${u.today.budget != null ? u.today.budget : ''}" style="width:110px;margin:4px 0 0;padding:8px 10px" placeholder="unset"></label>
+      <label class="mono" style="font-size:12px;color:var(--muted)">Weekly budget $
+        <input id="weeklyBudget" type="number" min="0" step="1" value="${u.week.budget != null ? u.week.budget : ''}" style="width:110px;margin:4px 0 0;padding:8px 10px" placeholder="unset"></label>
+      <button class="ghost" id="saveBudgets" style="padding:9px 16px;font-size:12px;align-self:flex-end">Save</button>
+    </div>`;
+  $('#saveBudgets').onclick = async () => {
+    const dv = $('#dailyBudget').value.trim();
+    const wv = $('#weeklyBudget').value.trim();
+    try {
+      await api('/api/usage/config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dailyBudgetUsd: dv === '' ? null : Number(dv), weeklyBudgetUsd: wv === '' ? null : Number(wv) }),
+      });
+    } catch {}
+    renderUsageConfig();
+    if (currentTab === 'overview') load('overview', true);
+  };
+}
 
 async function renderAutopilot() {
   const el = $('#autopilotPanel');
@@ -410,15 +484,16 @@ function boot() {
   }).catch(() => {});
   updateSpendBadge();
   setInterval(updateSpendBadge, 60000); // header badge, not tab-scoped — the one thing mobile must always show while autopilot dispatches runs unattended
-  // N5: theme toggle — the light-theme variable set ships in style.css under
-  // :root[data-theme="light"]; flipping the attribute + persisting is all we do.
-  try { if (localStorage.getItem('hub.theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch {}
+  // Theme toggle (◐): warm terminal-amber (default) ↔ clean-dark "sleek" (the
+  // amber-agent-orb design target). Both variable sets live in style.css; the
+  // light theme is still defined there but no longer on the toggle path.
+  try { if (localStorage.getItem('hub.theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch {}
   const tt = $('#themeTab');
   if (tt) tt.onclick = () => {
-    const light = document.documentElement.getAttribute('data-theme') !== 'light';
-    if (light) document.documentElement.setAttribute('data-theme', 'light');
+    const sleek = document.documentElement.getAttribute('data-theme') !== 'dark';
+    if (sleek) document.documentElement.setAttribute('data-theme', 'dark');
     else document.documentElement.removeAttribute('data-theme');
-    try { localStorage.setItem('hub.theme', light ? 'light' : 'dark'); } catch {}
+    try { localStorage.setItem('hub.theme', sleek ? 'dark' : 'warm'); } catch {}
   };
   // Restart button (beside the theme toggle): tell the server to respawn, then
   // poll the same port until the fresh process answers and hard-reload — the

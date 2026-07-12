@@ -9,6 +9,12 @@ const { spawn } = require('child_process');
 const NODE_BIN = path.dirname(process.execPath);
 const NPX_CLI = path.join(NODE_BIN, 'node_modules', 'npm', 'bin', 'npx-cli.js');
 
+// C5: the tier-alias model list ('auto' hub-routed, '' CLI default, the three
+// tier names) was hand-copied in runs.js/tasks.js/schedules.js — export one
+// copy so a change here propagates everywhere instead of silently drifting.
+// runs.js layers its own pinned-version IDs (claude-opus-4-8, etc.) on top.
+const SIMPLE_MODELS = ['auto', '', 'sonnet', 'opus', 'haiku'];
+
 function safeRead(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return null; } }
 function safeJson(p) { const t = safeRead(p); if (!t) return null; try { return JSON.parse(t); } catch { return null; } }
 function listDir(p) { try { return fs.readdirSync(p, { withFileTypes: true }); } catch { return []; } }
@@ -84,7 +90,7 @@ function run(cmd, args, timeoutMs, useShell, cwd) {
     const finish = (code) => { if (!done) { done = true; resolve({ code, out: out.trim() }); } };
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { out += d; });
-    child.on('error', e => finish(-1, out += '\n' + e.message));
+    child.on('error', e => { out += '\n' + e.message; finish(-1); });
     child.on('close', finish);
     const t = setTimeout(() => { try { child.kill(); } catch {} out += '\n[timed out]'; finish(-2); }, timeoutMs);
     child.on('close', () => clearTimeout(t));
@@ -100,5 +106,5 @@ function runNpx(args, timeoutMs, cwd) {
 
 module.exports = {
   safeRead, safeJson, listDir, frontmatter, collectMd,
-  stripAnsi, sendJson, readBody, run, runNpx,
+  stripAnsi, sendJson, readBody, run, runNpx, SIMPLE_MODELS,
 };
