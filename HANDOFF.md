@@ -62,8 +62,8 @@ scripts/csm-server.py    CSM-1B TTS sidecar (127.0.0.1:8790; csm-requirements.tx
 scripts/verify-dashboard.ps1   endpoint smoke test (41 checks)
 scripts/install-autostart.ps1  user-run logon task
 ```
-Nav order: Run · **Live** · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Tools · Config.
-(`assets/live.js` = Live tab; `assets/admin.js` = Tools tab; `assets/teams.js` = teams UI on the Agents tab.)
+Nav order: Run · **Live** · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · **Sources** · Tools · Config.
+(`assets/live.js` = Live tab; `assets/sources.js` = Sources tab; `assets/admin.js` = Tools tab; `assets/teams.js` = teams UI on the Agents tab.)
 Graph tab: "Agents" live crew view by default (persona names: Maestro/Poet/Dart
 models, Scout/Scribe/Wrench/etc tool crews). Codebase map behind a chip, with
 its own Modules (file-level, default) / All-symbols sub-views.
@@ -164,8 +164,48 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
   official weights instead of the mirror.
 - Obsidian export (roadmap Q-Obsidian): confirm they want it + give a vault path.
 
-## ⚡ CURRENT STATE (2026-07-12, latest) — Live tab, Assets library, efficiency Overview, GitHub-intake team
+## ⚡ CURRENT STATE (2026-07-12, newest) — Sources library (N11) + crawl4ai intake SKIP
 > Newest section — supersedes everything below (kept as history). This session's
+> commits: N11 Sources tab (`1151de6`), license verification (`d6ff52c`),
+> crawl4ai eval → skip (`c77bf97`), pattern.css URL canonicalize (`36b0062`).
+> **Both queued hub tasks are now DONE — the task queue (`data/tasks.json`) is
+> empty.** Smoke green (added a `/api/sources` check).
+
+1. **N11 Sources library SHIPPED.** New **Sources** Library tab
+   (`assets/sources.js`) → `/api/sources` (`lib/sources.js`, zero-dep, GET-only).
+   A provenance collator: vendored assets read from `vendor/manifest.json` (font
+   faces folded to one row per family, icon sprites, CSS — enriched with upstream
+   repo links via a `repoMap`) + non-vendored references from a curated
+   `lib/sources.json` (adapted skills, agent-tool siblings, queued-to-incorporate).
+   Grouped by kind (vendored asset / adapted skill / agent tool / queued) with
+   license badges, deprecated/queued status pills, and clickable repo links.
+   **27 sources / 15 linked repos.** Nav sits between Assets and Tools. New
+   GitHub-intake pulls land in the manifest or `sources.json` and surface here
+   automatically. `lib/sources.json` is the one place to keep the non-vendored
+   list truthful.
+2. **Every source link + license VERIFIED against the GitHub API** (`spdx_id`,
+   not README claims). All 15 repo URLs resolve; all 9 curated licenses confirmed.
+   Corrections: `browser-use/browser-harness` = MIT; hermes repo located =
+   **NousResearch/hermes-agent** (MIT); **`karpathy/llm-council` has NO license
+   declared (all rights reserved)** → flagged in-tab with a red badge as an
+   incorporation BLOCKER (reference-only until the author adds a license —
+   relevant to N10 Council). `pattern.css` URL canonicalized (`bansal-io` →
+   `bansal`). NB: Lucide (`NOASSERTION`) and pattern.css (`NO-LICENSE`) in the API
+   are just GitHub's classifier failing on non-standard LICENSE files — the
+   manifest's ISC / MIT are correct and stand.
+3. **crawl4ai intake → EVALUATED, SKIP** (`docs/crawl4ai-evaluation.md`). License
+   cleared (Apache-2.0, API-confirmed) but it overlaps Scrapling heavily (both
+   Playwright-based, both ship an MCP, both fetch/markdown/crawl). The
+   GitHub-intake team's real need — pull *specific* files from a repo/CDN — is
+   already met by Scrapling + one-time curl; crawl4ai's edge (LLM-markdown, deep
+   crawls, RAG extraction) isn't needed, and a second always-on scraper MCP would
+   tax every run's context for zero new capability. **Not installed.** Revisit
+   only as an *on-demand CLI* (never an always-on MCP) IF a deep-crawl /
+   docs→markdown RAG-ingestion feature is greenlit. Roadmap "GitHubs to
+   incorporate" updated with the decision.
+
+## ⚡ CURRENT STATE (2026-07-12) — Live tab, Assets library, efficiency Overview, GitHub-intake team
+> Superseded by the section above (kept as history). This session's
 > commits: Tabler+pattern.css vendor (`390bc35`), Bootstrap Icons + browsable
 > Assets (`44b6b93`), Pixelarticons + sortable sets (`254b0b9`), Overview
 > money→efficiency+context (`eb3f319`), Live tab (`0ce1531`), Live cursor
