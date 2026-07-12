@@ -57,13 +57,14 @@ async function tickLive(force) {
   const feed = $('#liveFeed');
   if (!feed) return;
   let sid = liveSid;
+  let active = false;
   try {
     const d = await api('/api/sessions');
     const list = Array.isArray(d) ? d : (d.list || []);
     if (!list.length) return;
     if (!sid) sid = list[0].id;                       // auto → newest
     const meta = list.find(s => s.id === sid) || list[0];
-    const active = sessionActive(meta.modified);
+    active = sessionActive(meta.modified);
     const st = $('#liveStatus');
     if (st) st.innerHTML = active ? '<span class="pill live">● live</span>' : '<span class="pill neutral">idle</span>';
     const lm = $('#liveMeta');
@@ -74,11 +75,13 @@ async function tickLive(force) {
   try { events = await api(`/api/session-tail?id=${encodeURIComponent(sid)}&n=140`); }
   catch { return; }
   if (!Array.isArray(events)) return;
-  const sig = events.length + '|' + (events.length ? events[events.length - 1].text : '');
+  const sig = events.length + '|' + active + '|' + (events.length ? events[events.length - 1].text : '');
   if (!force && sig === liveLastSig) return;          // nothing new — leave scroll alone
   liveLastSig = sig;
   const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 60;
-  feed.innerHTML = events.length ? events.map(fmtEvent).join('\n') : '(no conversation events in the transcript tail yet)';
+  const body = events.length ? events.map(fmtEvent).join('\n') : '(no conversation events in the transcript tail yet)';
+  // a blinking block cursor while the session is live — reads as "still running"
+  feed.innerHTML = body + (active ? '\n<span class="livecursor">▍</span>' : '');
   if (force || atBottom) feed.scrollTop = feed.scrollHeight; // follow the tail unless scrolled up
 }
 

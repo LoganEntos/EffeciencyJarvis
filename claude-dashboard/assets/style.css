@@ -205,6 +205,9 @@ button.danger:hover{background:#e0525233;box-shadow:none}
 @media (prefers-reduced-motion:reduce){.pill.live{animation:none}}
 /* Live tab: a tall, scroll-following transcript feed (mobile-first) */
 .livefeed{height:calc(100dvh - 250px);min-height:340px;margin-top:4px}
+.livecursor{color:var(--accent);font-weight:700;animation:blink 1.1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.livecursor{animation:none}}
 /* header ● Live badge: green + pulsing dot when a Claude Code session is active */
 #liveBadge{cursor:pointer}
 #liveBadge .dot{background:var(--dim)}
