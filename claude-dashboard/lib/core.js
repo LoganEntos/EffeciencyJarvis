@@ -205,7 +205,7 @@ function assets() {
   const iconSets = (man.items || []).filter(i => i.type === 'icons').map(it => {
     const base = path.basename(it.file).replace(/-sprite\.svg$/, '').replace(/\.svg$/, '');
     const index = U.safeJson(path.join(DASH_DIR, 'vendor', 'icons', base + '-index.json')) || [];
-    return { key: base, label: it.label || base, file: it.file, pfx: it.pfx || '', style: it.style || '', license: it.license, count: index.length, names: index };
+    return { key: base, label: it.label || base, file: it.file, pfx: it.pfx || '', style: it.style || '', license: it.license, bytes: it.bytes || 0, count: index.length, names: index };
   });
   // iconIndex kept for backward compat (older clients read the Lucide list directly)
   const lucide = iconSets.find(s => s.key === 'lucide');

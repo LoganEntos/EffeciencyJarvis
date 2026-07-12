@@ -218,6 +218,18 @@
       "bytes": 1123180
     },
     {
+      "file": "icons/pixelart-sprite.svg",
+      "type": "icons",
+      "name": "Pixelarticons sprite (877 icons)",
+      "label": "Pixelart",
+      "pfx": "",
+      "style": "pixel / retro, 24px grid",
+      "role": "retro pixel-art iconography; use via <use href=\"/vendor/icons/pixelart-sprite.svg#NAME\">",
+      "license": "MIT",
+      "source": "https://github.com/halfmage/pixelarticons (npm pixelarticons@2.2.0)",
+      "bytes": 202767
+    },
+    {
       "file": "css/pattern.min.css",
       "type": "css",
       "name": "pattern.css (14 background patterns × 4 sizes)",

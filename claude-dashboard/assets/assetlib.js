@@ -8,8 +8,21 @@
 
 let assetData = null;
 let iconFilter = '';
-let iconSet = null;   // active icon set key (lucide/tabler/bootstrap/…)
-let patSize = 'md';   // active pattern size (sm/md/lg/xl)
+let iconSet = null;    // active icon set key (lucide/tabler/bootstrap/pixelart/…)
+let patSize = 'md';    // active pattern size (sm/md/lg/xl)
+let setSort = 'name';  // how the set toggle is ordered: name | count | size
+let iconSort = 'az';   // icon order within a set: az | za
+
+const SEL_STYLE = 'background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:3px;padding:4px 8px;font-size:12px;cursor:pointer';
+
+// the icon sets ordered by the active set-sort
+function sortedSets() {
+  const sets = [...(assetData.iconSets || [])];
+  if (setSort === 'count') sets.sort((a, b) => b.count - a.count);
+  else if (setSort === 'size') sets.sort((a, b) => b.bytes - a.bytes);
+  else sets.sort((a, b) => a.label.localeCompare(b.label));
+  return sets;
+}
 
 // curated pattern.css base classes shown in the browser (each × the size toggle)
 const PATTERN_BASES = ['dots', 'grid', 'checks', 'cross-dots', 'diagonal-lines', 'vertical-lines',
@@ -62,10 +75,22 @@ renderers.assets = async function () {
     <div id="fontList">${fonts.map(fontRow).join('')}</div>
 
     <h2 id="a-icons" style="margin-top:28px">Icons ${sub('— pick a set, search, click to copy the &lt;svg&gt; snippet')}</h2>
-    <div class="flex" id="iconSetToggle" style="gap:6px;margin-bottom:8px;flex-wrap:wrap">
-      ${sets.map(s => setPill(s)).join('')}
+    <div class="flex" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="flex" id="iconSetToggle" style="gap:6px;flex-wrap:wrap"></div>
+      <label class="muted" style="font-size:11px;white-space:nowrap">sort sets
+        <select id="setSort" style="${SEL_STYLE}">
+          <option value="name"${setSort === 'name' ? ' selected' : ''}>name</option>
+          <option value="count"${setSort === 'count' ? ' selected' : ''}>count</option>
+          <option value="size"${setSort === 'size' ? ' selected' : ''}>size</option>
+        </select></label>
     </div>
-    <input class="search" id="iconSearch" placeholder="Search this set… (e.g. arrow, chart, brain)">
+    <div class="flex" style="gap:8px;align-items:center">
+      <input class="search" id="iconSearch" placeholder="Search this set… (e.g. arrow, chart, brain)" style="flex:1">
+      <select id="iconSort" aria-label="Icon sort order" style="${SEL_STYLE}">
+        <option value="az"${iconSort === 'az' ? ' selected' : ''}>A→Z</option>
+        <option value="za"${iconSort === 'za' ? ' selected' : ''}>Z→A</option>
+      </select>
+    </div>
     <div class="muted" id="iconCount" style="font-size:11px;margin:6px 0"></div>
     <div class="iconGrid" id="iconGrid"></div>
 
@@ -86,15 +111,12 @@ renderers.assets = async function () {
   });
   // fonts
   $('#fontList').querySelectorAll('[data-copy]').forEach(r => r.onclick = () => copySnippet(r.dataset.copy, r));
-  // icon search + set toggle
+  // icon search + set toggle + sort controls
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   $('#iconSearch').oninput = debounce(e => { iconFilter = e.target.value.trim().toLowerCase(); drawIcons(); }, 150);
-  $('#iconSetToggle').querySelectorAll('[data-set]').forEach(b => b.onclick = async () => {
-    if (iconSet === b.dataset.set) return;
-    iconSet = b.dataset.set;
-    $('#iconSetToggle').querySelectorAll('[data-set]').forEach(x => setPillState(x));
-    await inlineSprite(); drawIcons();
-  });
+  $('#setSort').onchange = e => { setSort = e.target.value; renderSetPills(); };
+  $('#iconSort').onchange = e => { iconSort = e.target.value; drawIcons(); };
+  renderSetPills();
   // patterns
   if (hasPatterns) {
     $('#patSizeToggle').querySelectorAll('[data-size]').forEach(b => b.onclick = () => {
@@ -111,6 +133,18 @@ renderers.assets = async function () {
 function setPill(s) {
   const on = s.key === iconSet;
   return `<button class="pill ${on ? 'ok' : 'neutral'}" data-set="${esc(s.key)}" aria-pressed="${on}" title="${esc(s.style || '')} · ${esc(s.license)}" style="cursor:pointer">${esc(s.label)} · ${s.count.toLocaleString()}</button>`;
+}
+// (re)build the set toggle in the current sort order and wire clicks
+function renderSetPills() {
+  const wrap = $('#iconSetToggle');
+  if (!wrap) return;
+  wrap.innerHTML = sortedSets().map(setPill).join('');
+  wrap.querySelectorAll('[data-set]').forEach(b => b.onclick = async () => {
+    if (iconSet === b.dataset.set) return;
+    iconSet = b.dataset.set;
+    wrap.querySelectorAll('[data-set]').forEach(setPillState);
+    await inlineSprite(); drawIcons();
+  });
 }
 function setPillState(x) {
   const on = x.dataset.set === iconSet;
@@ -173,7 +207,8 @@ function drawIcons() {
   const map = spriteCache[iconSet];
   if (!grid || !set || !map) return;
   const all = set.names;
-  const hits = iconFilter ? all.filter(n => n.includes(iconFilter)) : all;
+  const hits = (iconFilter ? all.filter(n => n.includes(iconFilter)) : all.slice()).sort();
+  if (iconSort === 'za') hits.reverse();
   const show = hits.slice(0, 120);
   injectSymbols(show.map(n => set.pfx + n)); // symbol ids carry the set prefix
   const cnt = $('#iconCount');
