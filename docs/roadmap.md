@@ -46,6 +46,47 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ---
 
+## 🗣️ USER REVIEW BACKLOG (2026-07-11 walkthrough) — highest priority
+
+Direction shift: **Hermes is now the default/always-on engine.** Everything
+below is framed by that — Hermes efficiency + observability is the theme.
+
+**R0. Hermes-first + efficiency metrics (PRIORITY 1).** Make hermes the default
+engine in the Run composer. Build real efficiency tracking on Overview:
+per-engine tokens/cost/latency, hermes tiering breakdown (main vs aux vs
+subagents), cost-per-task trend, so we can actually tune hermes. Depends on R1
+(graph must show hermes crews truthfully) + R2 (clean the libraries).
+
+**R1. Live run debrief + truthful agent graph.** Clicking a running task/prompt
+must show a live DEBRIEF (what it's doing, step by step), not just "running".
+The Graph must depict the ACTUAL agents for the active engine (claude vs
+hermes — today hermes `-z` one-shot emits no tool telemetry, so the graph
+shows only a static crew ring → need hermes structured/verbose event output to
+show real live agents, who's active, how they hand off), rendered in a vibrant,
+attractive web. **Blocker to investigate:** does `hermes` expose a
+streaming/JSON event mode (not `-z`)? If not, this is the gating技术 problem.
+
+**R2. Navigable libraries + rethink Assets.** Skills (59), Commands, Agents
+libraries need real sorting/grouping/search — currently a flat dump, hard to
+find anything (the ECC adoption made Skills much bigger). Assets tab needs a
+practicality rethink: it's design-example fonts/icons/css with NO website-
+creation feature wired into the app to consume them — decide if it earns its
+place or becomes a run-artifact style palette that's actually used.
+
+**R3. Auto session summaries (no manual click).** Sessions must NOT require
+clicking "summarize with Claude". A cheap model (haiku/sonnet) auto-scans every
+session and writes an exact debrief — improves memory, makes old sessions
+scannable. Run it on session close / on a cheap batch, cache the summary.
+
+**R4. Files: image thumbnails + day grouping.** Show a visual thumbnail of every
+uploaded image (you must see the context the AI is given). Group/sort by upload
+day; >10 images is unrememberable without categorization.
+
+**R5. Scheduled tasks are UNTESTED — no stress testing done** (`lib/schedules.js`,
+`data/schedules.json`). NOTHING has verified they actually fire. Fold
+scheduled-task testing into the self-improvement/autopilot loop (create a
+near-future schedule, assert it fires + lands in run history, tear down).
+
 ## 🔜 DO NEXT — autonomous, no user action needed (execute top-down)
 
 > **North star / definition of done:** the hub is a token-efficient, voice-

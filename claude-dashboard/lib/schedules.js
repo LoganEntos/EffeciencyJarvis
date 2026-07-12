@@ -5,6 +5,13 @@
  * tracking, and Engram memory capture. Zero-dep: a 30s setInterval tick
  * compares persisted nextDue timestamps against the clock (local time).
  * A schedule that came due while the server was off fires once on boot.
+ *
+ * ⚠️ UNTESTED (user flag, 2026-07-11): this module has had NO functional or
+ * stress testing — nothing has verified a schedule actually fires, lands in
+ * run history, computes the next due time correctly, or survives a restart.
+ * Treat it as unproven until the self-improvement/autopilot loop covers it
+ * (roadmap R5): create a near-future schedule, assert it fires + records a
+ * run, then tear it down. Do not rely on scheduled runs in production yet.
  */
 'use strict';
 const fs = require('fs');
@@ -17,7 +24,6 @@ const DASH_DIR = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(DASH_DIR, 'data');
 const SCHED_FILE = path.join(DATA_DIR, 'schedules.json');
 const KINDS = ['interval', 'daily', 'weekly'];
-const MODELS = ['auto', '', 'sonnet', 'opus', 'haiku'];
 const TICK_MS = 30 * 1000;
 const MIN_INTERVAL_MIN = 15;      // floor so a typo can't hammer the run engine
 const DEFER_MS = 5 * 60 * 1000;   // retry delay when a slot isn't free / run still active
@@ -114,7 +120,7 @@ function parseSchedule(b) {
   if (!prompt) return { error: 'prompt required' };
   const kind = KINDS.includes(b.kind) ? b.kind : null;
   if (!kind) return { error: 'kind must be interval | daily | weekly' };
-  const model = MODELS.includes(b.model) ? b.model : 'auto';
+  const model = U.SIMPLE_MODELS.includes(b.model) ? b.model : 'auto';
   const s = { kind, title: title || prompt.slice(0, 60), prompt, model };
   if (kind === 'interval') {
     const min = parseInt(b.minutes, 10);
