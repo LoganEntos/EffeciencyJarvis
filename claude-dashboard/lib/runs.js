@@ -168,7 +168,8 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
     id, engine, status: 'queued', queuedAt: new Date().toISOString(), startedAt: null, endedAt: null,
     exitCode: null, sessionId: null, model: model || '', permissionMode: perm,
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
-    costUsd: null, durationMs: null, routedReason, recallCount: recalled ? recalled.count : 0,
+    costUsd: null, durationMs: null, tokensIn: null, tokensOut: null,
+    routedReason, recallCount: recalled ? recalled.count : 0,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);
@@ -264,6 +265,14 @@ function launchClaude(st) {
             st.meta.sessionId = r.session_id || st.meta.sessionId;
             st.meta.costUsd = r.total_cost_usd ?? null;
             st.meta.durationMs = r.duration_ms ?? null;
+            // usage → context analytics: tokensIn = full input context on the
+            // final turn (fresh + cached), tokensOut = generated tokens.
+            const u = r.usage || (r.message && r.message.usage);
+            if (u) {
+              const cin = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+              st.meta.tokensIn = cin || st.meta.tokensIn;
+              st.meta.tokensOut = u.output_tokens ?? st.meta.tokensOut;
+            }
           }
         } catch {}
       }
