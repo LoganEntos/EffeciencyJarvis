@@ -14,10 +14,12 @@ const SRC_GROUPS = [
 // license → badge tone. Permissive/OFL = ok(amber-green), unknown = neutral.
 function licenseBadge(s) {
   const lic = s.license || 'see repo';
-  const known = /^(MIT|ISC|OFL|Apache|BSD|CC0)/i.test(lic);
-  const tone = !known ? 'neutral' : 'ok';
-  const flag = s.verified === false && known ? ' title="license not confirmed from the repo LICENSE — verify before relying on it"' : '';
-  const mark = s.verified === false && known ? ' ?' : '';
+  const permissive = /^(MIT|ISC|OFL|Apache|BSD|CC0)/i.test(lic);
+  const blocked = /none|all rights|proprietary|no license/i.test(lic);
+  const tone = blocked ? 'err' : (permissive ? 'ok' : 'neutral');
+  const unverified = s.verified === false && permissive;
+  const flag = unverified ? ' title="license not confirmed from the repo LICENSE — verify before relying on it"' : '';
+  const mark = unverified ? ' ?' : '';
   return `<span class="pill ${tone}"${flag} style="font-size:10px">${esc(lic)}${mark}</span>`;
 }
 

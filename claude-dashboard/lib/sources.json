@@ -32,7 +32,7 @@
       "name": "ibelick/ui-skills",
       "repo": "https://github.com/ibelick/ui-skills",
       "license": "MIT",
-      "verified": false,
+      "verified": true,
       "status": "active",
       "usedFor": "Adapted into the local ui-design / frontend polish skills (baseline-ui, anti-slop rules)."
     },
@@ -41,7 +41,7 @@
       "name": "D4Vinci/Scrapling",
       "repo": "https://github.com/D4Vinci/Scrapling",
       "license": "BSD-3-Clause",
-      "verified": false,
+      "verified": true,
       "status": "active",
       "usedFor": "The scraper agent's engine — the ONLY MCP wired in .mcp.json (mcp__scrapling__fetch/get/stealthy_fetch). Web fetch for the GitHub-intake team."
     },
@@ -50,16 +50,16 @@
       "name": "SesameAILabs/csm",
       "repo": "https://github.com/SesameAILabs/csm",
       "license": "Apache-2.0",
-      "verified": false,
+      "verified": true,
       "status": "active",
       "usedFor": "CSM-1B local neural voice (N9). Runs natively in gitignored .csm/; TTS sidecar at scripts/csm-server.py. Weights via ungated unsloth/csm-1b mirror."
     },
     {
       "kind": "tool",
-      "name": "hermes",
-      "repo": null,
-      "license": "see repo",
-      "verified": false,
+      "name": "NousResearch/hermes-agent",
+      "repo": "https://github.com/nousresearch/hermes-agent",
+      "license": "MIT",
+      "verified": true,
       "status": "deprecated",
       "usedFor": "Second agentic stack (per-task model tiering). DEPRECATED as too expensive — hidden behind a Config toggle (settings.hermesEnabled, default off). Use Hermes Desktop for hermes work."
     },
@@ -68,7 +68,7 @@
       "name": "unclecode/crawl4ai",
       "repo": "https://github.com/unclecode/crawl4ai",
       "license": "Apache-2.0",
-      "verified": false,
+      "verified": true,
       "status": "queued",
       "usedFor": "QUEUED — LLM-friendly web crawler/scraper being evaluated as a fetch sibling for the GitHub-intake team (overlaps Scrapling). Python; must NOT bundle into the zero-dep app."
     },
@@ -76,8 +76,8 @@
       "kind": "incorporate",
       "name": "browser-use/browser-harness",
       "repo": "https://github.com/browser-use/browser-harness",
-      "license": "see repo",
-      "verified": false,
+      "license": "MIT",
+      "verified": true,
       "status": "queued",
       "usedFor": "QUEUED — browser-automation harness on the incorporate list; not yet evaluated."
     },
@@ -85,10 +85,10 @@
       "kind": "incorporate",
       "name": "karpathy/llm-council",
       "repo": "https://github.com/karpathy/llm-council",
-      "license": "MIT",
-      "verified": false,
+      "license": "None (all rights reserved)",
+      "verified": true,
       "status": "queued",
-      "usedFor": "QUEUED — prior art for N10 Council mode (Claude-only fan-out + synthesis)."
+      "usedFor": "QUEUED — prior art for N10 Council mode (Claude-only fan-out + synthesis). ⚠ NO license declared (all rights reserved) — cannot be vendored/adapted as-is; use only as reference, or ask the author to add a license."
     }
   ]
 }
