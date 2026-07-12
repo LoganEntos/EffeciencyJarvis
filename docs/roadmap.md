@@ -279,6 +279,33 @@ frameworks in wholesale (the hermes lesson). Build only on the user's go-ahead.
   or port just the CDP-harness pattern into a hub skill — decide at build time.
   Needs a real Chrome with remote debugging; no cloud account required for local
   use.
+- **unclecode/crawl4ai** (2026-07-12, user-flagged). Tagline: *open-source
+  LLM-friendly web crawler & scraper* — async, returns clean LLM-ready markdown,
+  handles JS-heavy sites + extraction strategies. **Relevance:** a heavier
+  alternative/complement to `scrapling` for the new **GitHub-intake team**'s
+  fetch step (deep crawls, docs→markdown, structured extraction) where a plain
+  Scrapling fetch is too thin. **How to incorporate:** Python (violates the
+  app's zero-dep runtime) → run as a **sibling tool / MCP the hub drives** (like
+  Scrapling / Hermes Desktop / the CSM sidecar), NOT bundled into the app. **At
+  build:** confirm the license (Apache-2.0 as of writing — verify), decide
+  Scrapling-vs-crawl4ai overlap (don't add a second always-on scraper MCP just
+  to have it — MCPs tax every run), and whether the GitHub-intake team actually
+  needs it over Scrapling + one-time curl. Evaluate before installing.
+
+### N11. Sources library — "what GitHubs power this hub" (user request 2026-07-12)
+A new Library tab (or an Assets-tab section) that lists **every external GitHub
+repo the hub uses or references**, with repo link, license, and what it's used
+for. Data already exists, scattered: `vendor/manifest.json` `source` fields (the
+4 icon sprites + pattern.css + fonts + normalize), the adapted skills
+(ibelick/ui-skills, affaan-m/ecc, nextlevelbuilder/ui-ux-pro-max-skill,
+bansal-io/pattern.css, twbs/icons, tabler, lucide, halfmage/pixelarticons), the
+incorporate list above (browser-harness, crawl4ai, llm-council), and the tool
+siblings (Scrapling, hermes, CSM). **Build:** a `lib/` provenance collator (start
+from manifest `source` + a small curated JSON of the non-vendored references) →
+`/api/sources` → a tab that groups by kind (vendored asset / skill / agent tool /
+queued-to-incorporate) with license badges + "used for" text. Zero-dep, reads
+existing manifest; keep the curated reference list in one JSON so it stays
+truthful. Pairs naturally with the GitHub-intake team (new intakes append here).
 
 ### N8. iPhone incorporation (user request 2026-07-10 — QUEUED, evaluate options)
 Get the hub properly usable from an iPhone — possibly via Base44 or another
