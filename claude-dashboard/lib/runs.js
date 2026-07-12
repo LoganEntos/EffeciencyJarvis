@@ -11,6 +11,8 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const U = require('./util');
 const memory = require('./memory');
+const liveness = require('./liveness');
+const { countArtifacts, listArtifacts, serveArtifact } = require('./artifacts');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
@@ -70,6 +72,11 @@ function sessionModel(sessionId) {
 const active = new Map(); // id -> { child, lines, listeners, meta, stderr, cancelled, args, dir, out }
 const queue = [];         // ids waiting for a free slot, FIFO
 
+// Reap crash/restart orphans on boot + every 60s: any run left "running" on
+// disk that isn't in `active` had its process die without a close event, so
+// history would otherwise show it running forever.
+liveness.startReaper(RUNS_DIR, active);
+
 const okId = id => typeof id === 'string' && /^[a-z0-9-]+$/.test(id) && id.length < 64;
 function newId() {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19).toLowerCase()
@@ -99,6 +106,7 @@ function writeMeta(st) {
 
 function pushLine(st, line) {
   st.lines.push(line);
+  st.lastLineAt = Date.now(); // liveness: proof the run is doing something
   if (st.out) st.out.write(line + '\n');
   broadcast(st, 'line', line, st.lines.length - 1);
 }
@@ -189,8 +197,18 @@ function launch(st) {
   st.child = child;
   st.meta.status = 'running';
   st.meta.startedAt = new Date().toISOString();
+  st.lastLineAt = Date.now();
   writeMeta(st);
   st.out = fs.createWriteStream(path.join(st.dir, 'output.jsonl'), { flags: 'a' });
+  // liveness: broadcast a heartbeat so an attached client sees the run is
+  // alive (and how long it's been silent) even when nothing is streaming.
+  liveness.startHeartbeat(st, broadcast);
+  // hermes -z is silent mid-run — follow its activity log so its real work
+  // (model calls, tool use) shows up as it happens.
+  if (st.meta.engine === 'hermes') {
+    liveness.startHermesTail(st, HERMES_EXE, (s, text) =>
+      pushLine(s, JSON.stringify({ type: 'hermes_log', text })));
+  }
 
   let buf = '';
   child.stdout.on('data', d => {
@@ -222,6 +240,8 @@ function launch(st) {
   child.stderr.on('data', d => { if (st.stderr.length < 20000) st.stderr += d; });
   child.on('error', e => { st.stderr += '\nspawn error: ' + e.message; });
   child.on('close', (code) => {
+    liveness.stopHeartbeat(st);
+    liveness.stopHermesTail(st);
     st.meta.endedAt = new Date().toISOString();
     st.meta.exitCode = code;
     st.meta.status = st.cancelled ? 'cancelled' : (code === 0 ? 'done' : 'error');
@@ -342,24 +362,13 @@ function streamRun(req, res, id) {
   res.end();
 }
 
-function countArtifacts(id) {
-  let n = 0;
-  (function walk(d) {
-    for (const e of U.listDir(d)) {
-      if (e.isDirectory()) walk(path.join(d, e.name));
-      else if (e.isFile()) n++;
-    }
-  })(path.join(RUNS_DIR, id, 'artifacts'));
-  return n;
-}
-
 function listRuns() {
   const rows = [];
   for (const e of U.listDir(RUNS_DIR)) {
     if (!e.isDirectory() || !okId(e.name)) continue;
     const live = active.get(e.name);
     const meta = live ? live.meta : U.safeJson(path.join(RUNS_DIR, e.name, 'meta.json'));
-    if (meta) rows.push(Object.assign({ artifactCount: countArtifacts(e.name) }, meta));
+    if (meta) rows.push(Object.assign({ artifactCount: countArtifacts(e.name) }, liveness.annotate(meta, live)));
   }
   return rows.sort((a, b) => (b.queuedAt || b.startedAt || '').localeCompare(a.queuedAt || a.startedAt || '')).slice(0, 200);
 }
@@ -393,61 +402,14 @@ function routingStats() {
 function transcript(id) {
   if (!okId(id)) return null;
   const dir = path.join(RUNS_DIR, id);
-  const meta = active.get(id) ? active.get(id).meta : U.safeJson(path.join(dir, 'meta.json'));
+  const live = active.get(id);
+  const meta = liveness.annotate(live ? live.meta : U.safeJson(path.join(dir, 'meta.json')), live);
   if (!meta) return null;
   const raw = U.safeRead(path.join(dir, 'output.jsonl')) || '';
   const lines = raw.split('\n').filter(l => l.trim());
   // cap the payload — keep first 2 lines (init) + tail
   const capped = lines.length > 1500 ? lines.slice(0, 2).concat(lines.slice(-1498)) : lines;
   return { meta, prompt: U.safeRead(path.join(dir, 'prompt.txt')) || '', lines: capped, truncated: capped.length < lines.length };
-}
-
-function listArtifacts(id) {
-  if (!okId(id)) return null;
-  const base = path.join(RUNS_DIR, id, 'artifacts');
-  const out = [];
-  (function walk(d, rel) {
-    for (const e of U.listDir(d)) {
-      const full = path.join(d, e.name);
-      const r = rel ? rel + '/' + e.name : e.name;
-      if (e.isDirectory()) walk(full, r);
-      else if (e.isFile()) {
-        let st; try { st = fs.statSync(full); } catch { continue; }
-        out.push({ file: r, size: st.size });
-      }
-    }
-  })(base, '');
-  return out;
-}
-
-const MIME = {
-  '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif', '.webp': 'image/webp', '.css': 'text/css', '.js': 'text/javascript',
-  '.json': 'application/json', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
-  '.csv': 'text/csv', '.pdf': 'application/pdf',
-};
-
-function serveArtifact(res, id, file) {
-  if (!okId(id) || !file) return U.sendJson(res, { error: 'bad request' }, 400);
-  const base = path.join(RUNS_DIR, id, 'artifacts');
-  const full = path.normalize(path.join(base, file));
-  if (full !== base && !full.startsWith(base + path.sep)) return U.sendJson(res, { error: 'forbidden' }, 403);
-  let st; try { st = fs.statSync(full); } catch { return U.sendJson(res, { error: 'not found' }, 404); }
-  if (!st.isFile()) return U.sendJson(res, { error: 'not found' }, 404);
-  const mime = MIME[path.extname(full).toLowerCase()] || 'application/octet-stream';
-  res.writeHead(200, {
-    'Content-Type': mime, 'Content-Length': st.size, 'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
-    // opaque origin even when opened directly — an artifact page must never be
-    // able to read the hub token or call token-guarded endpoints. The ONLY
-    // reachable http path is the read-only local asset library under /vendor/.
-    'Content-Security-Policy': "sandbox allow-scripts; default-src 'unsafe-inline' data: blob:; "
-      + "font-src data: http://127.0.0.1:*/vendor/ http://localhost:*/vendor/; "
-      + "style-src 'unsafe-inline' http://127.0.0.1:*/vendor/ http://localhost:*/vendor/; "
-      + "img-src data: blob: http://127.0.0.1:*/vendor/ http://localhost:*/vendor/",
-  });
-  fs.createReadStream(full).pipe(res);
 }
 
 // ---------- route handling ----------
@@ -507,7 +469,7 @@ function getRunMeta(id) {
   const live = active.get(id);
   const meta = live ? live.meta : U.safeJson(path.join(RUNS_DIR, id, 'meta.json'));
   if (!meta) return null;
-  return Object.assign({ artifactCount: countArtifacts(id) }, meta);
+  return Object.assign({ artifactCount: countArtifacts(id) }, liveness.annotate(meta, live));
 }
 
 module.exports = { handle, startRun, getRunMeta, runningCount, listRuns, queueLength: () => queue.length };

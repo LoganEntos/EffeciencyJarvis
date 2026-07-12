@@ -206,6 +206,12 @@ function renderLine(o) {
   }
   if (o.type === 'hub_stderr') { addEl(errBlock(o.text), 'errblk'); return null; }
   if (o.type === 'hub_status') { addMsg(o.text, 'sys'); return null; }
+  if (o.type === 'hermes_log') {
+    // live activity tailed from hermes's own log — -z streams no tool events,
+    // so this is the window into what the run is actually doing right now.
+    addEl(`<span class="logdot">›</span> ${esc(o.text)}`, 'logline');
+    return null;
+  }
   if (o.type === 'hermes_out') {
     // hermes -z streams plain text lines — grow them into ONE assistant bubble
     if (!chat.hermesEl || !chat.hermesEl.isConnected) { chat.hermesEl = addEl('', 'msg assistant'); chat.hermesText = ''; }
@@ -224,14 +230,34 @@ function attachLiveRun(id, { startedAtMs, queued, seen } = {}) {
   chat.runId = id; chat.running = true; chat.seen = seen != null ? seen : -1;
   chat.t0 = startedAtMs || Date.now();
   chat.queued = !!queued;
+  chat.hb = null; chat.lastActivity = Date.now();
   $('#sendBtn').disabled = true;
   $('#cancelBtn').classList.remove('hidden');
   clearInterval(chat.timer);
-  chat.timer = setInterval(() => {
-    const label = chat.queued ? 'queued — waiting for a slot' : `running · ${Math.round((Date.now() - chat.t0) / 1000)}s`;
-    $('#runStatus').innerHTML = `<span class="pill warn">${label}</span><span class="muted mono">${esc(chat.runId)}</span>`;
-  }, 1000);
+  chat.timer = setInterval(renderRunStatus, 1000);
+  renderRunStatus();
   attachStream(id);
+}
+
+// Live status line: elapsed time + a truthful liveness signal so a working run
+// is visibly distinct from a stalled/dead one. Driven by the server heartbeat
+// (idle/stalled/procAlive) with a client-side idle fallback between beats.
+function renderRunStatus() {
+  const el = $('#runStatus');
+  if (!el || !chat.running) return;
+  if (chat.queued) {
+    el.innerHTML = `<span class="pill warn">queued — waiting for a slot</span><span class="muted mono">${esc(chat.runId)}</span>`;
+    return;
+  }
+  const elapsed = Math.round((Date.now() - chat.t0) / 1000);
+  const idleS = Math.round((chat.hb ? chat.hb.idleMs : Date.now() - chat.lastActivity) / 1000);
+  const dead = chat.hb && chat.hb.procAlive === false;
+  const stalled = dead || (chat.hb ? chat.hb.stalled : idleS > 120);
+  let html = `<span class="pill ${stalled ? 'err' : 'live'}">${stalled ? '⚠ ' : '◉ '}running · ${elapsed}s</span>`;
+  if (stalled) html += `<span class="pill err">${dead ? 'process gone' : 'no activity ' + idleS + 's'}</span>`;
+  else if (idleS >= 8) html += `<span class="muted mono">idle ${idleS}s</span>`;
+  html += `<span class="muted mono">${esc(chat.runId)}</span>`;
+  el.innerHTML = html;
 }
 
 // ---- live run flow ----
@@ -261,10 +287,15 @@ function attachStream(id) {
   es.addEventListener('line', e => {
     const idx = parseInt(e.lastEventId, 10);
     if (!isNaN(idx)) { if (idx <= chat.seen) return; chat.seen = idx; } // dedupe SSE auto-reconnect replays
+    chat.lastActivity = Date.now(); if (chat.hb) chat.hb.idleMs = 0; // any line = fresh activity
     let o; try { o = JSON.parse(e.data); } catch { return; }
     if (chat.queued && o.type === 'system') { chat.queued = false; chat.t0 = Date.now(); } // slot freed — run started
     const result = renderLine(o);
     if (result && result.session_id) setSession(result.session_id);
+  });
+  es.addEventListener('heartbeat', e => {
+    try { chat.hb = JSON.parse(e.data); } catch { return; }
+    renderRunStatus();
   });
   es.addEventListener('done', async e => {
     es.close(); chat.es = null;
@@ -393,10 +424,18 @@ function renderHistory() {
     && (!histStatusFilter || m.status === histStatusFilter));
   if (!rows.length) { el.innerHTML = '<div class="muted">No runs match the filter.</div>'; return; }
   const pill = s => s === 'done' ? 'ok' : (s === 'running' || s === 'queued' || s === 'cancelled' ? 'warn' : 'err');
+  // a "running" row that has gone silent (or whose process is gone) is flagged
+  // so a stalled/zombie run is never mistaken for a healthy one at a glance.
+  const liveBadge = m => {
+    if (m.status !== 'running') return '';
+    if (m.procAlive === false) return '<span class="pill err">process gone</span>';
+    if (m.stalled) return `<span class="pill err">stalled ${Math.round((m.idleMs || 0) / 1000)}s</span>`;
+    return '<span class="pill live">◉ live</span>';
+  };
   el.innerHTML = rows.map(m => `
     <div class="row clickable runrow" data-id="${esc(m.id)}">
       <div class="flex" style="justify-content:space-between">
-        <span><span class="pill ${pill(m.status)}">${esc(m.status)}</span>
+        <span><span class="pill ${pill(m.status)}">${esc(m.status)}</span>${liveBadge(m)}
           <span class="muted" style="font-size:11.5px">${new Date(m.startedAt || m.queuedAt || 0).toLocaleString()}</span></span>
         <span class="muted" style="font-size:11.5px">${m.engine === 'hermes' ? '⬡ hermes · ' : ''}${m.model ? esc(m.model) + (m.routedReason ? ' (auto)' : '') + ' · ' : ''}${m.durationMs ? (m.durationMs / 1000).toFixed(1) + 's' : ''}${m.costUsd != null ? ' · $' + m.costUsd.toFixed(4) : ''}${m.resumedFrom ? ' · ⟲ resumed' : ''}${m.artifactCount ? ' · ◫ ' + m.artifactCount : ''}
           <button class="danger delRunBtn" data-id="${esc(m.id)}" title="delete this run from history" style="padding:2px 9px;font-size:10.5px;margin-left:8px">✕</button></span>

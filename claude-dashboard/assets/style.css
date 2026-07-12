@@ -166,6 +166,11 @@ button.danger:hover{background:#e0525233;box-shadow:none}
 .navOverlay{display:none}
 .pill.err{background:#e0525218;color:#f0908f;border:1px solid #e0525245}
 .pill.neutral{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-dim)}
+/* live: a run confirmed alive by the server heartbeat — gently pulses so it
+   reads as "breathing", distinct from a static status badge */
+.pill.live{background:#4bc47a14;color:var(--green);border:1px solid #4bc47a40;animation:livepulse 1.8s ease-in-out infinite}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.pill.live{animation:none}}
 :root[data-theme="light"] .pill.warn{color:#8a6414}
 :root[data-theme="light"] .pill.err{color:#a83232}
 .muted{color:var(--muted)} .mono{font-family:var(--font-mono)}
@@ -227,6 +232,11 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .toolblk details[open] summary::before{content:'▾ '}
 .toolblk pre{margin:0;border:none;border-radius:0;border-top:1px solid var(--line);
   max-height:260px;font-size:11.5px;padding:10px 14px}
+/* live activity tailed from hermes's own log (its -z mode streams no tool
+   events) — quiet, mono, indented so it reads as ambient telemetry not chat */
+.logline{align-self:flex-start;max-width:88%;font-family:var(--font-mono);font-size:11px;
+  color:var(--dim);line-height:1.5;padding:1px 0 1px 4px;word-break:break-word}
+.logline .logdot{color:var(--green);opacity:.7;margin-right:5px}
 /* markdown inside assistant bubbles */
 .msg.assistant pre{background:#0b0a08;border:1px solid var(--line);border-radius:8px;
   padding:10px 12px;margin:8px 0;font-size:12px;overflow-x:auto;white-space:pre}
