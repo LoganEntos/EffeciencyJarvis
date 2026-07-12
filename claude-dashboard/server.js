@@ -25,6 +25,14 @@ const autopilot = require('./lib/autopilot');
 const PORT = parseInt(process.argv[2] || process.env.PORT || '5757', 10);
 const HOST = '127.0.0.1';
 
+// Supervised-restart handshake (see /api/restart). A restart child writes its
+// PID here in its own listen callback once it is actually serving; the old
+// process waits for that proof before exiting, and resumes serving if it
+// never appears — so a self-edit that breaks server code can never leave a
+// dead port (the working old process just keeps running).
+const RESTART_READY_FILE = path.join(__dirname, 'data', 'restart-ready');
+const IS_RESTART_CHILD = process.env.HUB_RESTART === '1';
+
 // CSRF guard: random per-boot token, injected into the served index.html and
 // required (X-Hub-Token header) on every state-changing request. A foreign
 // web page can fire requests at 127.0.0.1 but can never read this token.
@@ -119,17 +127,13 @@ const server = http.createServer(async (req, res) => {
       return U.sendJson(res, { error: 'missing or bad X-Hub-Token' }, 403);
     }
 
-    // Restart the hub from the browser (button beside the theme toggle): answer
-    // the client, spawn a fully-detached replacement on the same port, then exit
-    // so the child can bind it (the child's listen retries through the handover).
+    // Restart the hub from the browser (button beside the theme toggle).
+    // SUPERVISED handover — the old process does not exit until the new one
+    // proves it is listening; if the replacement crashes on boot or hangs,
+    // the old process resumes serving. See supervisedRestart().
     if (p === '/api/restart' && req.method === 'POST') {
       U.sendJson(res, { ok: true });
-      console.log('\n  Restart requested from the browser — respawning…\n');
-      const child = require('child_process').spawn(
-        process.execPath, [__filename, String(PORT)],
-        { cwd: __dirname, detached: true, stdio: 'ignore' });
-      child.unref();
-      setTimeout(() => process.exit(0), 400); // let the child start before we free the port
+      supervisedRestart();
       return;
     }
 
@@ -150,24 +154,89 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// Bind with retry: a browser-triggered restart spawns the replacement while the
-// old process is still holding the port for a moment. Retry EADDRINUSE for ~10s
-// so the handover always succeeds instead of the new process dying on boot.
+// Supervised self-restart. Spawn a replacement, free the port, and wait for the
+// child to confirm it is listening (it writes its PID to RESTART_READY_FILE in
+// its own listen callback). Only then does this process exit. If the child
+// crashes on boot — the real hazard when the hub edits its own server code — or
+// never comes up in time, this process re-binds and keeps serving, so a bad
+// self-edit degrades to "change didn't take effect", never to a dead port.
+let restarting = false;   // a handover is in flight
+let recovering = false;   // this (old) process is re-taking the port after a failed handover
+function supervisedRestart() {
+  if (restarting) return;
+  restarting = true;
+  try { fs.unlinkSync(RESTART_READY_FILE); } catch {}
+  console.log('\n  Restart requested — spawning replacement; will hand off only once it is listening…\n');
+
+  let child;
+  try {
+    child = require('child_process').spawn(
+      process.execPath, [__filename, String(PORT)],
+      { cwd: __dirname, detached: true, stdio: 'ignore',
+        env: Object.assign({}, process.env, { HUB_RESTART: '1' }) });
+  } catch (e) { restarting = false; console.error('  Restart failed to spawn: ' + e.message); return; }
+
+  let settled = false;
+  // the child is "up" only when the ready file holds exactly its PID (guards
+  // against a stale file from an earlier handover)
+  const childUp = () => {
+    try { return fs.readFileSync(RESTART_READY_FILE, 'utf8').trim() === String(child.pid); }
+    catch { return false; }
+  };
+  const handoff = () => {
+    if (settled) return; settled = true;
+    clearInterval(poll); clearTimeout(giveUp);
+    try { child.unref(); } catch {}
+    console.log('  Replacement is serving — old process exiting cleanly.');
+    setTimeout(() => process.exit(0), 150);
+  };
+  const recover = (why) => {
+    if (settled) return; settled = true;
+    clearInterval(poll); clearTimeout(giveUp);
+    restarting = false; recovering = true;
+    console.error(`\n  Restart aborted (${why}) — resuming service on the current (working) process.\n`);
+    if (!server.listening) { try { server.listen(PORT, HOST); } catch {} }
+  };
+
+  // free the listening socket so the child can bind (open connections drain on
+  // their own; we exit explicitly once the child is confirmed)
+  try { server.close(); } catch {}
+
+  const poll = setInterval(() => { if (childUp()) handoff(); }, 250);
+  const giveUp = setTimeout(() => recover('replacement did not start within 12s'), 12000);
+  child.on('exit', (code) => { if (!childUp()) recover('replacement exited on boot (code ' + code + ')'); });
+  child.on('error', (e) => recover('replacement could not be spawned: ' + e.message));
+}
+
+// Bind with retry: a restart child spawns while the old process is still
+// freeing the port. Retry EADDRINUSE briefly so the handover succeeds.
 let bindTries = 0;
 server.on('error', (e) => {
-  if (e.code === 'EADDRINUSE' && bindTries < 40) {
-    bindTries++;
-    if (bindTries === 1) console.log(`  Port ${PORT} busy (restart handover) — retrying…`);
-    setTimeout(() => server.listen(PORT, HOST), 250);
-  } else {
-    console.error(`\n  Cannot bind ${HOST}:${PORT} — ${e.message}\n`);
-    process.exit(1);
+  if (e.code === 'EADDRINUSE') {
+    // A recovering old process that finds the port taken means the replacement
+    // grabbed it after all — step aside cleanly rather than fighting for it.
+    if (recovering) { console.log('  Port taken by the replacement — old process exiting.'); return process.exit(0); }
+    if (bindTries < 40) {
+      bindTries++;
+      if (bindTries === 1) console.log(`  Port ${PORT} busy (restart handover) — retrying…`);
+      return setTimeout(() => server.listen(PORT, HOST), 250);
+    }
   }
+  console.error(`\n  Cannot bind ${HOST}:${PORT} — ${e.message}\n`);
+  process.exit(1);
 });
 
 server.listen(PORT, HOST, () => {
+  bindTries = 0;
   schedules.startTicker(); // scheduled runs fire only while the hub is up
   autopilot.startTicker(); // self-improvement loop — no-op unless enabled in Config
+  // tell the old process (if this is a supervised restart) that we're serving
+  if (IS_RESTART_CHILD) {
+    try {
+      fs.mkdirSync(path.dirname(RESTART_READY_FILE), { recursive: true });
+      fs.writeFileSync(RESTART_READY_FILE, String(process.pid));
+    } catch {}
+  }
   console.log(`\n  Claude Code Hub running at  http://${HOST}:${PORT}`
     + `\n  Project: ${core.PROJECT_DIR}`
     + `\n  Hub token (auto-injected into the page): ${TOKEN}`
