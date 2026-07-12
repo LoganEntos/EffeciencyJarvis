@@ -187,14 +187,23 @@ renderers.commands = function () { return listView('#commands', 'Commands', '/ap
 
 
 renderers.sessions = async function () {
-  const d = await api('/api/sessions');
+  const [d, runsList, teamsD] = await Promise.all([
+    api('/api/sessions'),
+    api('/api/runs').catch(() => []),
+    api('/api/teams').catch(() => null),
+  ]);
   const list = Array.isArray(d) ? d : (d.list || []);
   const dir = Array.isArray(d) ? '' : (d.dir || '');
-  $('#sessions').innerHTML = `<h2>Claude Code Sessions (this project) <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— peek at raw activity, or have Claude summarize a session for you</span></h2>` +
+  // map each Claude Code session → the agent team of the hub run that produced it
+  const teamBySid = {};
+  (Array.isArray(runsList) ? runsList : []).forEach(m => { if (m.sessionId && m.team && !teamBySid[m.sessionId]) teamBySid[m.sessionId] = m.team; });
+  const activeTeamName = teamsD ? ((teamsD.teams.find(t => t.id === teamsD.active) || {}).name || '') : '';
+  $('#sessions').innerHTML = `<h2>Claude Code Sessions (this project) <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— peek at raw activity, or have Claude summarize a session for you</span></h2>
+    ${activeTeamName ? `<div class="flex" style="margin:-2px 0 14px"><span class="pill neutral" title="the agent team the hub is steering right now">⛬ active team: ${esc(activeTeamName)}</span></div>` : ''}` +
     (list.length ? list.map((s, i) => `<div class="row" data-id="${esc(s.id)}">
       <div class="flex" style="justify-content:space-between">
         <span class="name mono">${i === 0 ? '<span class="dot ok"></span>' : ''}${esc(s.id.slice(0, 8))}…
-          <span class="muted" style="font-weight:400;font-size:11.5px">${i === 0 ? 'newest' : ''}</span></span>
+          <span class="muted" style="font-weight:400;font-size:11.5px">${i === 0 ? 'newest' : ''}</span>${teamBySid[s.id] ? `<span class="pill neutral" style="font-size:10px" title="team that worked this thread">⛬ ${esc(teamBySid[s.id])}</span>` : ''}</span>
         <span class="muted" style="font-size:11.5px">${rel(s.modified)} · ${s.sizeKb} KB</span>
       </div>
       <div class="flex" style="margin-top:8px">
@@ -269,7 +278,7 @@ async function showSessionTail(id) {
   pre.scrollTop = pre.scrollHeight; // newest last — jump to bottom
 }
 
-const KIND_COLOR = { user: 'var(--green)', assistant: 'var(--accent)', tool: 'var(--amber)' };
+const KIND_COLOR = { user: 'var(--green)', assistant: 'var(--accent)', tool: 'var(--bronze)' };
 function fmtEvent(e) {
   const t = e.time ? new Date(e.time).toLocaleTimeString() : '——:——:——';
   return `<span class="muted">${esc(t)}</span> <span style="color:${KIND_COLOR[e.kind] || 'var(--muted)'};font-weight:600">${esc((e.kind + '     ').slice(0, 9))}</span> ${esc(e.text)}`;

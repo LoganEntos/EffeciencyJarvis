@@ -18,6 +18,7 @@ function ensureTasksUI() {
     <h2>Tasks <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— queue work for the hub to run itself</span></h2>
     <div class="note">Each task is a prompt the hub runs on your behalf with automatic model routing.
       Queue improvement items and let cheap runs work through them instead of driving every change by hand.</div>
+    <div class="flex" id="taskTeamRow" style="margin:-6px 0 14px"></div>
     <div style="margin-bottom:18px">
       <input class="search" id="taskTitle" placeholder="Short title (optional)" style="margin-bottom:8px">
       <textarea id="taskPrompt" placeholder="The prompt to run… (e.g. 'Add a dark/light theme toggle to the hub header')" style="min-height:70px"></textarea>
@@ -172,6 +173,13 @@ async function refreshTasks() {
   let list;
   try { list = await api('/api/tasks'); } catch { el.innerHTML = '<div class="muted">Task queue unavailable.</div>'; return; }
   if (!Array.isArray(list)) list = [];
+  // active-team indicator — which team the hub steers when it runs these tasks
+  try {
+    const td = await api('/api/teams');
+    const an = (td.teams.find(t => t.id === td.active) || {}).name;
+    const row = $('#taskTeamRow');
+    if (row && an) row.innerHTML = `<span class="pill neutral" title="the agent team the hub steers when running tasks">⛬ active team: ${esc(an)}</span>`;
+  } catch {}
   const queued = list.filter(t => !t.runId).length;
   const running = list.filter(t => t.runId && !['done', 'error', 'cancelled', 'gone'].includes(t.runStatus)).length;
   $('#taskCount').textContent = `${list.length} total · ${queued} queued · ${running} running`;
@@ -181,7 +189,7 @@ async function refreshTasks() {
     return `<div class="row">
       <div class="flex" style="justify-content:space-between">
         <span class="name">${esc(t.title || t.prompt.slice(0, 60))}</span>
-        <span><span class="pill ${s.cls}">${s.label}</span></span>
+        <span>${t.team ? `<span class="pill neutral" style="font-size:10px" title="team that ran this task">⛬ ${esc(t.team)}</span>` : ''}<span class="pill ${s.cls}">${s.label}</span></span>
       </div>
       <div class="pex">${esc(t.prompt.slice(0, 160))}</div>
       ${t.errorExcerpt ? `<div class="pex" style="color:#f0908f;white-space:normal">↳ ${esc(t.errorExcerpt)}</div>` : ''}

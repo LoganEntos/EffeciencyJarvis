@@ -7,7 +7,7 @@
   --bg:#0e0d0b; --panel:#151310; --panel2:#1c1915; --line:#2a251d; --line2:#403828;
   --txt:#ece7dc; --muted:#a89e8a; --dim:#6e6657;
   --accent:#e8a33d; --accent-dim:#e8a33d99; --accent-soft:#e8a33d1a;
-  --green:#4bc47a; --red:#e05252; --amber:#e0a63f;
+  --green:#4bc47a; --red:#e05252; --amber:#e0a63f; --bronze:#9a8a63;
   --glow:0 0 14px #e8a33d55;
   --font-body:'IBM Plex Sans',ui-sans-serif,sans-serif;
   --font-mono:'JetBrains Mono','Cascadia Code',Consolas,monospace;
@@ -18,7 +18,7 @@
   --bg:#f3efe6; --panel:#fbf8f1; --panel2:#efe9dc; --line:#ddd4c2; --line2:#c4b89e;
   --txt:#2a251c; --muted:#6e6350; --dim:#998c73;
   --accent:#b0731c; --accent-dim:#b0731c99; --accent-soft:#b0731c14;
-  --green:#1f8a4c; --red:#c23b3b; --amber:#a1691a;
+  --green:#1f8a4c; --red:#c23b3b; --amber:#a1691a; --bronze:#8a7038;
   --glow:0 0 14px #b0731c33;
   --shadow:0 4px 20px #a8916444; --grid:#b0731c0a;
 }
@@ -30,7 +30,7 @@
   --bg:#0c0b0a; --panel:#17140f; --panel2:#141210; --line:#ffffff12; --line2:#ffffff24;
   --txt:#f2ece0; --muted:#a79e8c; --dim:#6d6455;
   --accent:#e8a33d; --accent-dim:#e8a33d40; --accent-soft:#e8a33d1a;
-  --green:#4bc47a; --red:#e05252; --amber:#e0a63f;
+  --green:#4bc47a; --red:#e05252; --amber:#e0a63f; --bronze:#9a8a63;
   --glow:0 0 10px #e8a33d33;
   --font-body:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
   --font-serif:'Instrument Serif',ui-serif,Georgia,serif;

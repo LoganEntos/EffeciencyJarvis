@@ -55,6 +55,25 @@ const BUILTINS = [
       + 'the existing CSS-variable tokens + components, respect prefers-reduced-motion and never leave an rAF loop '
       + 'running unbounded, and never add npm/React/Tailwind.',
   },
+  {
+    id: 'github', name: 'GitHub intake', builtin: true,
+    description: 'Incorporate new GitHub repos/assets into the hub — evaluate, fetch (via the scraper/Scrapling MCP), vendor locally, wire in, review.',
+    agents: ['scraper', 'web-researcher', 'backend-builder', 'json-wrangler', 'librarian', 'code-reviewer'],
+    skills: [],
+    hint: 'This session incorporates NEW GitHub repositories / assets into the hub. Workflow: '
+      + '(1) web-researcher evaluates the repo — what it is, its LICENSE (accept only MIT / OFL / ISC / Apache-2.0 / '
+      + 'CC0; reject anything more restrictive), maintenance, and whether it ships a ready artifact (sprite, single '
+      + 'CSS/JS file, JSON). (2) scraper (the Scrapling MCP — the ONLY MCP wired in .mcp.json; prefer '
+      + 'mcp__scrapling__fetch/get, escalate to stealthy_fetch only if blocked) or a one-time curl/WebFetch pulls '
+      + 'the raw files from the repo / a CDN (jsDelivr, unpkg, raw.githubusercontent). NEVER add a runtime CDN '
+      + 'dependency — download ONCE into the repo. (3) backend-builder vendors the files LOCALLY under '
+      + 'claude-dashboard/vendor/ (icons/, css/, fonts/) and json-wrangler updates vendor/manifest.json with an '
+      + 'entry {file,type,name,license,source,bytes} + any sibling <base>-index.json, so the Assets tab and every '
+      + 'run auto-see it. (4) librarian keeps the vendored tree + manifest tidy; code-reviewer checks the diff. '
+      + 'Hard rules: ZERO npm dependencies in the app, local files only (no CDNs at runtime), keep the license + '
+      + 'attribution in the manifest, keep every file under 500 lines, and extend scripts/verify-dashboard.ps1 with '
+      + 'a GET check for each new vendored file. Record the source URL + license for everything you bring in.',
+  },
 ];
 
 const okId = id => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id);

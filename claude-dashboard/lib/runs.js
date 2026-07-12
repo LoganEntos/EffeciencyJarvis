@@ -146,8 +146,9 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   if (recall) { try { recalled = memory.recall(prompt); } catch {} }
   // Active agent-team steering (empty for the default "Lean" team, so normal
   // runs stay token-neutral). Injected between the user's prompt and the hub note.
-  let team = null;
+  let team = null, teamName = null;
   try { team = teams.activeHint(); } catch {}
+  try { teamName = teams.activeTeam().name; } catch {} // recorded on every run (incl. Lean) so history/sessions/tasks show it
   const fullPrompt = (recalled ? recalled.block + '\n\n' : '') + prompt + (team ? team.text : '') + hint;
   let args = null, hermesCfg = null;
   const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'acceptEdits';
@@ -169,7 +170,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
     exitCode: null, sessionId: null, model: model || '', permissionMode: perm,
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
     costUsd: null, durationMs: null, tokensIn: null, tokensOut: null,
-    routedReason, recallCount: recalled ? recalled.count : 0,
+    team: teamName, routedReason, recallCount: recalled ? recalled.count : 0,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);

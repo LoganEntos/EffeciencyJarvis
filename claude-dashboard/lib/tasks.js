@@ -33,6 +33,7 @@ function enrich(list) {
       model: m ? m.model : t.model,
       costUsd: m ? m.costUsd : null,
       artifactCount: m ? m.artifactCount : 0,
+      team: m ? m.team : null,
       errorExcerpt: m ? m.errorExcerpt : null,
     });
   });
