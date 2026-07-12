@@ -163,11 +163,10 @@
     if (V.call) return 'In a call — click or press Esc to hang up';
     return 'Voice — tap to talk once · Shift+click or long-press for a hands-free call (V)';
   }
-  function setState(s) { V.state = s; const b = $('#voiceOrb'); if (b) b.title = orbTitle(); }
+  function setState(s) { V.state = s; const b = $('#voiceOrb'); if (b) b.title = orbTitle(); kickVoice(); }
 
   function loop() {
-    V.raf = requestAnimationFrame(loop);
-    const ctx = V.ctx; if (!ctx) return;
+    const ctx = V.ctx; if (!ctx) { V.raf = null; return; }
     const t = (performance.now() - V.t0) / 1000;
     const amber = css('--accent', '#e8a33d'), listen = css('--amber', '#e0a63f');
     const muted = css('--muted', '#a89e8a');
@@ -179,7 +178,7 @@
     if (V.state === 'listening') { color = listen; pulse = 2.1 * (0.5 + 0.5 * Math.sin(t * 7)); base = 5.6; }
     else if (V.state === 'thinking') { color = amber; pulse = 1.9 * (0.5 + 0.5 * Math.sin(t * 4)); }
     else if (V.state === 'speaking') { color = amber; pulse = 2.8 * Math.abs(Math.sin(t * 11)); }
-    else { color = SR ? amber : muted; pulse = 0.7 * (0.5 + 0.5 * Math.sin(t * 1.6)); } // idle breath
+    else { color = SR ? amber : muted; pulse = 0; } // idle is static — no perpetual 60fps breath loop
     // outer ring
     ctx.beginPath(); ctx.arc(cx, cy, base + pulse + 2.8, 0, 6.2832);
     ctx.strokeStyle = color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.1; ctx.stroke();
@@ -199,7 +198,11 @@
       ctx.lineWidth = 1.3; ctx.setLineDash([3, 3]); ctx.stroke();
       ctx.setLineDash([]); ctx.globalAlpha = 1;
     }
+    // animate only during active voice (listening/thinking/speaking/call); the
+    // idle orb is drawn once and the loop stops — no perpetual 60fps repaint.
+    V.raf = (V.call || V.state !== 'idle') ? requestAnimationFrame(loop) : null;
   }
+  function kickVoice() { if (V.raf == null && V.ctx) V.raf = requestAnimationFrame(loop); }
 
   // ---- speech-to-text ------------------------------------------------------
   function startListen() {
@@ -289,7 +292,7 @@
     if (V.call) return;
     const blocked = micBlockReason();
     if (blocked) { say(blocked, 'errmsg'); return; }
-    V.call = true; V.silence = 0;
+    V.call = true; V.silence = 0; kickVoice();
     earOpen();
     startListen();
   }

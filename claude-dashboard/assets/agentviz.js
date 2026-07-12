@@ -68,6 +68,7 @@ async function fetchAgentGraph() {
   if (st) st.innerHTML = `<span class="pill ${g.run.status === 'done' ? 'ok' : running ? 'warn' : 'err'}">${esc(g.run.status)}</span>`
     + (g.run.costUsd != null ? `<span class="pill neutral">$${g.run.costUsd.toFixed(3)}</span>` : '');
   renderAgentDetail(aviz.sel);
+  if (aviz.kick) aviz.kick(); // redraw / resume the loop for the fresh graph
 }
 
 // radial layout: root center, everyone else on an ellipse, stable order
@@ -109,14 +110,17 @@ function drawLoop() {
 
   canvas.onmousemove = e => {
     const r = canvas.getBoundingClientRect();
+    const prev = aviz.hover;
     aviz.hover = hitNode(e.clientX - r.left, e.clientY - r.top, W, H);
     canvas.style.cursor = aviz.hover ? 'pointer' : 'default';
+    if (aviz.hover !== prev && aviz.kick) aviz.kick(); // redraw the hover highlight
   };
   canvas.onclick = () => {
     if (!aviz.hover) return;
     if (aviz.hover.kind === 'root' || aviz.hover.kind === 'artifacts') { goTab('run'); ensureRunUI(); openRun(aviz.runId); return; }
     aviz.sel = aviz.hover.id;
     renderAgentDetail(aviz.sel);
+    if (aviz.kick) aviz.kick(); // redraw the selection highlight
   };
   function hitNode(x, y, W, H) {
     if (!aviz.graph) return null;
@@ -129,10 +133,10 @@ function drawLoop() {
 
   function frame(t) {
     if (!document.body.contains(canvas)) return stopAgentViz();
-    if ($('#graph').classList.contains('hidden')) { aviz.raf = requestAnimationFrame(frame); return; }
+    if ($('#graph').classList.contains('hidden')) { aviz.raf = null; return; } // paused while hidden — kick() restarts
     ctx.clearRect(0, 0, W, H);
     const g = aviz.graph;
-    if (!g) { aviz.raf = requestAnimationFrame(frame); return; }
+    if (!g) { aviz.raf = null; return; }
     const pos = layoutNodes(W, H);
     const pulse = 0.5 + 0.5 * Math.sin(t / 320);
     // links (animated dashes toward active workers)
@@ -185,9 +189,14 @@ function drawLoop() {
       }
     }
     ctx.globalAlpha = 1;
-    aviz.raf = requestAnimationFrame(frame);
+    // Keep animating only while something is live/active (the pulse + link
+    // dashes need motion); once settled this drew one static frame — stop the
+    // loop instead of repainting the crew at 60fps forever. kick() resumes it.
+    const animating = g.run.status === 'running' || g.run.status === 'queued' || g.nodes.some(n => n.active);
+    aviz.raf = animating ? requestAnimationFrame(frame) : null;
   }
-  aviz.raf = requestAnimationFrame(frame);
+  aviz.kick = () => { if (aviz.raf == null && document.body.contains(canvas)) aviz.raf = requestAnimationFrame(frame); };
+  aviz.kick();
 }
 
 function renderAgentDetail(id) {
