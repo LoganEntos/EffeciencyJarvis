@@ -11,7 +11,18 @@ const U = require('./util');
 
 const DATA_DIR = path.join(path.resolve(__dirname, '..'), 'data');
 const FILE = path.join(DATA_DIR, 'settings.json');
-const DEFAULTS = { hermesEnabled: false };
+// `plan` mirrors the Claude subscription usage the app can't fetch live (no
+// public API — see the earlier decision) — the user keeps these numbers current
+// by hand in Config, and Overview renders them. Defaults from the 2026-07 snapshot.
+const DEFAULTS = {
+  hermesEnabled: false,
+  plan: {
+    label: 'Max (5×)',
+    sessionPct: 18, sessionResets: '3h 13m',
+    weeklyAll: 58, weeklyFable: 86, weeklyResets: 'Tue 1:59 AM',
+    creditsSpent: 94.88, creditsPct: 95, creditsResets: 'Aug 1',
+  },
+};
 
 function load() { return Object.assign({}, DEFAULTS, U.safeJson(FILE) || {}); }
 
@@ -29,6 +40,7 @@ async function handle(req, res, url) {
     try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
     const patch = {};
     if (typeof b.hermesEnabled === 'boolean') patch.hermesEnabled = b.hermesEnabled;
+    if (b.plan && typeof b.plan === 'object') patch.plan = Object.assign({}, load().plan, b.plan);
     U.sendJson(res, save(patch));
     return true;
   }

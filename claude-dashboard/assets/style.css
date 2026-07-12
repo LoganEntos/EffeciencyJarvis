@@ -375,3 +375,19 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
   .runrow .pex{font-size:13px}
   button,select{min-height:36px}
 }
+
+/* ── Overview: usage hero + plan-usage bars + stat cards (amber-agent-orb) ── */
+.ovhero{padding:4px 0 12px}
+.ovhero .l{margin-bottom:2px}
+.ovheronum{font-family:var(--font-serif,'Instrument Serif',ui-serif,Georgia,serif);
+  font-size:clamp(52px,9vw,96px);line-height:1.02;color:var(--accent);letter-spacing:-0.02em;font-weight:400}
+.planbar{height:6px;border-radius:99px;background:#ffffff14;overflow:hidden}
+:root[data-theme="light"] .planbar{background:#00000012}
+.planbar-fill{height:100%;border-radius:99px;background:var(--accent);transition:width .5s ease}
+.planbar-fill.warn{background:var(--amber)}
+.planbar-fill.danger{background:var(--red)}
+.ovstats{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
+.card.ovstat{padding:12px 14px}
+.ovstatnum{font-family:var(--font-mono);font-size:22px;font-weight:500;color:var(--txt);margin-top:3px;letter-spacing:-0.01em}
+.ovstatnum.accent{color:var(--accent)}
+.ovstatnum.warn{color:var(--amber)}

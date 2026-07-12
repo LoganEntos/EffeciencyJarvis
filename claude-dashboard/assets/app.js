@@ -186,11 +186,13 @@ function usageGaugeCard(label, u) {
 }
 
 renderers.overview = async function () {
-  const [d, runs, files, usageData] = await Promise.all([
+  const [d, runs, files, usageData, cfg, routing] = await Promise.all([
     api('/api/overview'),
     api('/api/runs').catch(() => []),
     api('/api/files').catch(() => []),
     api('/api/usage').catch(() => null),
+    api('/api/settings').catch(() => ({})),
+    api('/api/routing').catch(() => null),
   ]);
   $('#projBadge').textContent = d.project;
   $('#nodeBadge').textContent = 'Node ' + d.nodeVersion;
@@ -214,24 +216,48 @@ renderers.overview = async function () {
   const costBreakdown = Object.entries(modelCosts).map(([m, c]) =>
     `<span class="pill neutral" style="font-size:11px">${esc(m)}: $${c.toFixed(3)}</span>`).join('');
 
-  const usageHero = usageData ? `
-    <h2>Usage remaining</h2>
-    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-bottom:18px">
-      ${usageGaugeCard('Today', usageData.today)}
-      ${usageGaugeCard('This week', usageData.week)}
+  // Hero (usage remaining) — giant Instrument-Serif number, amber-agent-orb style
+  const u = usageData && usageData.today;
+  const budgetSet = u && u.budget != null;
+  const heroNum = budgetSet ? '$' + Math.max(0, u.remaining).toFixed(2) : '$' + spend.toFixed(2);
+  const heroLabel = budgetSet ? 'Usage remaining' : 'Spent today';
+  const heroSub = budgetSet
+    ? `of $${u.budget.toFixed(2)} daily budget · burn $${u.burnPerHour.toFixed(2)}/hr${u.projection ? ' · ' + esc(u.projection) : ''}`
+    : 'no daily budget set — set one in Config to track remaining';
+  // Plan usage bars (numbers the user keeps current in Config — no live API)
+  const plan = cfg.plan || {};
+  const planBar = (text, pct, cls) => `<div style="margin:0 0 11px">
+    <div class="mono" style="font-size:11.5px;color:var(--muted);margin-bottom:5px">${esc(text)}</div>
+    <div class="planbar"><div class="planbar-fill ${cls}" style="width:${Math.min(100, Math.max(0, pct || 0))}%"></div></div></div>`;
+  const planCard = plan.sessionPct != null ? `<div class="card" style="margin:16px 0 20px">
+    <div class="flex" style="justify-content:space-between;margin-bottom:12px">
+      <div class="l">Plan usage — ${esc(plan.label || '')}</div>
+      <span class="muted" style="font-size:10.5px">edit in Config ⚙</span></div>
+    ${planBar(`Current session — ${plan.sessionPct}% used · resets in ${esc(plan.sessionResets || '')}`, plan.sessionPct, '')}
+    ${planBar(`Weekly · All models — ${plan.weeklyAll}% used · resets ${esc(plan.weeklyResets || '')}`, plan.weeklyAll, '')}
+    ${planBar(`Weekly · Fable — ${plan.weeklyFable}% used · resets ${esc(plan.weeklyResets || '')}`, plan.weeklyFable, plan.weeklyFable >= 80 ? 'warn' : '')}
+    ${planBar(`Usage credits — $${plan.creditsSpent} spent · ${plan.creditsPct}% used · resets ${esc(plan.creditsResets || '')}`, plan.creditsPct, plan.creditsPct >= 90 ? 'danger' : 'warn')}
+  </div>` : '';
+  const usageHero = `
+    <div class="ovhero">
+      <div class="l">${heroLabel}</div>
+      <div class="ovheronum">${heroNum}</div>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">${heroSub}</div>
     </div>
-    ${!usageData.configured ? '<div class="note" style="margin-bottom:22px">No usage limits set yet — proxy is $ spend against a budget you choose (real plan-quota telemetry is a separate wiring task). Set a daily/weekly limit in <span class="mono">Config</span>.</div>' : ''}
-  ` : '';
+    ${planCard}`;
+  const active = runs.filter(m => m.status === 'running' || m.status === 'queued').length;
+  const routePct = routing && routing.total ? Math.round(100 * routing.ok / routing.total) + '% ok' : '—';
+  const stat = (label, val, cls) => `<div class="card ovstat"><div class="l">${label}</div><div class="ovstatnum ${cls || ''}">${val}</div></div>`;
 
   $('#overview').innerHTML = `
     <h2>Overview</h2>
     ${usageHero}
-    <h2 style="margin-top:8px">Other signals</h2>
-    <div class="cards">
-      <div class="card"><div class="n" style="color:var(--accent)">${tRuns.length}</div><div class="l">Runs today</div></div>
-      <div class="card"><div class="n">${okRate === null ? '—' : okRate + '%'}</div><div class="l">Success rate</div></div>
-      <div class="card" ${errors.length ? 'style="border-color:#e0525255"' : ''}><div class="n" ${errors.length ? 'style="color:#e05252;text-shadow:none"' : ''}>${errors.length}</div><div class="l">Failed runs</div></div>
-      <div class="card"><div class="n">${files.length || 0}</div><div class="l">Inbox files</div></div>
+    <div class="cards ovstats">
+      ${stat('Today', '$' + spend.toFixed(2), 'accent')}
+      ${stat('Runs', tRuns.length)}
+      ${stat('Success', okRate === null ? '—' : okRate + '%')}
+      ${stat('Active', active, active ? 'accent' : '')}
+      ${stat('Routing', routePct, routing && routing.suspects && routing.suspects.length ? 'warn' : '')}
     </div>
     ${costBreakdown ? `<div style="padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:22px">
       <div style="color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Cost breakdown today (by model)</div>
