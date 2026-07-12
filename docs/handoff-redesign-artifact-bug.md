@@ -1,9 +1,28 @@
-# HANDOFF — "redesign produces HTML mockups instead of changing the real UI"
+# HANDOFF — make the UI redesign actually happen (root cause FIXED; now execute)
 
-**Start a fresh thread with this.** Symptom the user reported: Hermes runs asked
-to revamp the hub UI keep producing **standalone HTML preview documents** (e.g.
-`overview-r0-preview.html` in a run's `artifacts/`) instead of editing the live
-dashboard. The real UI does not change.
+**Start a fresh thread with this.** Original symptom: Hermes runs asked to revamp
+the hub UI kept producing **standalone HTML preview documents** (e.g.
+`overview-r0-preview.html`) instead of editing the live dashboard.
+
+## ✅ Already done this session (2026-07-12) — do NOT redo
+- **Root cause fixed** (commit `c33db03`): the per-prompt hub note in
+  `lib/runs.js` now explicitly says *editing the dashboard's own UI = edit the
+  real files in place, no preview/mockup artifacts*; the artifacts dir is only
+  for separate report/chart deliverables. Server restarted, smoke 45/45 green.
+- **Cleaned up:** the 2 zombie runs and the orphaned mockup run were deleted;
+  no runs active. Working tree clean.
+- **Real R0 already shipped** (commit `0b0f687`): the Overview usage-remaining
+  hero + `lib/usage.js` + `/api/usage` are REAL, live, committed. The redesign
+  builds ON this — it is not starting from zero.
+
+## YOUR JOB: execute the redesign against the REAL files (Hermes/Fable)
+The plumbing is fixed; now drive the actual per-tab redesign. Use the prompt in
+"The fix" §2 below. Kick off the build engine and, because Hermes is currently
+invisible mid-run (see §3), **verify each tab yourself in the browser** and
+commit per working tab.
+
+---
+### Reference: original diagnosis (kept for context)
 
 ## Confirmed root cause
 `claude-dashboard/lib/runs.js` (~line 124) appends a `hint` to **every** run
