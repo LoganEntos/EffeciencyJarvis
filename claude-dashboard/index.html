@@ -23,6 +23,7 @@
   <button id="navToggle" title="Toggle navigation menu" aria-label="Toggle navigation menu">☰</button>
   <h1><span class="logo"></span>Claude Code Hub</h1>
   <span class="badge" id="statusBadge"><span class="dot ok"></span>server live</span>
+  <span class="badge" id="liveBadge" title="Watch Claude Code run live"><span class="dot"></span>idle</span>
   <span class="badge mono" id="spendBadge" title="spend today — stays visible on mobile so autopilot spend is never out of sight">$0.00 today</span>
   <span class="badge" id="nodeBadge"></span>
   <span class="badge mono" id="projBadge" title="project directory">loading…</span>
@@ -35,17 +36,18 @@
   <nav id="mainNav">
     <div class="navlabel">Work</div>
     <a data-tab="run" class="active"><span class="ico">▷</span><span class="txt">Run</span><kbd>1</kbd></a>
-    <a data-tab="tasks"><span class="ico">☰</span><span class="txt">Tasks</span><kbd>2</kbd></a>
-    <a data-tab="files"><span class="ico">⇪</span><span class="txt">Files</span><kbd>3</kbd></a>
-    <a data-tab="sessions"><span class="ico">≣</span><span class="txt">Sessions</span><kbd>4</kbd></a>
+    <a data-tab="live"><span class="ico">◉</span><span class="txt">Live</span><kbd>2</kbd></a>
+    <a data-tab="tasks"><span class="ico">☰</span><span class="txt">Tasks</span><kbd>3</kbd></a>
+    <a data-tab="files"><span class="ico">⇪</span><span class="txt">Files</span><kbd>4</kbd></a>
+    <a data-tab="sessions"><span class="ico">≣</span><span class="txt">Sessions</span><kbd>5</kbd></a>
     <div class="navlabel" style="margin-top:14px">Monitor</div>
-    <a data-tab="memory"><span class="ico">◇</span><span class="txt">Memory</span><kbd>5</kbd></a>
-    <a data-tab="overview"><span class="ico">◈</span><span class="txt">Overview</span><kbd>6</kbd></a>
-    <a data-tab="graph"><span class="ico">⬡</span><span class="txt">Graph</span><kbd>7</kbd></a>
+    <a data-tab="memory"><span class="ico">◇</span><span class="txt">Memory</span><kbd>6</kbd></a>
+    <a data-tab="overview"><span class="ico">◈</span><span class="txt">Overview</span><kbd>7</kbd></a>
+    <a data-tab="graph"><span class="ico">⬡</span><span class="txt">Graph</span><kbd>8</kbd></a>
     <div class="navlabel" style="margin-top:14px">Library</div>
-    <a data-tab="agents"><span class="ico">⛬</span><span class="txt">Agents</span><kbd>8</kbd></a>
-    <a data-tab="skills"><span class="ico">✦</span><span class="txt">Skills</span><kbd>9</kbd></a>
-    <a data-tab="commands"><span class="ico">❯_</span><span class="txt">Commands</span><kbd>0</kbd></a>
+    <a data-tab="agents"><span class="ico">⛬</span><span class="txt">Agents</span><kbd>9</kbd></a>
+    <a data-tab="skills"><span class="ico">✦</span><span class="txt">Skills</span><kbd>0</kbd></a>
+    <a data-tab="commands"><span class="ico">❯_</span><span class="txt">Commands</span></a>
     <a data-tab="assets"><span class="ico">◧</span><span class="txt">Assets</span></a>
     <a data-tab="tools"><span class="ico">⚒</span><span class="txt">Tools</span></a>
     <a data-tab="config"><span class="ico">⚙</span><span class="txt">Config</span></a>
@@ -53,6 +55,7 @@
   <div class="navOverlay" id="navOverlay"></div>
   <main>
     <section id="run"></section>
+    <section id="live" class="hidden"></section>
     <section id="tasks" class="hidden"></section>
     <section id="files" class="hidden"></section>
     <section id="sessions" class="hidden"></section>
@@ -74,6 +77,7 @@
 <script src="assets/graph.js"></script>
 <script src="assets/run.js"></script>
 <script src="assets/runhistory.js"></script>
+<script src="assets/live.js"></script>
 <script src="assets/tasks.js"></script>
 <script src="assets/memory.js"></script>
 <script src="assets/files.js"></script>

@@ -203,6 +203,14 @@ button.danger:hover{background:#e0525233;box-shadow:none}
 .pill.live{background:#4bc47a14;color:var(--green);border:1px solid #4bc47a40;animation:livepulse 1.8s ease-in-out infinite}
 @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.55}}
 @media (prefers-reduced-motion:reduce){.pill.live{animation:none}}
+/* Live tab: a tall, scroll-following transcript feed (mobile-first) */
+.livefeed{height:calc(100dvh - 250px);min-height:340px;margin-top:4px}
+/* header ● Live badge: green + pulsing dot when a Claude Code session is active */
+#liveBadge{cursor:pointer}
+#liveBadge .dot{background:var(--dim)}
+#liveBadge.liveon{color:var(--green);border-color:#4bc47a40}
+#liveBadge.liveon .dot{background:var(--green);animation:livepulse 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){#liveBadge.liveon .dot{animation:none}}
 :root[data-theme="light"] .pill.warn{color:#8a6414}
 :root[data-theme="light"] .pill.err{color:#a83232}
 .muted{color:var(--muted)} .mono{font-family:var(--font-mono)}
@@ -375,6 +383,12 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
   header #statusBadge .dot{margin-right:0}
   header #spendBadge{display:inline-block;max-width:120px;padding:4px 10px;font-size:10.5px;font-weight:600;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* keep the ● Live badge visible on mobile (compact dot-only) — it's the
+     always-on "is Claude Code running right now" glance + tap-to-Live entry */
+  header #liveBadge{display:inline-flex;align-items:center;font-size:0;padding:6px;border-radius:50%;max-width:none}
+  header #liveBadge .dot{margin-right:0}
+  /* the live feed fills the screen above the bottom nav bar on phones */
+  .livefeed{height:calc(100dvh - 210px)}
   header .iconbtn{width:36px;height:36px;font-size:16px}
   .msg,.toolblk{max-width:96%}
   .cards{grid-template-columns:repeat(2,1fr);gap:10px}
