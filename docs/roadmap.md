@@ -46,7 +46,26 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ---
 
-## 🚨 SERIOUS BLOCKER — Hermes runs are INVISIBLE while active (user-flagged 2026-07-11)
+## ✅ RESOLVED — Hermes/agent runs are now visible mid-run (fixed 2026-07-11, commit cebfe6a)
+
+**Fixed** via `lib/liveness.js` (wired into `runs.js`; UI in `run.js`/`style.css`),
+covering all three fix-path items below at once:
+1. **Orphan reaper** (boot + every 60s) — any run left `running`/`queued` on disk
+   but absent from the live map is a crash/restart orphan → rewritten to a
+   terminal `error` (`orphaned:true`). Zombies can no longer masquerade as active.
+2. **Heartbeat** — a 5s SSE `heartbeat` event (elapsed/idle/procAlive/stalled);
+   the Run tab shows `◉ running` / `⚠ stalled` (no output >120s) / `process gone`,
+   and `/api/runs` rows carry the same flags. Applies to BOTH stacks.
+3. **Hermes log tail** — for `-z` runs the hub follows `hermes logs agent -f` and
+   streams the filtered activity lines as `hermes_log` events, so the run's real
+   work (model calls, tool use) surfaces live despite `-z` printing only final text.
+
+Verified free (reaper on a synthetic zombie, heartbeat+annotate stalled detection,
+all client render paths, smoke 45/45). **Still to do:** one real paid hermes run to
+confirm `hermes logs agent -f` emits useful tool/step lines (log was plugin-noise at
+boot; live tool-level verbosity unconfirmed). This unblocks R0/R1.
+
+<details><summary>Original blocker writeup (kept for context)</summary>
 
 **The problem (elevated to a top priority by the user):** a running Hermes run
 shows **no live progress at all** — you cannot see what it is doing, whether
@@ -78,11 +97,13 @@ for the entire run.
    so zombies stop masquerading as active (this alone removes the worst
    confusion and should ship regardless).
 
+</details>
+
 ## 🗣️ USER REVIEW BACKLOG (2026-07-11 walkthrough) — highest priority
 
 Direction shift: **Hermes is now the default/always-on engine.** Everything
 below is framed by that — Hermes efficiency + observability is the theme.
-**Observability is gated by the SERIOUS BLOCKER above — fix it first.**
+**Observability blocker RESOLVED (see above) — R0/R1 are unblocked.**
 
 **R0. Hermes-first + efficiency metrics (PRIORITY 1).** Make hermes the default
 engine. Build REAL efficiency tracking on Overview — the current mockup metrics
