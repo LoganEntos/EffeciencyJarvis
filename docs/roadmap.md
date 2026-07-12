@@ -52,10 +52,25 @@ Direction shift: **Hermes is now the default/always-on engine.** Everything
 below is framed by that — Hermes efficiency + observability is the theme.
 
 **R0. Hermes-first + efficiency metrics (PRIORITY 1).** Make hermes the default
-engine in the Run composer. Build real efficiency tracking on Overview:
-per-engine tokens/cost/latency, hermes tiering breakdown (main vs aux vs
-subagents), cost-per-task trend, so we can actually tune hermes. Depends on R1
-(graph must show hermes crews truthfully) + R2 (clean the libraries).
+engine. Build REAL efficiency tracking on Overview — the current mockup metrics
+(Runs Today, Total Tokens, Median Latency) are vanity counts, useless for
+tuning. What actually matters (user, 2026-07-11), in priority order:
+  1. **Usage remaining — today & this week (THE hero metric).** On a
+     subscription with daily/weekly caps, remaining allowance is the #1
+     scheduling/delegation signal: run now vs defer vs delegate to a cheaper
+     tier. Show as prominent gauges + burn rate / projection ("at this rate the
+     weekly cap hits Thursday"). Wiring real quota is a separate step (Claude
+     Code usage file/`/status`; hermes usage via Nous Portal).
+  2. Where tokens & $ go — split by tier (main vs aux vs subagent) and per task.
+  3. Bottlenecks — time per step, which agent/tool is the slow path.
+  4. Wasted work — redundant/failed tool calls, retries, re-reads, cache misses.
+  5. Outcome per dollar — first-try success vs rework, at what cost.
+**Design direction (user, 2026-07-11): CLEAN & MINIMAL, not corny.** Strip the
+editorial magazine headlines and the big Fraunces serif display; drop the
+over-"designed"/marketed feel. Restrained dark theme, few colors + one accent,
+generous whitespace, information-first but calm. Type: clean grotesque (Hanken
+Grotesk / Archivo) + JetBrains Mono for data — no serif display. Depends on R1
+(truthful hermes graph) + R2 (clean libraries).
 
 **R1. Live run debrief + truthful agent graph.** Clicking a running task/prompt
 must show a live DEBRIEF (what it's doing, step by step), not just "running".
