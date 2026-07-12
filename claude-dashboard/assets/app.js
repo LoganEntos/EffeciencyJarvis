@@ -313,6 +313,7 @@ renderers.config = async function () {
     <h2>Config</h2>
     <div id="usagePanel"></div>
     <div id="enginePanel"></div>
+    <div id="planPanel"></div>
     <div id="autopilotPanel"></div>
     <h2 style="font-size:12px;margin-top:22px">.claude/settings.json (hooks &amp; more)</h2>
     <pre>${esc(JSON.stringify(d.settings, null, 2))}</pre>
@@ -322,7 +323,37 @@ renderers.config = async function () {
   renderAutopilot();
   renderUsageConfig();
   renderEngineConfig();
+  renderPlanConfig();
 };
+
+// Plan-usage numbers shown on Overview. Claude exposes no usage API, so the user
+// keeps these current by hand here; they persist to settings.plan.
+async function renderPlanConfig() {
+  const el = $('#planPanel');
+  if (!el) return;
+  let p = {};
+  try { p = (await api('/api/settings')).plan || {}; } catch {}
+  const f = (id, label, val, w) => `<label style="font-size:11px;color:var(--muted)">${label}<br>
+    <input class="search" id="${id}" value="${esc(String(val == null ? '' : val))}" style="margin:2px 0 0;width:${w || 110}px"></label>`;
+  el.innerHTML = `<div class="row" style="margin-bottom:22px">
+    <div class="l" style="margin-bottom:4px">Plan usage <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">— shown on Overview (Claude has no usage API, so keep these current by hand)</span></div>
+    <div class="flex" style="gap:12px;flex-wrap:wrap;align-items:flex-end">
+      ${f('plLabel', 'plan label', p.label, 90)}
+      ${f('plSess', 'session %', p.sessionPct, 70)}${f('plSessR', 'session resets', p.sessionResets, 120)}
+      ${f('plWa', 'weekly all %', p.weeklyAll, 70)}${f('plWf', 'weekly Fable %', p.weeklyFable, 70)}${f('plWr', 'weekly resets', p.weeklyResets, 120)}
+      ${f('plCs', 'credits $', p.creditsSpent, 80)}${f('plCp', 'credits %', p.creditsPct, 70)}${f('plCr', 'credits resets', p.creditsResets, 110)}
+      <button id="plSave">Save</button> <span id="plMsg" class="muted" style="font-size:11px"></span></div></div>`;
+  $('#plSave').onclick = async () => {
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? undefined : n; };
+    const plan = { label: $('#plLabel').value.trim(),
+      sessionPct: num($('#plSess').value), sessionResets: $('#plSessR').value.trim(),
+      weeklyAll: num($('#plWa').value), weeklyFable: num($('#plWf').value), weeklyResets: $('#plWr').value.trim(),
+      creditsSpent: num($('#plCs').value), creditsPct: num($('#plCp').value), creditsResets: $('#plCr').value.trim() };
+    try { await api('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }) });
+      $('#plMsg').textContent = '✓ saved — reflected on Overview'; $('#plMsg').style.color = 'var(--green)'; }
+    catch (e) { $('#plMsg').textContent = '✗ ' + (e.message || 'failed'); $('#plMsg').style.color = 'var(--red)'; }
+  };
+}
 
 // Tools tab: MCP connectors + site editor + git (server: lib/admin.js).
 renderers.tools = function () {
