@@ -519,7 +519,7 @@ function boot() {
   // Theme toggle (◐): warm terminal-amber (default) ↔ clean-dark "sleek" (the
   // amber-agent-orb design target). Both variable sets live in style.css; the
   // light theme is still defined there but no longer on the toggle path.
-  try { if (localStorage.getItem('hub.theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch {}
+  try { if (localStorage.getItem('hub.theme') !== 'warm') document.documentElement.setAttribute('data-theme', 'dark'); } catch {}
   const tt = $('#themeTab');
   if (tt) tt.onclick = () => {
     const sleek = document.documentElement.getAttribute('data-theme') !== 'dark';

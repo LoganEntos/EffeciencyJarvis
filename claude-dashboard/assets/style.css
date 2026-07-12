@@ -22,29 +22,32 @@
   --glow:0 0 14px #b0731c33;
   --shadow:0 4px 20px #a8916444; --grid:#b0731c0a;
 }
-/* Clean-dark ("sleek") theme — the amber-agent-orb / Lovable design target:
-   cool near-black, flat (no warm amber grid/glow), muted-gold accent, Hanken
-   Grotesk body. Tokens sampled from the reference. Toggled by the ◐ button. */
+/* Clean-dark theme — EXACT tokens ported from the amber-agent-orb Lovable
+   reference (https://amber-agent-orb.lovable.app): warm near-black, one amber
+   accent, Bricolage Grotesque display + JetBrains Mono data + Instrument Serif
+   for hero numbers. This is the hub's DEFAULT look; ◐ toggles to warm. */
 :root[data-theme="dark"]{
-  --bg:#0b0b0c; --panel:#17171a; --panel2:#111113; --line:#1f1f22; --line2:#2a2a2e;
-  --txt:#ececec; --muted:#7a7a7d; --dim:#55555a;
-  --accent:#d4a24c; --accent-dim:#d4a24c99; --accent-soft:#d4a24c14;
-  --green:#4bc47a; --red:#e05252; --amber:#d4a24c;
-  --glow:0 0 10px #d4a24c33;
-  --font-body:'Hanken Grotesk',ui-sans-serif,system-ui,sans-serif;
+  --bg:#0c0b0a; --panel:#17140f; --panel2:#141210; --line:#ffffff12; --line2:#ffffff24;
+  --txt:#f2ece0; --muted:#a79e8c; --dim:#6d6455;
+  --accent:#e8a33d; --accent-dim:#e8a33d40; --accent-soft:#e8a33d1a;
+  --green:#4bc47a; --red:#e05252; --amber:#e0a63f;
+  --glow:0 0 10px #e8a33d33;
+  --font-body:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
+  --font-serif:'Instrument Serif',ui-serif,Georgia,serif;
   --shadow:0 6px 28px #00000088; --grid:transparent;
 }
-/* flat, calm background — no amber grid or warm radial glows */
+/* warm near-black with layered depth + a faint dot-grid (per the reference) */
 :root[data-theme="dark"] body{
   background:
-    radial-gradient(1200px 600px at 50% -20%, #16161a 0%, transparent 60%),
+    radial-gradient(1100px 560px at 50% -20%, #1a1610 0%, transparent 60%),
+    radial-gradient(900px 480px at 90% 110%, #2a1e0e33 0%, transparent 55%),
     var(--bg);
 }
-:root[data-theme="dark"] header{background:#0b0b0ccc}
-/* clean-minimal headings in the grotesque, not mono — matches the reference */
-:root[data-theme="dark"] h1,
+:root[data-theme="dark"] header{background:#0c0b0acc}
+/* Bricolage-Grotesque headings with the reference's weights/tracking */
+:root[data-theme="dark"] h1{font-family:var(--font-body);font-weight:800;letter-spacing:-0.02em}
 :root[data-theme="dark"] h2,
-:root[data-theme="dark"] h3{font-family:var(--font-body);font-weight:600;letter-spacing:-0.01em}
+:root[data-theme="dark"] h3{font-family:var(--font-body);font-weight:600;letter-spacing:-0.006em}
 *{box-sizing:border-box}
 ::selection{background:var(--accent-dim);color:#0e0d0b}
 html{scrollbar-color:var(--line2) transparent}
