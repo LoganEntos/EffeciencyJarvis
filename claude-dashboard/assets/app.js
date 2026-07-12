@@ -287,15 +287,20 @@ renderers.config = async function () {
     <div id="usagePanel"></div>
     <div id="enginePanel"></div>
     <div id="autopilotPanel"></div>
-    <div id="toolsPanel"></div>
     <h2 style="font-size:12px;margin-top:22px">.claude/settings.json (hooks &amp; more)</h2>
     <pre>${esc(JSON.stringify(d.settings, null, 2))}</pre>
+    <div class="muted" style="font-size:11px;margin-top:8px">MCP connectors, the site editor, and git live in the <b>Tools</b> tab.</div>
     <div id="voiceSettings"></div>`;
   if (window.HubVoice) HubVoice.renderSettings($('#voiceSettings'));
-  if (window.HubAdmin) HubAdmin.renderConfigPanels($('#toolsPanel'));
   renderAutopilot();
   renderUsageConfig();
   renderEngineConfig();
+};
+
+// Tools tab: MCP connectors + site editor + git (server: lib/admin.js).
+renderers.tools = function () {
+  if (window.HubAdmin) HubAdmin.renderConfigPanels($('#tools'));
+  else $('#tools').innerHTML = '<div class="muted">Tools module not loaded.</div>';
 };
 
 // Engine pivot: Claude is the lean default. hermes is a deprecated paid second
