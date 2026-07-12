@@ -200,7 +200,9 @@ renderers.sessions = async function () {
 async function listView(sel, title, endpoint, type, extraHtml = '') {
   const data = await api(endpoint);
   const el = $(sel);
+  const LV_SUB = { skills: 'reusable capabilities — advertised to every run', commands: 'slash commands available to runs' };
   el.innerHTML = `<h2>${title} <span class="muted" style="font-weight:400">(${data.length})</span></h2>
+    ${LV_SUB[type] ? `<div class="muted" style="font-size:12px;margin:-4px 0 12px">${LV_SUB[type]}</div>` : ''}
     ${extraHtml}
     <input class="search" placeholder="Filter ${title.toLowerCase()}… (click a row to view its definition)">
     <div class="list"></div>`;
@@ -257,7 +259,7 @@ async function showSessionTail(id) {
   pre.scrollTop = pre.scrollHeight; // newest last — jump to bottom
 }
 
-const KIND_COLOR = { user: 'var(--green)', assistant: 'var(--accent)', tool: '#e6b45a' };
+const KIND_COLOR = { user: 'var(--green)', assistant: 'var(--accent)', tool: 'var(--amber)' };
 function fmtEvent(e) {
   const t = e.time ? new Date(e.time).toLocaleTimeString() : '——:——:——';
   return `<span class="muted">${esc(t)}</span> <span style="color:${KIND_COLOR[e.kind] || 'var(--muted)'};font-weight:600">${esc((e.kind + '     ').slice(0, 9))}</span> ${esc(e.text)}`;

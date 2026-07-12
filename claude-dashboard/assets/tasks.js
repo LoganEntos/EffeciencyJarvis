@@ -15,7 +15,7 @@ renderers.tasks.noSkeleton = true;
 function ensureTasksUI() {
   if ($('#taskList')) return;
   $('#tasks').innerHTML = `
-    <h2>Tasks — queue work for the hub to run itself</h2>
+    <h2>Tasks <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— queue work for the hub to run itself</span></h2>
     <div class="note">Each task is a prompt the hub runs on your behalf with automatic model routing.
       Queue improvement items and let cheap runs work through them instead of driving every change by hand.</div>
     <div style="margin-bottom:18px">
