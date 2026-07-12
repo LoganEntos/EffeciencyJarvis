@@ -279,18 +279,16 @@ frameworks in wholesale (the hermes lesson). Build only on the user's go-ahead.
   or port just the CDP-harness pattern into a hub skill — decide at build time.
   Needs a real Chrome with remote debugging; no cloud account required for local
   use.
-- **unclecode/crawl4ai** (2026-07-12, user-flagged). Tagline: *open-source
-  LLM-friendly web crawler & scraper* — async, returns clean LLM-ready markdown,
-  handles JS-heavy sites + extraction strategies. **Relevance:** a heavier
-  alternative/complement to `scrapling` for the new **GitHub-intake team**'s
-  fetch step (deep crawls, docs→markdown, structured extraction) where a plain
-  Scrapling fetch is too thin. **How to incorporate:** Python (violates the
-  app's zero-dep runtime) → run as a **sibling tool / MCP the hub drives** (like
-  Scrapling / Hermes Desktop / the CSM sidecar), NOT bundled into the app. **At
-  build:** confirm the license (Apache-2.0 as of writing — verify), decide
-  Scrapling-vs-crawl4ai overlap (don't add a second always-on scraper MCP just
-  to have it — MCPs tax every run), and whether the GitHub-intake team actually
-  needs it over Scrapling + one-time curl. Evaluate before installing.
+- **unclecode/crawl4ai** — ⛔ **EVALUATED → SKIP (2026-07-12).** License cleared
+  (Apache-2.0, confirmed via the GitHub API). But it overlaps Scrapling heavily
+  (both Playwright-based, both ship an MCP, both fetch/markdown/crawl), and the
+  GitHub-intake team's real need — pull *specific* files from a repo/CDN and
+  vendor them — is already met by Scrapling + one-time curl/WebFetch. crawl4ai's
+  edge (LLM-markdown, deep crawls, RAG extraction) isn't what intake needs, and a
+  second always-on scraper MCP taxes every run's context for zero new capability.
+  **Not installed.** Revisit only as an *on-demand CLI* (never an always-on MCP)
+  IF a deep-crawl / docs→markdown RAG-ingestion feature is greenlit. Full
+  rationale + capability table: `docs/crawl4ai-evaluation.md`.
 
 ### N11. Sources library — "what GitHubs power this hub" ✅ DONE 2026-07-12
 Shipped: **Sources** Library tab (`assets/sources.js`) → `/api/sources`
