@@ -167,9 +167,16 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
 ## ⚡ CURRENT STATE (2026-07-12, newest) — Sources library (N11) + crawl4ai intake SKIP
 > Newest section — supersedes everything below (kept as history). This session's
 > commits: N11 Sources tab (`1151de6`), license verification (`d6ff52c`),
-> crawl4ai eval → skip (`c77bf97`), pattern.css URL canonicalize (`36b0062`).
+> crawl4ai eval → skip (`c77bf97`), pattern.css URL canonicalize (`36b0062`),
+> HANDOFF (`58f3b2d`), intake additions + `declined` status (`135127c`).
 > **Both queued hub tasks are now DONE — the task queue (`data/tasks.json`) is
 > empty.** Smoke green (added a `/api/sources` check).
+>
+> **⚠ This repo has NO git remote and never has** (`git remote -v` empty; a prior
+> thread confirmed "this repo has no GitHub remote"). The GitHub URLs the user
+> provides in threads are repos to *incorporate*, NOT a push target — don't
+> conflate them. To push, a remote URL must be supplied (gh CLI isn't installed).
+> 7 commits sit local, ready to push once a remote exists.
 
 1. **N11 Sources library SHIPPED.** New **Sources** Library tab
    (`assets/sources.js`) → `/api/sources` (`lib/sources.js`, zero-dep, GET-only).
@@ -203,6 +210,14 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
    only as an *on-demand CLI* (never an always-on MCP) IF a deep-crawl /
    docs→markdown RAG-ingestion feature is greenlit. Roadmap "GitHubs to
    incorporate" updated with the decision.
+4. **Memory/thread sweep → 3 repos added to the Sources intake list.** Swept
+   past session transcripts + memory for every GitHub referenced; the only
+   *untracked* one was **open-jarvis/OpenJarvis** (user "add this in", Apache-2.0)
+   — now in the roadmap + Sources. Also surfaced `zcaceres/markdownify-mcp`
+   (MIT, roadmap Q2) and `eyaltoledano/claude-task-master` (**MIT + Commons
+   Clause**, source-available — restricts selling; roadmap Q3 declined-as-MCP)
+   into Sources. New **`declined`** status (red badge) added; crawl4ai +
+   task-master carry it. Sources now 30 entries / 18 repos.
 
 ## ⚡ CURRENT STATE (2026-07-12) — Live tab, Assets library, efficiency Overview, GitHub-intake team
 > Superseded by the section above (kept as history). This session's
