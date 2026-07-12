@@ -241,27 +241,38 @@ function drawGraphViz(container, data) {
     }
     ctx.globalAlpha = 1;
   }
-  (function loop() {
-    if (!canvas.isConnected) return; // section re-rendered — stop this instance
+  // On-demand render loop. The force sim used to redraw a 277-node canvas at
+  // 60fps FOREVER — even after it settled and even while the Graph tab was
+  // hidden — pegging a CPU core and making the whole UI feel frozen. Now the
+  // loop only runs while the sim is warm (alpha>0.02) or an interaction kicks
+  // it; it stops when settled and never draws a hidden canvas.
+  let rafId = null;
+  function frame() {
+    rafId = null;
+    if (!canvas.isConnected) return; // section re-rendered — drop this instance
     if (alpha > 0.02) { step(); alpha *= 0.985; }
-    draw();
-    requestAnimationFrame(loop);
-  })();
+    const hidden = document.getElementById('graph') && document.getElementById('graph').classList.contains('hidden');
+    if (!hidden) draw();
+    if (alpha > 0.02 && !hidden) rafId = requestAnimationFrame(frame);
+  }
+  function kick() { if (rafId == null && canvas.isConnected) rafId = requestAnimationFrame(frame); }
+  kick();
 
   // mouse: hover tooltip + highlight, drag to pin, click → explain
   const pos = e => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) }; };
   const pick = p => { let best = null, bd = 1e9; for (const n of nodes) { const dx = n.x - p.x, dy = n.y - p.y, d = dx * dx + dy * dy, r = rad(n) + 6; if (d < r * r && d < bd) { best = n; bd = d; } } return best; };
   let downAt = null;
-  canvas.onmousedown = e => { dragNode = pick(pos(e)); downAt = { x: e.clientX, y: e.clientY }; if (dragNode) alpha = 1; };
+  canvas.onmousedown = e => { dragNode = pick(pos(e)); downAt = { x: e.clientX, y: e.clientY }; if (dragNode) { alpha = 1; kick(); } };
   canvas.onmousemove = e => {
     if (dragNode) {
       const p = pos(e);
       dragNode.x = Math.max(PAD, Math.min(W - PAD, p.x));
       dragNode.y = Math.max(PAD, Math.min(H - PAD, p.y));
-      alpha = 1; tip.classList.add('hidden');
+      alpha = 1; tip.classList.add('hidden'); kick();
       return;
     }
     const n = pick(pos(e));
+    const changed = n !== hover;
     hover = n;
     canvas.style.cursor = n ? 'pointer' : 'default';
     if (n) {
@@ -269,8 +280,9 @@ function drawGraphViz(container, data) {
       tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px';
       tip.classList.remove('hidden');
     } else tip.classList.add('hidden');
+    if (changed) kick(); // redraw the highlight without spinning the sim
   };
-  canvas.onmouseleave = () => { hover = null; tip.classList.add('hidden'); };
+  canvas.onmouseleave = () => { hover = null; tip.classList.add('hidden'); kick(); };
   window.addEventListener('mouseup', e => {
     if (dragNode && downAt && Math.abs(e.clientX - downAt.x) < 4 && Math.abs(e.clientY - downAt.y) < 4) {
       selectNode(dragNode);
@@ -303,12 +315,14 @@ function drawGraphViz(container, data) {
     };
     detail.querySelector('#ndClear').onclick = () => selectNode(null);
     detail.querySelectorAll('.ndnb').forEach(c => c.onclick = () => { const m = byId[c.dataset.id]; if (m) selectNode(m); });
+    kick(); // redraw the selection highlight
   }
 
   return {
     find(q) {
       matches.clear();
       if (q) for (const n of nodes) if ((n.label + ' ' + (n.file || '')).toLowerCase().includes(q)) matches.add(n.id);
+      kick(); // redraw the search highlight
     },
     selectFirst() {
       const first = nodes.filter(n => matches.has(n.id)).sort((a, b) => b.deg - a.deg)[0];
