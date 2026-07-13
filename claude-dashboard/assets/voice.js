@@ -19,13 +19,13 @@
 */
 'use strict';
 (function () {
-  // ---- KILL SWITCH (user, 2026-07-11 late night) --------------------------
-  // "the voice module is absolutely awful and needs to be disabled and
-  // reassessed much later." Hard-disabled by default: no orb, no hotkey, no
-  // auto-talkback, regardless of any localStorage flags left over from
-  // earlier sessions. Flip VOICE_DISABLED back to false to bring it back for
-  // re-evaluation — the engine code below is untouched, just gated off.
-  const VOICE_DISABLED = true;
+  // ---- KILL SWITCH (re-enabled 2026-07-13) --------------------------------
+  // Was hard-disabled while Sesame CSM-1B (the old neural default) proved too
+  // slow (~6 s to first word). CSM is now retired as the default: the module
+  // ships with the instant browser engine as default, Kokoro-82M as the fast
+  // local-neural option. Any stale localStorage 'csm' engine setting is
+  // migrated to 'browser' in init(). Set back to true to fully gate the module.
+  const VOICE_DISABLED = false;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const SS = window.speechSynthesis;
   const store = {
@@ -454,6 +454,17 @@
     if (V.state === 'speaking') setState('idle');
   }
 
+  // On a phone the hub is voice-first: read replies aloud automatically, no
+  // talk-back toggle needed. Gated on a coarse pointer AND a phone-sized screen
+  // so touch laptops / large tablets still honor the explicit desktop toggle.
+  function isMobileDevice() {
+    try {
+      return !!(window.matchMedia
+        && window.matchMedia('(pointer: coarse)').matches
+        && window.matchMedia('(max-width: 820px)').matches);
+    } catch { return false; }
+  }
+
   // ---- run lifecycle hooks (called from run.js) ----------------------------
   // Any new prompt — typed OR spoken — silences an in-progress reply at once.
   function onRunStart() { if (!VOICE_DISABLED) { if (speakingNow()) stopSpeak(); if (!V.listening) setState('thinking'); } }
@@ -466,13 +477,17 @@
       if (!(text && speak(text))) reListenSoon(500);
       return;
     }
-    if (store.talk && text) speak(text);
+    // Auto-read on mobile; on desktop respect the "Speak replies out loud" toggle.
+    if ((store.talk || isMobileDevice()) && text) speak(text);
     else if (V.state === 'thinking') setState('idle');
   }
 
   function init() {
     if (VOICE_DISABLED) return; // see kill switch note at top of file
     if (!SR && !SS) return; // nothing available at all
+    // Reroute off Sesame: anyone left on the retired CSM default from earlier
+    // testing falls back to the instant browser engine (Kokoro stays opt-in).
+    if (store.engine === 'csm') store.engine = 'browser';
     buildOrb();
     const orb = $('#voiceOrb');
     if (orb && !store.mic) orb.style.display = 'none';
