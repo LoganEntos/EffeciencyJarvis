@@ -59,17 +59,37 @@ function parseMultipart(body, contentType) {
   return parts;
 }
 
+// The inbox supports ONE level of "project" subfolders (data/inbox/<project>/)
+// — created by SharePoint pulls or the project field on upload — so related
+// files group into a project a run can be pointed at.
+function statEntry(rel) {
+  let st; try { st = fs.statSync(path.join(INBOX, rel)); } catch { st = {}; }
+  const seg = rel.split(path.sep);
+  return { name: seg.join('/'), project: seg.length > 1 ? seg[0] : null,
+    size: st.size || 0, modified: st.mtime || null, path: path.join(INBOX, rel) };
+}
 function listFiles() {
-  return U.listDir(INBOX).filter(e => e.isFile()).map(e => {
-    let st; try { st = fs.statSync(path.join(INBOX, e.name)); } catch { st = {}; }
-    return { name: e.name, size: st.size || 0, modified: st.mtime || null, path: path.join(INBOX, e.name) };
-  }).sort((a, b) => new Date(b.modified) - new Date(a.modified));
+  const out = [];
+  for (const e of U.listDir(INBOX)) {
+    if (e.isFile()) out.push(statEntry(e.name));
+    else if (e.isDirectory() && sanitizeName(e.name)) {
+      for (const f of U.listDir(path.join(INBOX, e.name))) {
+        if (f.isFile()) out.push(statEntry(path.join(e.name, f.name)));
+      }
+    }
+  }
+  return out.sort((a, b) => new Date(b.modified) - new Date(a.modified));
 }
 
+// name may be "file" or "project/file" — each segment independently sanitized,
+// so traversal can never survive (path.basename strips separators and ..).
 function inboxFile(name) {
-  const safe = sanitizeName(name);
-  if (!safe) return null;
-  const full = path.join(INBOX, safe);
+  const segs = (name || '').toString().split('/');
+  if (segs.length > 2) return null;
+  const safeSegs = segs.map(sanitizeName);
+  if (safeSegs.some(s => !s)) return null;
+  const safe = safeSegs.join('/');
+  const full = path.join(INBOX, ...safeSegs);
   return { safe, full, exists: fs.existsSync(full) };
 }
 
@@ -175,10 +195,11 @@ async function handle(req, res, url) {
     const parts = parseMultipart(body, req.headers['content-type']);
     if (!parts || !parts.length) { U.sendJson(res, { error: 'no file in upload' }, 400); return true; }
     const overwrite = url.searchParams.get('overwrite') === '1';
-    fs.mkdirSync(INBOX, { recursive: true });
+    const project = sanitizeName(url.searchParams.get('project') || '');
+    fs.mkdirSync(project ? path.join(INBOX, project) : INBOX, { recursive: true });
     const saved = [], conflicts = [];
     for (const part of parts) {
-      const f = inboxFile(part.filename);
+      const f = inboxFile((project ? project + '/' : '') + part.filename);
       if (!f) continue;
       if (f.exists && !overwrite) { conflicts.push(f.safe); continue; }
       fs.writeFileSync(f.full, part.data);

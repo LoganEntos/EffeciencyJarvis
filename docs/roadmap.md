@@ -13,6 +13,13 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ---
 
+## ✅ Shipped (2026-07-13)
+
+| # | Item | Where |
+|---|------|-------|
+| S-SP | **SharePoint tab** — zero-dep Microsoft Graph client: device-code sign-in (user authenticates at microsoft.com/devicelogin; hub never sees the password), live site→drive→folder browser, pull-to-inbox (project folders `data/inbox/<project>/`), push-from-inbox, full-tenant file INDEX via drive delta crawls (`data/sharepoint-index.json`) + one-click graphify run so future runs query the tree instead of re-scanning Graph | `lib/sharepoint.js`, `assets/sharepoint.js`, `lib/files.js` (project folders) |
+| S-PM | **Hub runs default to bypassPermissions** — headless `-p` runs have no approval prompt, so acceptEdits silently denied every Bash/MCP call (the mobile-can't-do-anything bug); server+tasks+schedules default flipped, Run-tab selector migrated | `lib/runs.js`, `lib/tasks.js`, `lib/schedules.js`, `assets/run.js` |
+
 ## ✅ Shipped (2026-07-10)
 
 | # | Item | Where |

@@ -71,6 +71,10 @@ Check "GET /api/voice/status"  "$base/api/voice/status"
 Check "GET /api/routing"       "$base/api/routing"
 Check "GET /api/autopilot"     "$base/api/autopilot"
 Check "GET /api/usage"         "$base/api/usage"
+Check "GET /api/sharepoint/status" "$base/api/sharepoint/status"
+Check "GET /api/sharepoint/index/status" "$base/api/sharepoint/index/status"
+Check "GET /api/sharepoint/index/search" "$base/api/sharepoint/index/search?q=test"
+Check "GET /assets/sharepoint.js" "$base/assets/sharepoint.js"
 Check "GET /api/files/xlsx (bad name 404)" "$base/api/files/xlsx?name=nope.xlsx" 404
 Check "GET /api/run/transcript (bad id 404)" "$base/api/run/transcript?id=nope" 404
 Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2Fserver.js" 403
@@ -84,6 +88,8 @@ CheckPost "POST /api/voice/tts w/o token (403)"   "$base/api/voice/tts"   '{"tex
 CheckPost "POST /api/voice/start w/o token (403)" "$base/api/voice/start" '{}' 403
 CheckPost "POST /api/autopilot/toggle w/o token (403)" "$base/api/autopilot/toggle" '{}' 403
 CheckPost "POST /api/usage/config w/o token (403)" "$base/api/usage/config" '{"dailyBudgetUsd":5}' 403
+CheckPost "POST /api/sharepoint/pull w/o token (403)" "$base/api/sharepoint/pull" '{"drive":"x","item":"y"}' 403
+CheckPost "POST /api/sharepoint/auth/start w/o token (403)" "$base/api/sharepoint/auth/start" '{}' 403
 
 if ($fails -eq 0) { Write-Host "`nAll checks passed." -ForegroundColor Green; exit 0 }
 Write-Host "`n$fails check(s) failed." -ForegroundColor Red

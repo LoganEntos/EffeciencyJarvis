@@ -10,6 +10,8 @@ renderers.files = async function () {
       <div class="dropzone" id="dropzone">Drop files here or click to browse<br>
         <span class="muted" style="font-size:11.5px">50 MB per upload · xlsx, csv, pdf, docs, anything</span></div>
       <input type="file" id="fileIn" multiple class="hidden">
+      <div class="flex" style="margin:8px 0">
+        <input class="search" id="fileProject" placeholder="project folder (optional) — uploads and SharePoint pulls group under data/inbox/<project>/" style="max-width:420px"></div>
       <div id="upStatus" class="badgebar" style="margin-bottom:14px"></div>
       <div id="fileList"><div class="muted">Loading…</div></div>`;
     const dz = $('#dropzone'), fi = $('#fileIn');
@@ -33,7 +35,9 @@ async function uploadFiles(fileList, overwrite) {
   $('#upStatus').innerHTML = `<span class="pill warn">uploading ${files.length} file${files.length === 1 ? '' : 's'}…</span>`;
   let r;
   try {
-    r = await api('/api/files' + (overwrite ? '?overwrite=1' : ''), { method: 'POST', body: fd, timeoutMs: 120000 });
+    const project = ($('#fileProject') && $('#fileProject').value.trim()) || '';
+    r = await api('/api/files?' + new URLSearchParams({ ...(overwrite ? { overwrite: 1 } : {}), ...(project ? { project } : {}) }),
+      { method: 'POST', body: fd, timeoutMs: 120000 });
   } catch (e) { $('#upStatus').innerHTML = `<span class="pill err">upload failed: ${esc(e.message || 'network error')}</span>`; return; }
   if (r.error === 'exists' || (r.conflicts && r.conflicts.length)) {
     const names = (r.conflicts || []).join(', ');
