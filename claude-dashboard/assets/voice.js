@@ -454,6 +454,27 @@
     if (V.state === 'speaking') setState('idle');
   }
 
+  // ---- gesture unlock (mobile autoplay) ------------------------------------
+  // Mobile browsers (iOS Safari especially, Android Chrome too) only let
+  // speechSynthesis produce sound if a *prior* SS.speak() ran inside a real
+  // user gesture. Our auto-read fires later, from an async run-completion
+  // callback with no gesture on the stack, so it's silently blocked. The fix:
+  // on the very first tap/key, speak a zero-volume blank to open the channel
+  // (and resume any suspended AudioContext for the earcons). Once → done.
+  let speechPrimed = false;
+  function primeAudio() {
+    if (speechPrimed) return;
+    speechPrimed = true;
+    try {
+      if (SS) {
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0; u.rate = store.rate;
+        SS.cancel(); SS.speak(u);
+      }
+    } catch {}
+    try { if (actx && actx.state === 'suspended') actx.resume(); } catch {}
+  }
+
   // On a phone the hub is voice-first: read replies aloud automatically, no
   // talk-back toggle needed. Gated on a coarse pointer AND a phone-sized screen
   // so touch laptops / large tablets still honor the explicit desktop toggle.
@@ -492,6 +513,10 @@
     const orb = $('#voiceOrb');
     if (orb && !store.mic) orb.style.display = 'none';
     if (SS && SS.onvoiceschanged === null) SS.onvoiceschanged = () => {}; // prime async voice list
+    // Unlock speech on the first user gesture so mobile auto-read isn't blocked
+    // by the browser's autoplay policy (see primeAudio). Passive + once each.
+    ['pointerdown', 'touchend', 'keydown'].forEach(ev =>
+      document.addEventListener(ev, primeAudio, { once: true, passive: true }));
     // The moment you start texting me, I go quiet — stop the reply mid-sentence.
     // (Barge-in rule; the spoken-input half arrives when we keep the mic open
     //  during talk-back — see startListen's SS.cancel for the manual version.)
