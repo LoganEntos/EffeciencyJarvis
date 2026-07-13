@@ -152,6 +152,16 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
 (Tailscale PWA vs Base44-over-Tailscale vs native wrapper).
 
 ## Pending USER actions (remind them; you can't do these)
+- **Permission allowlist for hub runs (blocks execution otherwise).** Hub runs —
+  and any auto-mode agent — cannot execute `node` / `curl` / `powershell` / web
+  research until these are in `.claude/settings.json` → `permissions.allow`:
+  `Bash(node:)`, `Bash(curl:)`, `Bash(powershell:)`, `WebSearch`,
+  `WebFetch(domain:github.com)`, `WebFetch(domain:api.github.com)`,
+  `WebFetch(domain:raw.githubusercontent.com)`. **An agent can't add these
+  itself** — the auto-mode classifier blocks self-widening of execution
+  permissions on instruction alone (anti-prompt-injection). The USER must
+  hand-edit the file, use `/permissions` in a terminal `claude`, or set the hub's
+  run mode to `bypassPermissions`.
 - **H4 needs a Telegram bot token** (from @BotFather) — 2 minutes, unblocks the
   phone voice/text bridge.
 - Autostart: `powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1`
