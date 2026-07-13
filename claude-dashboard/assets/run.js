@@ -48,7 +48,9 @@ function ensureRunUI() {
         <option value="claude">engine: claude</option>
         <option value="hermes" id="hermesOpt" hidden>engine: hermes (deprecated)</option>
       </select>
-      <select id="runModel" title="model — auto routes each prompt to the cheapest capable model; or pin a specific Claude">
+      <label class="chk" title="Jarvis mode: turn your vibe code into clean prompts, with smart model routing">
+        <input type="checkbox" id="jarvisToggle"> ✦ Jarvis</label>
+      <select id="runModel" title="model — auto routes each prompt to the cheapest capable model; or pin a specific Claude. If Jarvis is on, it will auto-select unless you override here">
         <option value="auto">model: auto (routed)</option>
         <option value="">CLI default</option>
         <optgroup label="Tier alias (current model)">
@@ -65,6 +67,7 @@ function ensureRunUI() {
           <option value="claude-haiku-4-5">Haiku 4.5</option>
         </optgroup>
       </select>
+      <span class="pill neutral hidden" id="jarvisStatus" title="Jarvis model selection"></span>
       <select id="runPerm" title="permission mode">
         <option value="acceptEdits">perms: acceptEdits</option>
         <option value="default">perms: default (tools denied)</option>
@@ -109,13 +112,16 @@ function ensureRunUI() {
     if (p !== null) $('#runPerm').value = p;
     $('#runEngine').value = localStorage.getItem('hub.engine') === 'hermes' ? 'hermes' : 'claude';
     $('#runRecall').checked = localStorage.getItem('hub.recall') === '1'; // default OFF
+    $('#jarvisToggle').checked = localStorage.getItem('hub.jarvis') === '1'; // default OFF
   } catch {}
   applyEngineUI();
   gateHermesEngine();
+  initJarvis();
   $('#runEngine').onchange = e => { try { localStorage.setItem('hub.engine', e.target.value); } catch {} applyEngineUI(); };
-  $('#runModel').onchange = e => { try { localStorage.setItem('hub.model', e.target.value); } catch {} };
+  $('#runModel').onchange = e => { try { localStorage.setItem('hub.model', e.target.value); } catch {} updateJarvisStatus(); };
   $('#runPerm').onchange = e => { try { localStorage.setItem('hub.perm', e.target.value); } catch {} };
   $('#runRecall').onchange = e => { try { localStorage.setItem('hub.recall', e.target.checked ? '1' : '0'); } catch {} };
+  $('#jarvisToggle').onchange = e => { try { localStorage.setItem('hub.jarvis', e.target.checked ? '1' : '0'); } catch {} initJarvis(); };
 }
 
 // hermes is a deprecated paid stack, OFF by default. Reveal the engine option
@@ -332,9 +338,25 @@ function renderRunStatus() {
 // ---- live run flow ----
 async function sendPrompt() {
   const ta = $('#promptIn');
-  const prompt = ta.value.trim();
+  let prompt = ta.value.trim();
   if (!prompt || chat.running) return;
   const engine = $('#runEngine') ? $('#runEngine').value : 'claude';
+
+  // Jarvis mode: buffer prompt + auto-route model
+  const jarvisToggle = $('#jarvisToggle');
+  if (jarvisToggle && jarvisToggle.checked && engine === 'claude') {
+    const transform = jarvisTransform(prompt);
+    if (transform) {
+      prompt = transform.buffered;
+      // If user hasn't pinned a model, use Jarvis's pick
+      const userModel = $('#runModel').value;
+      if (userModel === 'auto' || userModel === '') {
+        $('#runModel').value = transform.complexity;
+      }
+      addMsg(`✦ Jarvis: cleaned prompt (model: ${transform.complexity})`, 'sys');
+    }
+  }
+
   let r;
   try {
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },

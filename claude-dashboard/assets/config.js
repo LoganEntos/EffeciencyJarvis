@@ -7,6 +7,7 @@ renderers.config = async function () {
   $('#config').innerHTML = `
     <h2>Config</h2>
     <div id="usagePanel"></div>
+    <div id="personaPanel"></div>
     <div id="enginePanel"></div>
     <div id="planPanel"></div>
     <div id="autopilotPanel"></div>
@@ -17,9 +18,38 @@ renderers.config = async function () {
   if (window.HubVoice) HubVoice.renderSettings($('#voiceSettings'));
   renderAutopilot();
   renderUsageConfig();
+  renderPersonaConfig();
   renderEngineConfig();
   renderPlanConfig();
 };
+
+// Communication persona injected ahead of every Claude hub run (server:
+// lib/personas.js). Jarvis is the default bearing; "off" = plain Claude,
+// token-neutral. The soul lives in personas/<id>.md.
+async function renderPersonaConfig() {
+  const el = $('#personaPanel');
+  if (!el) return;
+  let d = { personas: [], active: null };
+  try { d = await api('/api/personas'); } catch {}
+  const opts = [`<option value="none"${!d.active ? ' selected' : ''}>Off — plain Claude</option>`]
+    .concat((d.personas || []).map(p =>
+      `<option value="${esc(p.id)}"${d.active === p.id ? ' selected' : ''}>${esc(p.name)}${p.tagline ? ' — ' + esc(p.tagline) : ''}</option>`));
+  el.innerHTML = `<div class="row" style="margin-bottom:22px">
+    <div class="l" style="margin-bottom:4px">Communication persona
+      <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">— a bearing injected ahead of every Claude hub run (composure, candor, economy). Off = plain Claude. Edit the soul in <span class="mono">personas/&lt;id&gt;.md</span>.</span></div>
+    <div class="flex" style="gap:10px;align-items:center;flex-wrap:wrap">
+      <select id="personaSel">${opts.join('')}</select>
+      <span id="personaMsg" class="muted" style="font-size:11px"></span></div></div>`;
+  $('#personaSel').onchange = async e => {
+    const id = e.target.value === 'none' ? null : e.target.value;
+    const msg = $('#personaMsg');
+    try {
+      const r = await api('/api/personas/active', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+      if (r.error) { msg.textContent = '✗ ' + r.error; msg.style.color = 'var(--red)'; }
+      else { msg.textContent = r.active ? '✓ active: ' + r.active : '✓ off — plain Claude'; msg.style.color = 'var(--green)'; }
+    } catch (err) { msg.textContent = '✗ ' + (err.message || 'failed'); msg.style.color = 'var(--red)'; }
+  };
+}
 
 // Plan-usage numbers shown on Overview. Claude exposes no usage API, so the user
 // keeps these current by hand here; they persist to settings.plan.

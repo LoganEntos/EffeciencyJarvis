@@ -14,6 +14,7 @@ const memory = require('./memory');
 const liveness = require('./liveness');
 const hermes = require('./hermes');
 const teams = require('./teams');
+const personas = require('./personas');
 const { countArtifacts, listArtifacts, serveArtifact } = require('./artifacts');
 
 const DASH_DIR = path.resolve(__dirname, '..');
@@ -149,7 +150,15 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   let team = null, teamName = null;
   try { team = teams.activeHint(); } catch {}
   try { teamName = teams.activeTeam().name; } catch {} // recorded on every run (incl. Lean) so history/sessions/tasks show it
-  const fullPrompt = (recalled ? recalled.block + '\n\n' : '') + prompt + (team ? team.text : '') + hint;
+  // Active persona (Jarvis etc.) — a system directive that LEADS the prompt so
+  // the bearing is set before anything else. Empty when no persona is active
+  // (plain Claude, token-neutral). Claude engine only; hermes has its own voice.
+  let persona = '', personaName = null;
+  if (engine === 'claude') {
+    try { persona = personas.activePrefix(); } catch {}
+    try { personaName = personas.activeName(); } catch {}
+  }
+  const fullPrompt = persona + (recalled ? recalled.block + '\n\n' : '') + prompt + (team ? team.text : '') + hint;
   let args = null, hermesCfg = null;
   const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'acceptEdits';
   if (engine === 'hermes') {
@@ -170,7 +179,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
     exitCode: null, sessionId: null, model: model || '', permissionMode: perm,
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
     costUsd: null, durationMs: null, tokensIn: null, tokensOut: null,
-    team: teamName, routedReason, recallCount: recalled ? recalled.count : 0,
+    team: teamName, persona: personaName, routedReason, recallCount: recalled ? recalled.count : 0,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);
@@ -178,6 +187,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   if (routedReason) pushLine(st, JSON.stringify({ type: 'hub_status', text: `auto → ${model} (${routedReason})` }));
   if (recalled) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◇ memory recall: ${recalled.count} relevant memor${recalled.count === 1 ? 'y' : 'ies'} injected` }));
   if (team) pushLine(st, JSON.stringify({ type: 'hub_status', text: `⛬ team: ${team.name} — steering delegation to its specialists` }));
+  if (personaName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◈ persona: ${personaName} — communication bearing active` }));
   if (runningCount() < MAX_ACTIVE) launch(st);
   else {
     queue.push(id);
