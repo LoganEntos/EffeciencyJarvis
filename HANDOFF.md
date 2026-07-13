@@ -228,6 +228,21 @@ Queued (do NOT build until the user greenlights): **N7 SharePoint Breakdown**
    Clause**, source-available — restricts selling; roadmap Q3 declined-as-MCP)
    into Sources. New **`declined`** status (red badge) added; crawl4ai +
    task-master carry it. Sources now 30 entries / 18 repos.
+5. **Personas feature FINISHED + LIVE** (`34c0d38`). A parallel hub run had built
+   most of it but was blocked (couldn't execute node/curl to verify — see the
+   permission-allowlist item above). Completed here: **`lib/personas.js`** →
+   `/api/personas` + `/api/personas/active` (swappable personas from
+   `personas/<id>.md`, traversal-guarded; `data/personas.json` holds the active
+   id, default = Jarvis); **`lib/runs.js`** injects the active persona's directive
+   ahead of each Claude run (token-neutral when off); the missing piece I added =
+   a **Config → Communication persona** selector (off / Jarvis). Separately, the
+   run composer's **✦ Jarvis** toggle (`assets/jarvis.js`) is CLIENT-side
+   prompt-buffering + complexity routing — a different layer, same name. Verified
+   end-to-end (endpoints, selector, traversal guard, smoke) and the hub was
+   restarted so it's live on 5757 (→ phone via Tailscale). ⚠ **The restart also
+   loaded `assets/voice.js`, which is a SEPARATE uncommitted change** (voice module
+   re-enabled: CSM→browser default, Kokoro opt-in, mobile auto-read) — left
+   uncommitted as the user's own in-flight work; commit it separately when ready.
 
 ## ⚡ CURRENT STATE (2026-07-12) — Live tab, Assets library, efficiency Overview, GitHub-intake team
 > Superseded by the section above (kept as history). This session's
