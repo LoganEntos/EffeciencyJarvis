@@ -66,7 +66,7 @@ const settled = st => !st || st === 'done' || st === 'error' || st === 'cancelle
 
 function fire(s) {
   const prompt = `[Scheduled run "${s.title}" — ${describe(s)}]\n\n${s.prompt}`;
-  const r = runs.startRun({ prompt, model: s.model || 'auto', permissionMode: 'acceptEdits' });
+  const r = runs.startRun({ prompt, model: s.model || 'auto', permissionMode: 'bypassPermissions' });
   if (r.error) { // engine busy — try again shortly without skipping the slot
     s.nextDue = new Date(Date.now() + DEFER_MS).toISOString();
     return null;

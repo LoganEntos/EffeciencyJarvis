@@ -68,10 +68,10 @@ function ensureRunUI() {
         </optgroup>
       </select>
       <span class="pill neutral hidden" id="jarvisStatus" title="Jarvis model selection"></span>
-      <select id="runPerm" title="permission mode">
-        <option value="acceptEdits">perms: acceptEdits</option>
-        <option value="default">perms: default (tools denied)</option>
-        <option value="bypassPermissions">perms: bypassPermissions</option>
+      <select id="runPerm" title="permission mode — hub runs are headless (no approval prompt exists), so anything below bypassPermissions silently denies Bash/MCP tools">
+        <option value="bypassPermissions">perms: full (bypassPermissions)</option>
+        <option value="acceptEdits">perms: acceptEdits (Bash/MCP denied)</option>
+        <option value="default">perms: default (most tools denied)</option>
         <option value="plan">perms: plan</option>
       </select>
       <label class="chk" title="inject the top 3 relevant hub memories into the prompt (costs a few hundred prompt tokens — off by default)">
@@ -107,6 +107,14 @@ function ensureRunUI() {
   $('#histFilter').oninput = renderHistory;
   // engine/model/permission choices survive reloads
   try {
+    // one-time migration: 'acceptEdits' was the old default, but headless hub
+    // runs have no approval prompt, so it silently denied every Bash/MCP call
+    // (the "phone can't change anything" bug). Stored copies of the old
+    // default upgrade to the new one; an explicit re-pick after this sticks.
+    if (localStorage.getItem('hub.permV2') !== '1') {
+      if (localStorage.getItem('hub.perm') === 'acceptEdits') localStorage.setItem('hub.perm', 'bypassPermissions');
+      localStorage.setItem('hub.permV2', '1');
+    }
     const m = localStorage.getItem('hub.model'), p = localStorage.getItem('hub.perm');
     if (m !== null) $('#runModel').value = m;
     if (p !== null) $('#runPerm').value = p;

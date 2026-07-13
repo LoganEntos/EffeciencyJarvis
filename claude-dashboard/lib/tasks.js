@@ -51,7 +51,7 @@ function runTask(id) {
     const m = runs.getRunMeta(t.runId);
     if (m && !settled(m.status)) return { error: 'task already running' };
   }
-  const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'acceptEdits' });
+  const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions' });
   if (r.error) return r;
   t.runId = r.id;
   t.startedAt = new Date().toISOString();
@@ -68,7 +68,7 @@ function runAll() {
     const m = t.runId ? runs.getRunMeta(t.runId) : null;
     // run tasks that never ran, or that failed/cancelled (retry); leave done/active ones
     if (!t.runId || (m && settled(m.status) && m.status !== 'done')) {
-      const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'acceptEdits' });
+      const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions' });
       if (!r.error) { t.runId = r.id; t.startedAt = new Date().toISOString(); started++; }
     }
   }

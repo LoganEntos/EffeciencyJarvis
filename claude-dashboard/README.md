@@ -66,7 +66,10 @@ data/                runtime, gitignored: runs/<id>/…, inbox/, tasks.json,
   complex/architectural work — resumed conversations keep their model), and the
   decision streams into the chat as `auto → <model> (<reason>)`. An optional
   **◇ memory recall** toggle (default off) injects the top-3 relevant Engram
-  memories into the prompt. Permission mode defaults to `acceptEdits`; Cancel
+  memories into the prompt. Permission mode defaults to `bypassPermissions` —
+  hub runs are headless, so any stricter mode silently DENIES Bash/MCP tool
+  calls (there is no prompt to approve them); the hub is localhost/tailnet-only
+  so full permissions is the intended default. Cancel
   kills the process tree; 2 runs execute concurrently, up to 5 more queue.
   Every run is persisted under `data/runs/<id>/` (`prompt.txt`, `output.jsonl`,
   `meta.json`, `artifacts/`) and listed in the history panel — click to replay

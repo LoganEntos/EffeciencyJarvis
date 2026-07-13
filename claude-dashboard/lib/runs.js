@@ -160,7 +160,12 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   }
   const fullPrompt = persona + (recalled ? recalled.block + '\n\n' : '') + prompt + (team ? team.text : '') + hint;
   let args = null, hermesCfg = null;
-  const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'acceptEdits';
+  // Default is bypassPermissions: hub runs are headless (`-p`), so there is no
+  // approval prompt — under acceptEdits/default every Bash/MCP call is silently
+  // DENIED and the run just reports it "lacks permission" (this was the
+  // phone-can't-do-anything bug). The hub is localhost/tailnet-only, single
+  // user, so full permissions is the intended mode for its runs.
+  const perm = PERM_MODES.includes(permissionMode) ? permissionMode : 'bypassPermissions';
   if (engine === 'hermes') {
     // hermes transport is chosen at launch by HUB_HERMES_ENGINE (acp default /
     // oneshot fallback — see lib/hermes.js). Either way we just stash the prompt
