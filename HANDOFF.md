@@ -26,6 +26,21 @@ powershell -File scripts\verify-dashboard.ps1 -Port 5757
 Server accepts a port arg (`server.js 5758`). Never use Bash to run it in a way
 that blocks — start detached or via the Browser preview tooling.
 
+## Syncing across machines (this PC <-> laptop)
+The repo lives on a **private GitHub remote** (`origin`). To sync in either
+direction, one command handles it:
+```
+powershell -File scripts\sync.ps1              # pull --rebase --autostash, then push
+powershell -File scripts\sync.ps1 -Message "wip"   # commit tracked changes first, then sync
+```
+It never clobbers the other machine (rebases local work on top of remote).
+Not synced (gitignored, per-machine): `claude-dashboard/data/` (run history,
+inbox, tasks, schedules), `.claude/settings.local.json` (permission allowlist),
+and anything else in `.gitignore`. Copy `data/` over manually (or via Tailscale)
+if you want run history on the other machine. Global `~/.claude/` skills/memory
+also live per-machine — the project rules that matter are in-repo (this file +
+`CLAUDE.md`).
+
 ## Ground rules (non-negotiable)
 1. **No client/business data** without an explicit prompt in that conversation. M365 has never been called; keep it that way.
 2. **No-install rule is LIFTED** (user, 2026-07-10) — installs are allowed to enhance the hub. BUT **token efficiency still governs**: prefer zero-dep, and do NOT add always-on MCPs (every MCP in `.mcp.json` taxes every run's context).
