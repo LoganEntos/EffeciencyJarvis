@@ -40,13 +40,15 @@
           <input type="range" id="vPause" min="1" max="5" step="0.5" value="${store.pause}" style="width:150px">
           <span class="muted mono" id="vPauseVal" style="font-size:11.5px">${store.pause.toFixed(1)}s</span>
         </div>
-        <div class="flex" style="margin-top:12px;align-items:center" title="which engine reads replies aloud — CSM is a local neural voice on your GPU (see docs/voice-csm.md)">
-          <span class="muted" style="font-size:12px">TTS engine</span>
-          <select id="vEngine">
-            <option value="browser"${store.engine === 'browser' ? ' selected' : ''}>Browser (speechSynthesis) — instant</option>
-            <option value="kokoro"${store.engine === 'kokoro' ? ' selected' : ''}>Kokoro-82M (local) — fast neural</option>
-            <option value="csm"${store.engine === 'csm' ? ' selected' : ''}>Sesame CSM-1B (local) — natural, slow</option>
-          </select>
+        <div style="margin-top:16px">
+          <div class="muted" style="font-size:12px;margin-bottom:8px">TTS engine <span class="muted" style="font-weight:400;color:var(--dim)">— which voice reads replies aloud (neural engines run locally on your GPU; see docs/voice-csm.md)</span></div>
+          <div class="seg" id="vEngine" role="radiogroup" aria-label="TTS engine">
+            <label class="seg-opt"><input type="radio" name="vEngine" value="browser"${store.engine === 'browser' ? ' checked' : ''}><span class="seg-t">Browser</span><span class="seg-s">instant · zero-cost</span></label>
+            <label class="seg-opt"><input type="radio" name="vEngine" value="kokoro"${store.engine === 'kokoro' ? ' checked' : ''}><span class="seg-t">Kokoro-82M</span><span class="seg-s">fast neural</span></label>
+            <label class="seg-opt"><input type="radio" name="vEngine" value="csm"${store.engine === 'csm' ? ' checked' : ''}><span class="seg-t">Sesame CSM-1B</span><span class="seg-s">natural · slow</span></label>
+          </div>
+        </div>
+        <div class="flex" style="margin-top:12px;align-items:center">
           <span class="muted" style="font-size:12px">Speaker</span>
           <input type="number" id="vCsmSpk" min="0" max="9" step="1" value="${store.csmSpeaker}" style="width:58px">
           <span id="vCsmEng" class="pill neutral" style="font-size:11px">engine: checking…</span>

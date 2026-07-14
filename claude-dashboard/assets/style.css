@@ -198,6 +198,21 @@ button.danger:hover{background:#e0525233;box-shadow:none}
 :root[data-theme="light"] button.ghost{background:#00000006}
 :root[data-theme="light"] button.danger{color:#a83232}
 
+/* ---- segmented control (a prominent radio group; e.g. the TTS engine picker) ---- */
+.seg{display:inline-flex;gap:4px;padding:4px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:11px;flex-wrap:wrap;max-width:100%}
+.seg-opt{position:relative;display:flex;flex-direction:column;gap:2px;padding:8px 16px;border-radius:8px;
+  cursor:pointer;color:var(--muted);min-width:104px;transition:background .14s,color .14s,box-shadow .14s}
+.seg-opt input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.seg-t{font-size:13px;font-weight:700;letter-spacing:.01em}
+.seg-s{font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);font-family:var(--font-mono)}
+.seg-opt:hover{color:var(--txt);background:var(--accent-soft)}
+.seg-opt:has(input:checked){background:var(--accent);color:#171204;box-shadow:0 1px 8px #e8a33d40}
+.seg-opt:has(input:checked) .seg-s{color:#17120499}
+.seg-opt:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+:root[data-theme="light"] .seg-opt:has(input:checked){color:#fff}
+:root[data-theme="light"] .seg-opt:has(input:checked) .seg-s{color:#ffffffcc}
+
 /* ---- pills / misc ---- */
 .pill{display:inline-block;font-size:11px;padding:3px 10px;border-radius:20px;margin:2px 5px 2px 0;font-weight:500;
   font-family:var(--font-mono)}
