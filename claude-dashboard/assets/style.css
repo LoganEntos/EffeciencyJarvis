@@ -195,7 +195,18 @@ input.search,select,textarea{width:100%;padding:10px 14px;background:var(--panel
   transition:border-color .15s,box-shadow .15s}
 input.search:focus,select:focus,textarea:focus{border-color:var(--accent-dim);box-shadow:0 0 0 3px var(--accent-soft)}
 input.search::placeholder,textarea::placeholder{color:var(--dim)}
-select{width:auto;margin-bottom:0}
+/* U13: strip the OS chevron (appearance:none) and draw our own amber one so the
+   closed control reads as part of the theme, not a bare native widget. The popup
+   list itself is still the OS one — native keeps full a11y/keyboard for free —
+   but the resting affordance now matches the U3 segmented control's language. */
+select{width:auto;margin-bottom:0;appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:32px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23e8a33d' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:12px}
+select:hover{border-color:var(--line2)}
+select:disabled{cursor:default}
+/* runbar pickers wear the mono face like their sibling controls (usage gauge,
+   session pill) so the whole Run header reads as one typographic system */
+.runbar select{font-family:var(--font-mono);font-size:12px;letter-spacing:-.2px}
 pre{background:#0b0a08;border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;overflow:auto;
   font-size:12.5px;line-height:1.55;color:#d8d2c4;white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono)}
 :root[data-theme="light"] pre{background:#efe9dc;color:#3a3428}
