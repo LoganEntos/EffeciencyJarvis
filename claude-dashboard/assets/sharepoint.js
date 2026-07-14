@@ -98,9 +98,9 @@ function spRenderIndex(s) {
   $('#spGraphify').onclick = async () => {
     const r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       prompt: '/graphify claude-dashboard/data/sharepoint-index.json — ingest the SharePoint file index (sites → drives → file paths with sizes and modified dates) into the knowledge graph, replacing any earlier SharePoint ingest, so future runs can locate SharePoint files and answer structure questions from the graph instead of calling Microsoft Graph or re-scanning.',
-      model: 'claude-fable-5' }) });
+      model: 'claude-opus-4-8' }) });
     if (!r.error) api('/api/sharepoint/graphify', { method: 'POST' }).catch(() => {});
-    $('#spGraphify').outerHTML = r.error ? `<span class="pill err">${esc(r.error)}</span>` : '<span class="pill ok">Fable 5 graphify started — watch it in the Run tab</span>';
+    $('#spGraphify').outerHTML = r.error ? `<span class="pill err">${esc(r.error)}</span>` : '<span class="pill ok">graphify started (Opus) — watch it in the Run tab</span>';
   };
   $('#spSearch').oninput = spDebounceSearch;
 }
