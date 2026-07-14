@@ -123,6 +123,35 @@ document.querySelectorAll('nav a').forEach(a => {
   a.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTab(a.dataset.tab); } };
 });
 
+// ---- a11y: keyboard-operable non-native clickables (backlog U1) ----
+// Cards, chips, filter pills, tags and rows are plain <div>/<span> wired only
+// with onclick — mouse-only: no tab stop, no focus ring, no Enter/Space. Rather
+// than patch every render site (and re-break on the next new one), we centralise:
+// a MutationObserver grants tabindex + role="button" to any clickable as it's
+// rendered, and one delegated key handler activates it. The global :focus-visible
+// ring (style.css) then shows keyboard focus for free. To cover a new clickable
+// pattern anywhere, just add its selector here — nothing else to touch.
+const CLICKABLE_SEL = '.row.clickable,.card.clickable,.iconCell,.tag-pill,.mem-item,.mem-backlink,.mem-tag,.ndnb,.pill[data-f],.pill[data-t],#liveBadge';
+function upgradeClickables(root) {
+  const els = root.matches && root.matches(CLICKABLE_SEL) ? [root] : [];
+  root.querySelectorAll && els.push(...root.querySelectorAll(CLICKABLE_SEL));
+  els.forEach(el => {
+    if (el.dataset.a11y) return;
+    el.dataset.a11y = '1';
+    if (!el.hasAttribute('tabindex')) el.tabIndex = 0;
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
+  });
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if (el && el.matches && el.matches(CLICKABLE_SEL)) { e.preventDefault(); el.click(); }
+});
+new MutationObserver(muts => {
+  for (const m of muts) for (const n of m.addedNodes) if (n.nodeType === 1) upgradeClickables(n);
+}).observe(document.body, { childList: true, subtree: true });
+upgradeClickables(document.body); // catch the header #liveBadge + anything already in the DOM
+
 const loaded = {};
 async function load(tab, force) {
   if (loaded[tab] && !force) return;
