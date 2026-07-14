@@ -329,7 +329,13 @@
       clean = (end > Math.min(250, cap * 0.5) ? head.slice(0, end + 1) : head) + ' The rest is on screen.';
     }
     if (!clean) return false;
-    return store.neural ? speakCSM(clean) : speakBrowser(clean);
+    // On phones, browser speechSynthesis can't auto-read from an async reply
+    // (iOS blocks speak() outside a live gesture — priming doesn't cure it).
+    // Route mobile auto-read through the neural audio-element path instead,
+    // which iOS honors once the element is unlocked on first tap (primeAudio).
+    // speakCSM's csmFetch defaults to Kokoro when the stored engine is browser.
+    const mobileNeural = isMobileDevice() && store.engine === 'browser';
+    return (store.neural || mobileNeural) ? speakCSM(clean) : speakBrowser(clean);
   }
   // iOS/Chrome both suspend speechSynthesis after ~15 s, cutting long replies
   // off mid-sentence; a periodic pause()+resume() keeps the queue alive.
@@ -484,6 +490,29 @@
       }
     } catch {}
     try { if (actx && actx.state === 'suspended') actx.resume(); } catch {}
+    // Unlock the <audio> element too: iOS only lets HTMLAudioElement.play() run
+    // programmatically later if it was first played inside a gesture. Play a
+    // silent (inaudible-content) clip now so neural TTS auto-read works on phones.
+    try {
+      const el = V.audioEl = V.audioEl || new Audio();
+      el.src = silentWavUrl();
+      const p = el.play();
+      if (p && p.catch) p.catch(() => {});
+      Promise.resolve(p).finally(() => { try { el.pause(); el.currentTime = 0; } catch {} });
+    } catch {}
+  }
+  // A tiny, valid, silent WAV as a blob URL — used only to unlock the audio
+  // element on the first user gesture (see primeAudio). Built at runtime so we
+  // never ship a base64 blob that some browser rejects.
+  function silentWavUrl() {
+    const n = 256, buf = new ArrayBuffer(44 + n), dv = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); dv.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, 8000, true); dv.setUint32(28, 8000, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
+    w(36, 'data'); dv.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) dv.setUint8(44 + i, 128); // 8-bit PCM midpoint = silence
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
   }
 
   // On a phone the hub is voice-first: read replies aloud automatically, no
