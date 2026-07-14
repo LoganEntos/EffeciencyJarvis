@@ -399,57 +399,79 @@
     if (cur.trim()) out.push(cur.trim());
     return out.length ? out : [text];
   }
+  // A generic fetch-ahead → play-in-order pipeline. Given ordered `chunks`, it
+  // fetches each (opts.fetch → Promise<blob>) back-to-back so the synth engine
+  // never idles, and plays them strictly in order (opts.play(blob, next)) the
+  // moment each lands. This is the chunk/fetch/play interleaving that used to
+  // live tangled inside speakCSM; the CSM-specific policy is injected:
+  //   opts.isStale()  → abort every callback on barge-in (a newer reply began)
+  //   opts.onDone()   → the last chunk finished playing
+  //   opts.onError(e, firstUnplayed) → a fetch rejected. firstUnplayed means
+  //     chunk 0 failed before any audio, so the caller does a full fallback;
+  //     otherwise the pipeline truncates to what already played and stops.
+  function ChunkPipeline(chunks, opts) {
+    const ready = [];               // blobs by chunk index, filled as fetches land
+    let fetchIdx = 0, playIdx = 0, playing = false, len = chunks.length;
+    function playNext() {
+      if (opts.isStale()) return;
+      if (playIdx >= len) { opts.onDone(); return; }
+      const blob = ready[playIdx];
+      if (!blob) { playing = false; return; } // not synthesized yet — a fetch cb resumes us
+      playing = true;
+      opts.play(blob, playNext);
+      ready[playIdx] = null; playIdx++;
+    }
+    function fetchNext() {
+      if (opts.isStale() || fetchIdx >= len) return;
+      const i = fetchIdx++;
+      opts.fetch(chunks[i]).then(blob => {
+        if (opts.isStale()) return;
+        ready[i] = blob;
+        fetchNext();                          // keep the engine busy on the next chunk
+        if (!playing && playIdx === i) playNext();
+      }).catch(e => {
+        if (opts.isStale()) return;
+        const firstUnplayed = (i === 0 && !playing);
+        opts.onError(e, firstUnplayed);
+        if (!firstUnplayed) {                 // mid-reply — stop after what's queued
+          len = Math.min(len, i);
+          if (!playing) playNext();
+        }
+      });
+    }
+    return { start: fetchNext };
+  }
+
   let csmWarned = false;
-  // Returns true optimistically (the wav arrives async). If the FIRST chunk
-  // fails, falls back to browser TTS for the whole utterance so the call loop
-  // stays alive; a mid-utterance failure just ends the reply early.
+  // Returns true optimistically (the wav arrives async). Drives a ChunkPipeline:
+  // if the FIRST chunk fails, falls back to browser TTS for the whole utterance
+  // so the call loop stays alive; a mid-utterance failure just ends the reply.
   function speakCSM(clean) {
     stopSpeak();
     const gen = ++V.csmGen;
     V.csmPending = true; // stays true across inter-chunk gaps (barge-in guard)
-    const chunks = csmChunks(clean);
-    const ready = [];               // blobs by chunk index, filled as fetches land
-    let fetchIdx = 0, playIdx = 0, playing = false;
-
-    const done = () => {
-      if (gen !== V.csmGen) return;
-      V.csmPending = false;
-      if (V.call) reListenSoon(200);
-      else if (V.state === 'speaking') setState('idle');
-    };
-    function playNext() {
-      if (gen !== V.csmGen) return;
-      if (playIdx >= chunks.length) { done(); return; }
-      const blob = ready[playIdx];
-      if (!blob) { playing = false; return; } // not synthesized yet — fetch cb resumes us
-      playing = true;
-      playBlob(blob, playNext);
-      ready[playIdx] = null; playIdx++;
-    }
-    function fetchNext() {
-      if (gen !== V.csmGen || fetchIdx >= chunks.length) return;
-      const i = fetchIdx++;
-      csmFetch(chunks[i]).then(blob => {
-        if (gen !== V.csmGen) return;
-        ready[i] = blob;
-        fetchNext();                          // keep the GPU busy on the next chunk
-        if (!playing && playIdx === i) playNext();
-      }).catch(e => {
-        if (gen !== V.csmGen) return;
+    const stale = () => gen !== V.csmGen;
+    ChunkPipeline(csmChunks(clean), {
+      isStale: stale,
+      fetch: (chunk) => csmFetch(chunk),
+      play: (blob, next) => playBlob(blob, next),
+      onDone: () => {
+        if (stale()) return;
+        V.csmPending = false;
+        if (V.call) reListenSoon(200);
+        else if (V.state === 'speaking') setState('idle');
+      },
+      onError: (e, firstUnplayed) => {
         if (!csmWarned) { csmWarned = true; say('CSM voice unavailable — using the browser voice instead. (' + String((e && e.message) || e).slice(0, 120) + ')', 'errmsg'); }
-        if (i === 0 && !playing) {            // nothing spoken yet — full fallback
+        if (firstUnplayed) {                  // nothing spoken yet — full fallback
           V.csmPending = false;
           if (!speakBrowser(clean)) {
             if (V.call) reListenSoon(400);
             else if (V.state === 'speaking' || V.state === 'thinking') setState('idle');
           }
-        } else {                              // mid-reply — stop after what's queued
-          chunks.length = Math.min(chunks.length, i);
-          if (!playing) playNext();
         }
-      });
-    }
-    fetchNext();
+      },
+    }).start();
     return true;
   }
 
