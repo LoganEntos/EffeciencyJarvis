@@ -392,11 +392,11 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
      are hidden outright — desktop rules for them are untouched above. */
   #navToggle,.navOverlay{display:none!important}
   .wrap{min-height:calc(100dvh - 48px)}
-  /* Two-row grid, not a single scrolling strip: 15 tabs at 52px overflowed
+  /* Two-row grid, not a single scrolling strip: the tabs at 52px overflowed
      375px into a hidden horizontal scroll, so the last tabs (Sources/Tools/
      Config) fell off the right edge and were easy to miss. Wrapping to a fixed
      8-per-row grid keeps EVERY tab on screen and tappable with zero JS — the
-     row 1 fills 8, row 2 centers the remaining 7. */
+     16 tabs fill two even rows of 8. */
   nav{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;height:auto;flex-shrink:0;
     display:flex;flex-direction:row;flex-wrap:wrap;align-items:stretch;justify-content:center;
     gap:3px 2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));
@@ -406,7 +406,7 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
   nav a{flex:0 0 calc(12.5% - 4px);flex-direction:column;justify-content:center;align-items:center;gap:1px;
     padding:5px 3px;margin:0;border-radius:8px;min-width:0}
   nav a .ico{width:19px;height:19px;flex:0 0 auto;opacity:1}
-  nav a span.txt{display:block;font-size:8.5px;letter-spacing:0;white-space:nowrap;
+  nav a span.txt{display:block;font-size:10px;letter-spacing:0;white-space:nowrap;
     max-width:100%;overflow:hidden;text-overflow:ellipsis}
   nav a kbd{display:none}
   nav a.active{box-shadow:inset 0 2px 0 var(--accent)}
