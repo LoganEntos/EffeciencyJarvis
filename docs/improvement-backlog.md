@@ -65,7 +65,39 @@ Two audits ran 2026-07-11 (code-reviewer + ui-designer subagents over
 | U3 | assets/voicecfg.js:43-56 | Voice engine selector (Browser/Kokoro/CSM) — the most consequential voice setting — is an undersized plain `<select>` buried in a dense row | Promote to a prominent segmented control | S | med | ✅ 2026-07-14 |
 | U4 | assets/voice.js:170 vs style.css:3 | Mic orb paints "listening" GREEN, violating the app's own "green = success only" rule; 38×38 orb breaks the 32×32 header rhythm | Distinct non-green listening color; align size | S | med | ✅ 2026-07-14 |
 | U5 | assets/style.css:91 | One flat 12px `h2` for both page titles and subsections — no tab gets a hero moment (against "big size jumps" rule) | Add a page-title scale | M | med | ✅ 2026-07-14 |
-| U6 | — | 7 more ranked UI findings + a "what's working" section (from the audit) | see reply notes | — | — | ⬜ |
+| U6 | — | 7 more ranked UI findings + a "what's working" section (from the audit) | Captured below (U7–U13 + "What's working") | S | — | ✅ 2026-07-14 |
+| U7 | assets/app.js:102 `goTab()` | Switching tabs never moves focus into the revealed `<section>` — keyboard/SR users stay parked on the nav item and must re-traverse the whole page; nothing announces the panel changed | Give each `<section>` `tabindex="-1"` and `.focus()` it in `goTab()` (and/or wrap `<main>` in `aria-live="polite"`) | S | high | ⬜ |
+| U8 | assets/app.js:121 | Hrefless nav anchors are tagged `role="link"` but never navigate to a URL and activate on Space like buttons — a screen reader mis-announces "link", and links don't normally fire on Space | These are a tab set: use `role="tab"` + `aria-selected` inside a `role="tablist"`, or fall back to `role="button"` | S | med | ⬜ |
+| U9 | index.html:52-53 | `#statusBadge` (server live/down) and `#liveBadge` (idle↔live) mutate their text silently — no `aria-live`, so non-visual users never hear "server down" or "run started" | Add `aria-live="polite"` to both badges | S | med | ⬜ |
+| U10 | assets/style.css:145-150 | The single page-load stagger is misaligned after SharePoint + the Library group were added: the `nth-child` delays assume `.navlabel` divs at children 6/11, but they now sit at 8/12 — so SharePoint (child 6), Graph (child 11) and Assets/Sources/Tools/Config (16-19) reveal with **zero** delay while a label div gets a delay it can't use | Re-key the reveal to the anchors themselves — e.g. `nav a{animation-delay:calc(var(--i)*.03s)}` with an index set in JS, so it survives future nav edits | S | low | ⬜ |
+| U11 | assets/style.css:406 | Mobile bottom-bar tab labels render at **8.5px** `.txt`, below the legibility floor the rest of the M1 mobile pass raised everything else to; the accompanying comment ("15 tabs / row 2 centers the remaining 7") is also stale — there are now 16 tabs, an even 8+8 | Bump label size (≥10px) or drop the label under the active tab only; refresh the stale comment | S | low | ⬜ |
+| U12 | assets/style.css:125,180 | `nav .navlabel` and `.card .l` render weight-200 mono at 10px in `--dim` (~#6d6455 on #0c0b0a ≈ 3:1), under WCAG's 4.5:1 for text — the "extreme weights" rule shouldn't cost readability on functional labels | Raise those two label roles to `--muted`, or lift size/weight until they clear 4.5:1 | S | low | ⬜ |
+| U13 | assets/style.css:190 (runbar selects) | The Run-tab engine/model/perms pickers are still bare native `<select>`s — only the TTS engine got the U3 segmented control; their OS popup ignores the amber theme and mono font, the same "buried select" critique U3 raised | Add a custom chevron/affordance to the closed control, or promote the most-used picker (perms) to a segmented control for consistency | S | low | ⬜ |
+
+### What's working (audit positives — keep these, don't regress)
+
+- **Self-maintaining keyboard a11y (U1).** The `MutationObserver` in `app.js:150`
+  that grants `tabindex`/`role="button"` to any clickable as it renders, plus one
+  delegated Enter/Space handler, means new clickables are covered for free — a
+  genuinely elegant pattern, not a per-site patch.
+- **Disciplined motion budget.** One staggered page-load reveal (`rise`) is the
+  whole animation budget, and `prefers-reduced-motion` is honoured on every
+  keyframe (nav, cursor, live-pulse, shimmer). No scattered micro-interactions.
+- **Cohesive token system.** Amber-on-near-black with full light / warm-dark /
+  clean-dark theming driven entirely by CSS variables; green is now correctly
+  reserved for success states only (post-U4). No AI-slop palette.
+- **Mobile shell is robust.** The bottom-tab rebuild keeps every tab visible with
+  zero dependence on JS toggle state, and safe-area insets stop the phone status
+  bar from overlapping the title — both prior bug reports stay fixed.
+- **Distinctive typography.** Bricolage Grotesque / JetBrains Mono / Instrument
+  Serif with real weight and size jumps and `tabular-nums` on data — no Inter,
+  Roboto, or system-font slop.
+- **Correct number-key shortcuts.** Tab hotkeys are driven off each anchor's own
+  `<kbd>` (`app.js:101`), not DOM index, so the post-SharePoint off-by-one can't
+  recur.
+- **Consistent, shape-hugging focus ring.** `:focus-visible` gives one accent ring
+  across nav, buttons, chips, rows and inputs, with per-shape `border-radius`
+  overrides so it hugs pills and cards correctly.
 
 ## Voice engine (this session — UNVERIFIED, pending user install)
 - Kokoro-82M fast engine added (scripts/kokoro-server.py, generalized lib/voice.js
