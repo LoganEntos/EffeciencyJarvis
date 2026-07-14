@@ -81,23 +81,15 @@ voice-engine control, page-title scale, focus management, aria-live badges,
 WCAG-contrast label lift, amber runbar selects) are all done — see
 `docs/improvement-backlog.md` (every C/U item marked ✅). Smoke green.
 
-## EXECUTE NEXT — the live find-fix list (`docs/improvement-backlog.md`, 2026-07-14 round)
-A fresh source trace surfaced these; **P1 first** (correctness / security / hard-rule):
-1. **Uploaded SVG served inline & script-executable, same-origin** — `lib/files.js:168`
-   drops `.svg` through `/api/files/view` as `image/svg+xml` with no sandbox;
-   navigating the URL directly runs its inline `<script>` in the hub's token-bearing
-   origin. Force svg through download, or send `Content-Security-Policy: sandbox`.
-2. **`run.js` is 501 lines — 1 over the hard rule.** Move `renderUsageGauge()` (or
-   the artifacts block) into a helper file before the next edit.
-3. **Stale voice talk-back:** `chat.lastText` is never cleared between prompts
-   (`assets/run.js`), so a tool-only run speaks the PREVIOUS reply aloud on mobile.
-   Clear it in `sendPrompt()`/`newChat()`.
-4. **Number-key tab shortcuts are off-by-one after SharePoint** (`assets/app.js`) —
-   drive the shortcut off each anchor's own `<kbd>` digit, not array index.
-
-Then the P2 (mobile/voice) and P3 (polish) items in the same file. **These are the
-efficient batch for a Fable 5 self-improvement pass** — mechanical, well-scoped,
-each with an exact file:line and fix.
+## EXECUTE NEXT
+The 2026-07-14 find-fix round is **fully closed** (Fable 5 pass, same day): all
+15 P1/P2/P3 items are ✅ in `docs/improvement-backlog.md` — 6 were already fixed
+by the C/U rounds, 9 fixed in the pass (rungauge.js split, mobile-voice probe +
+pointer-based `isMobileDevice()`, token-count, sessionModel scan, inbox rmdir…).
+**N7 SharePoint Breakdown SHIPPED** the same day: offline navigable tree under
+the SharePoint tab (index/tree + index/browse endpoints), file Open via
+SharePoint's own viewers, Pull to inbox, graphify-on-Opus with a last-run stamp.
+Next work comes from `docs/roadmap.md` — nothing is queued in the backlog.
 
 Queued (do NOT build until the user greenlights): **N10 Council mode** (Claude-only
 fan-out + synthesis, `lib/council.js`), **N7 SharePoint Breakdown** (file-level

@@ -227,7 +227,15 @@ async function handle(req, res, url) {
     try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
     const f = inboxFile((b.name || '').toString());
     if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
-    try { fs.unlinkSync(f.full); U.sendJson(res, { ok: true }); }
+    try {
+      fs.unlinkSync(f.full);
+      // deleting the last file of a project folder shouldn't leave an empty
+      // group hanging in the Files tab — rmdir refuses non-empty dirs, so this
+      // only ever removes a now-empty project folder
+      const dir = path.dirname(f.full);
+      if (path.resolve(dir) !== path.resolve(INBOX)) { try { fs.rmdirSync(dir); } catch {} }
+      U.sendJson(res, { ok: true });
+    }
     catch (e) { U.sendJson(res, { error: e.message }, 500); }
     return true;
   }

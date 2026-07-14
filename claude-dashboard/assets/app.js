@@ -191,7 +191,6 @@ document.addEventListener('keydown', e => {
   const t = e.target.tagName;
   if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || e.ctrlKey || e.altKey || e.metaKey) return;
   if (/^[0-9]$/.test(e.key) && KEY_TABS[e.key]) { goTab(KEY_TABS[e.key]); }
-  else if (e.key === '0') { const tab = TABS[9]; if (tab) goTab(tab); }
   else if (e.key === 'r' || e.key === 'R') { load(currentTab, true); }
   else if (e.key === '/') { const s = $('#' + currentTab + ' input.search'); if (s) { e.preventDefault(); s.focus(); } }
 });

@@ -169,7 +169,11 @@ window.HubVoiceTTS = function (ctx) {
         else if (V.state === 'speaking') setState('idle');
       },
       onError: (e, firstUnplayed) => {
-        if (!csmWarned) { csmWarned = true; say('CSM voice unavailable — using the browser voice instead. (' + String((e && e.message) || e).slice(0, 120) + ')', 'errmsg'); }
+        if (!csmWarned) {
+          csmWarned = true;
+          const eng = store.neural ? store.engine : 'kokoro'; // mirrors csmFetch's default
+          say((eng === 'csm' ? 'CSM' : 'Kokoro') + ' voice unavailable — using the browser voice instead. (' + String((e && e.message) || e).slice(0, 120) + ')', 'errmsg');
+        }
         if (firstUnplayed) {                  // nothing spoken yet — full fallback
           V.csmPending = false;
           if (!speakBrowser(clean)) {

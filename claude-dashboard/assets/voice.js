@@ -326,12 +326,12 @@
     if (speechPrimed) return;
     speechPrimed = true;
     try {
-      if (SS) {
-        // iOS Safari only opens the speech channel when an AUDIBLE utterance
-        // runs inside a real gesture — a volume:0 primer (what we used before)
-        // never unlocks it, so later async auto-reads stayed silent on phones.
-        // Use a real but near-instant, barely-audible utterance instead, and
-        // resume() (iOS parks the queue in a suspended state after the gesture).
+      // The AUDIBLE primer is a mobile-only need: iOS Safari only opens the
+      // speech channel when an audible utterance runs inside a real gesture —
+      // a volume:0 primer never unlocks it, so async auto-reads stayed silent
+      // on phones. Desktop has no such block, and the faint blip there could
+      // clip the first earcon — so desktop keeps only the silent unlocks below.
+      if (SS && isMobileDevice()) {
         const u = new SpeechSynthesisUtterance('.');
         u.volume = 0.05; u.rate = 2;
         SS.cancel(); SS.speak(u); SS.resume();
@@ -364,13 +364,15 @@
   }
 
   // On a phone the hub is voice-first: read replies aloud automatically, no
-  // talk-back toggle needed. Gated on a coarse pointer AND a phone-sized screen
-  // so touch laptops / large tablets still honor the explicit desktop toggle.
+  // talk-back toggle needed. Gated on a coarse pointer AND no hover — not a
+  // pixel width, which broke on an iPhone in landscape (~844px > the old
+  // 820px cap, so rotating the phone silently turned auto-read off). Touch
+  // laptops still fail the test (their primary pointer is fine + they hover).
   function isMobileDevice() {
     try {
       return !!(window.matchMedia
         && window.matchMedia('(pointer: coarse)').matches
-        && window.matchMedia('(max-width: 820px)').matches);
+        && window.matchMedia('(hover: none)').matches);
     } catch { return false; }
   }
 
@@ -405,6 +407,19 @@
     // by the browser's autoplay policy (see primeAudio). Passive + once each.
     ['pointerdown', 'touchend', 'keydown'].forEach(ev =>
       document.addEventListener(ev, primeAudio, { once: true, passive: true }));
+    // Mobile auto-read depends on the Kokoro sidecar (speak() routes phones
+    // through the neural audio-element path because iOS blocks async
+    // speechSynthesis, and the browser fallback is that same blocked path).
+    // If Kokoro isn't up, the phone would just be silent with no explanation —
+    // probe once and say why, instead of leaving a dead voice.
+    if (isMobileDevice() && store.engine === 'browser') {
+      fetch('/api/voice/status?engine=kokoro').then(r => r.json()).then(s => {
+        if (s && s.status !== 'ok') say(
+          s.installed
+            ? 'Spoken replies need the Kokoro voice engine — start it on the PC: Config → Voice → ⚡ Start engine.'
+            : 'Spoken replies need the Kokoro voice engine, which isn\'t installed yet — see Config → Voice on the PC (one-time ~340 MB setup).', 'sys');
+      }).catch(() => {});
+    }
     // The moment you start texting me, I go quiet — stop the reply mid-sentence.
     // (Barge-in rule; the spoken-input half arrives when we keep the mic open
     //  during talk-back — see startListen's SS.cancel for the manual version.)

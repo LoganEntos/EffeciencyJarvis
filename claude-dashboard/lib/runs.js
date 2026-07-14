@@ -65,10 +65,16 @@ function routeModel(prompt) {
 // A resumed conversation keeps the model it started with — switching models
 // mid-session wastes the prompt cache and changes the voice.
 function sessionModel(sessionId) {
-  for (const e of U.listDir(RUNS_DIR)) {
-    if (!e.isDirectory()) continue;
-    const live = active.get(e.name);
-    const meta = live ? live.meta : U.safeJson(path.join(RUNS_DIR, e.name, 'meta.json'));
+  // Live runs first (no disk), then history NEWEST-first with an early return —
+  // run ids are timestamps so a reverse name-sort walks newest first, and a
+  // resumed session is almost always recent. The old version stat-read every
+  // meta.json on disk per resume, O(all history) forever.
+  for (const live of active.values()) {
+    if (live.meta && live.meta.sessionId === sessionId && live.meta.model) return live.meta.model;
+  }
+  const dirs = U.listDir(RUNS_DIR).filter(e => e.isDirectory()).map(e => e.name).sort().reverse();
+  for (const name of dirs) {
+    const meta = U.safeJson(path.join(RUNS_DIR, name, 'meta.json'));
     if (meta && meta.sessionId === sessionId && meta.model) return meta.model;
   }
   return null;
