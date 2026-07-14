@@ -331,17 +331,22 @@
     if (!clean) return false;
     return store.neural ? speakCSM(clean) : speakBrowser(clean);
   }
+  // iOS/Chrome both suspend speechSynthesis after ~15 s, cutting long replies
+  // off mid-sentence; a periodic pause()+resume() keeps the queue alive.
+  function stopTtsKeepAlive() { if (V.ttsKA) { clearInterval(V.ttsKA); V.ttsKA = null; } }
   function speakBrowser(clean) {
     if (!SS || !clean) return false;
     SS.cancel();
     const u = new SpeechSynthesisUtterance(clean);
     const v = pickVoice(); if (v) u.voice = v;
-    u.rate = store.rate; u.onstart = () => setState('speaking');
+    u.rate = store.rate;
+    u.onstart = () => { setState('speaking'); stopTtsKeepAlive(); V.ttsKA = setInterval(() => { try { if (SS.speaking) { SS.pause(); SS.resume(); } } catch {} }, 9000); };
     u.onend = u.onerror = () => {
+      stopTtsKeepAlive();
       if (V.call) reListenSoon(200);        // reply finished → your turn again
       else if (V.state === 'speaking') setState('idle');
     };
-    SS.speak(u);
+    SS.speak(u); SS.resume();               // resume: iOS parks the queue post-gesture
     return true;
   }
 
@@ -447,6 +452,7 @@
   // The one place speech dies (SS + in-flight CSM fetch + CSM audio element);
   // every barge-in path — typing, Esc, run start, orb click — funnels here.
   function stopSpeak() {
+    stopTtsKeepAlive();
     if (SS) SS.cancel();
     V.csmGen++; V.csmPending = false;
     if (V.audioEl) { try { V.audioEl.onended = V.audioEl.onerror = null; V.audioEl.pause(); V.audioEl.currentTime = 0; } catch {} }
@@ -467,9 +473,14 @@
     speechPrimed = true;
     try {
       if (SS) {
-        const u = new SpeechSynthesisUtterance(' ');
-        u.volume = 0; u.rate = store.rate;
-        SS.cancel(); SS.speak(u);
+        // iOS Safari only opens the speech channel when an AUDIBLE utterance
+        // runs inside a real gesture — a volume:0 primer (what we used before)
+        // never unlocks it, so later async auto-reads stayed silent on phones.
+        // Use a real but near-instant, barely-audible utterance instead, and
+        // resume() (iOS parks the queue in a suspended state after the gesture).
+        const u = new SpeechSynthesisUtterance('.');
+        u.volume = 0.05; u.rate = 2;
+        SS.cancel(); SS.speak(u); SS.resume();
       }
     } catch {}
     try { if (actx && actx.state === 'suspended') actx.resume(); } catch {}
