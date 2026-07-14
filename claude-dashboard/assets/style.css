@@ -112,7 +112,7 @@ header .badge{font-size:11px;color:var(--muted);border:1px solid var(--line);bor
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 header .spacer{flex:1}
 header .iconbtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;
-  width:32px;height:32px;padding:0;font-size:15px;line-height:1;cursor:pointer}
+  width:32px;height:32px;padding:0;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 header .iconbtn:hover{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-soft)}
 #navToggle{display:none;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;
   width:32px;height:32px;padding:0;font-size:16px;line-height:1;cursor:pointer;align-items:center;justify-content:center}
@@ -127,7 +127,12 @@ nav .navlabel{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:v
 nav a{display:flex;align-items:center;gap:11px;padding:9px 14px;margin:1px 0;color:var(--muted);cursor:pointer;
   border-radius:8px;user-select:none;font-size:13.5px;transition:background .12s,color .12s;position:relative;
   -webkit-tap-highlight-color:transparent}
-nav a .ico{width:18px;text-align:center;font-size:14px;opacity:.85}
+nav a .ico{width:17px;height:17px;flex:0 0 17px;opacity:.85;stroke:currentColor;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav a.active .ico,nav a:hover .ico{opacity:1}
+/* header icon buttons (theme / restart / refresh / nav toggle) */
+header .btnico{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;display:block}
 nav a kbd{margin-left:auto;font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:4px;
   padding:1px 5px;background:#ffffff05}
 nav a:hover{color:var(--txt);background:#ffffff08}
@@ -372,7 +377,7 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
   nav .navlabel{display:none}
   nav a{flex:0 0 calc(12.5% - 4px);flex-direction:column;justify-content:center;align-items:center;gap:1px;
     padding:5px 3px;margin:0;border-radius:8px;min-width:0}
-  nav a .ico{width:auto;font-size:17px;opacity:1}
+  nav a .ico{width:19px;height:19px;flex:0 0 auto;opacity:1}
   nav a span.txt{display:block;font-size:8.5px;letter-spacing:0;white-space:nowrap;
     max-width:100%;overflow:hidden;text-overflow:ellipsis}
   nav a kbd{display:none}
