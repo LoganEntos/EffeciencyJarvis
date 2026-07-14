@@ -23,6 +23,9 @@ ruvector.db
 # CSM-1B local TTS sidecar (venv + model cache), see scripts/csm-server.py
 .csm/
 
+# Kokoro-82M local TTS sidecar (venv + ~325MB onnx + voices bin), see scripts/kokoro-server.py
+.kokoro/
+
 # raw ECC download (adopted copy lives in .claude/skills-library/)
 ECC-main/
 ECC-main.zip

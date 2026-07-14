@@ -4,10 +4,20 @@ Single source of truth for what to build next. Ordering rule: items that make
 every later item cheaper/better ship first. **Token efficiency is the north
 star** — prefer zero-dep, avoid always-on MCPs (they tax every run).
 
-> **Architecture decision log: `docs/open-issues.md`** — ALL six ISSUES
-> resolved 2026-07-10: 1/2/3/4/6 by retiring ruflo; ISSUE-5 by ADOPTING hermes
-> as the second agentic stack (installed + operational; H2–H4 wire it into the
-> hub, the gateway toggle is the mobile bridge). No open architecture issues.
+> ⚠️ **STATUS BANNER (2026-07-14) — read before trusting the sections below.**
+> The engine is now **Claude-only**; **hermes was DEPRECATED as too expensive**
+> (hidden behind `settings.hermesEnabled`, default off — see the `engine-claude-only`
+> memory + HANDOFF). So every "Hermes is the default / always-on engine" and
+> "H2–H4 next" framing further down is **historical, not the plan** — kept as the
+> decision log, not active work. The clean-dark redesign shipped. The **C1–C13
+> code-health + U1–U13 UI/a11y rounds are DONE** (`docs/improvement-backlog.md`).
+> **What is actually next:** the 2026-07-14 P1→P3 find-fix items in
+> `docs/improvement-backlog.md` (SVG-inline-serve, `run.js` >500, stale voice
+> `lastText`, off-by-one tab keys, then P2/P3). Queued behind a user greenlight:
+> N10 Council, N7 SharePoint Breakdown, N8 iPhone.
+>
+> **Architecture decision log: `docs/open-issues.md`** — all six 2026-07-10 ISSUES
+> resolved (ruflo retired; hermes adopted-then-deprecated). No open architecture issues.
 
 Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred (needs a trigger) · 🙋 needs user action
 
