@@ -113,6 +113,15 @@ function goTab(tab) {
   const sec = $('#' + tab);
   sec.classList.remove('hidden');
   sec.style.animation = 'none'; void sec.offsetHeight; sec.style.animation = ''; // retrigger entrance
+  // a11y (backlog U7): pull focus into the revealed panel so keyboard/SR users
+  // land on the new content instead of staying parked on the nav item. Name it
+  // as a region so the switch is announced ("<Tab>, region"); preventScroll
+  // keeps the layout from jumping on switch.
+  const link = document.querySelector(`nav a[data-tab="${tab}"] .txt`);
+  sec.setAttribute('role', 'region');
+  sec.setAttribute('aria-label', link ? link.textContent.trim() : tab);
+  sec.tabIndex = -1;
+  requestAnimationFrame(() => sec.focus({ preventScroll: true }));
   load(tab);
 }
 // nav items are hrefless <a> — make them keyboard-operable (focusable + Enter/Space)

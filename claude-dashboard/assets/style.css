@@ -156,6 +156,10 @@ main{animation-delay:.12s}
 
 main{flex:1;padding:26px 32px 60px;overflow:auto;min-width:0}
 main section{animation:fadein .18s ease-out}
+/* U7: goTab() focuses the revealed panel for keyboard/SR users; suppress the ring
+   on the section wrapper itself — a full-panel outline reads as noise, and focus
+   still lands here so the next Tab enters the panel content. */
+main section:focus,main section:focus-visible{outline:none}
 @keyframes fadein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 h2{font-size:12px;margin:0 0 16px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--muted)}
 /* page-title scale (U5): the FIRST h2 in each tab is a hero, not a micro-label —
