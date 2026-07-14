@@ -124,10 +124,12 @@ function goTab(tab) {
   requestAnimationFrame(() => sec.focus({ preventScroll: true }));
   load(tab);
 }
-// nav items are hrefless <a> — make them keyboard-operable (focusable + Enter/Space)
+// nav items are hrefless <a> that switch tabs, not navigate to a URL (backlog
+// U8): role="button" — not "link" — so a screen reader announces "button" and
+// Space-to-activate matches native button semantics (links don't fire on Space).
 document.querySelectorAll('nav a').forEach(a => {
   a.tabIndex = 0;
-  a.setAttribute('role', 'link');
+  a.setAttribute('role', 'button');
   a.onclick = () => goTab(a.dataset.tab);
   a.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTab(a.dataset.tab); } };
 });
