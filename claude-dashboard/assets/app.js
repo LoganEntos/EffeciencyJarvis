@@ -95,6 +95,9 @@ $('#navOverlay').onclick = () => closeNav();
 // ---- tab switching (persisted, keyboard-driven) ----
 let currentTab = 'run';
 const TABS = [...document.querySelectorAll('nav a')].map(a => a.dataset.tab);
+// Stagger index for the page-load reveal (U10): key each anchor to its own DOM
+// order so the CSS delay survives nav edits instead of relying on nth-child.
+document.querySelectorAll('nav a').forEach((a, i) => a.style.setProperty('--i', i + 1));
 // Number-key → tab from the printed <kbd> hint, NOT DOM index: tabs without a
 // hint (SharePoint, Commands…) would otherwise shift keys 5–0 off by one.
 const KEY_TABS = {};

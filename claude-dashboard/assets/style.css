@@ -141,13 +141,12 @@ nav a.active{color:var(--accent);background:var(--accent-soft);box-shadow:inset 
 nav a.active kbd{color:var(--muted);border-color:var(--accent-dim)}
 
 /* ---- one staggered page-load reveal (the motion budget) ---- */
+/* Delay is keyed to each anchor's own --i (set in app.js by DOM order of the
+   real links, skipping the .navlabel group headers), so the stagger survives
+   nav edits — adding a tab or a Library/Monitor group no longer shifts the
+   nth-child math out from under it (U10). */
 header,nav a,main{animation:rise .4s ease-out backwards}
-nav a:nth-child(2){animation-delay:.03s} nav a:nth-child(3){animation-delay:.06s}
-nav a:nth-child(4){animation-delay:.09s} nav a:nth-child(5){animation-delay:.12s}
-nav a:nth-child(7){animation-delay:.15s} nav a:nth-child(8){animation-delay:.18s}
-nav a:nth-child(9){animation-delay:.21s} nav a:nth-child(10){animation-delay:.24s}
-nav a:nth-child(12){animation-delay:.27s} nav a:nth-child(13){animation-delay:.3s}
-nav a:nth-child(14){animation-delay:.33s} nav a:nth-child(15){animation-delay:.36s}
+nav a{animation-delay:calc(var(--i,0)*.03s)}
 main{animation-delay:.12s}
 @keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){
