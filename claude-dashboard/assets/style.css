@@ -158,6 +158,16 @@ main{flex:1;padding:26px 32px 60px;overflow:auto;min-width:0}
 main section{animation:fadein .18s ease-out}
 @keyframes fadein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 h2{font-size:12px;margin:0 0 16px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--muted)}
+/* page-title scale (U5): the FIRST h2 in each tab is a hero, not a micro-label —
+   a real ~2.4x size jump over the 12px subsection heads below it, full-contrast
+   and normal-case, with a short accent underline as the tab's signature. */
+main section > h2:first-of-type{font-size:clamp(22px,3.2vw,28px);margin:2px 0 22px;font-weight:800;
+  line-height:1.05;text-transform:none;letter-spacing:-.4px;color:var(--txt)}
+main section > h2:first-of-type::after{content:"";display:block;width:34px;height:3px;margin-top:11px;
+  border-radius:2px;background:var(--accent);box-shadow:var(--glow);opacity:.85}
+/* keep any inline muted subtitle small so the title reads big, the aside quiet */
+main section > h2:first-of-type .muted{display:inline-block;font-size:13px;font-weight:400;
+  letter-spacing:.2px;text-transform:none;vertical-align:middle}
 
 /* ---- cards / rows ---- */
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:26px}
