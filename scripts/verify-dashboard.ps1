@@ -74,6 +74,8 @@ Check "GET /api/usage"         "$base/api/usage"
 Check "GET /api/sharepoint/status" "$base/api/sharepoint/status"
 Check "GET /api/sharepoint/index/status" "$base/api/sharepoint/index/status"
 Check "GET /api/sharepoint/index/search" "$base/api/sharepoint/index/search?q=test"
+Check "GET /api/sharepoint/index/tree" "$base/api/sharepoint/index/tree"
+Check "GET /api/sharepoint/index/browse (bad drive 400)" "$base/api/sharepoint/index/browse?drive=%2F..%2Fx" 400
 Check "GET /assets/sharepoint.js" "$base/assets/sharepoint.js"
 Check "GET /api/files/xlsx (bad name 404)" "$base/api/files/xlsx?name=nope.xlsx" 404
 Check "GET /api/run/transcript (bad id 404)" "$base/api/run/transcript?id=nope" 404

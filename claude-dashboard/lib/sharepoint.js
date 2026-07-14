@@ -23,6 +23,7 @@ const DATA = path.join(DASH_DIR, 'data');
 const AUTH_FILE = path.join(DATA, 'sharepoint-auth.json');
 const CFG_FILE = path.join(DATA, 'sharepoint.json');
 const INDEX_FILE = path.join(DATA, 'sharepoint-index.json');
+const GRAPHIFY_FILE = path.join(DATA, 'sharepoint-graphify.json');
 const INBOX = path.join(DATA, 'inbox');
 const MAX_PULL = 50 * 1024 * 1024; // match the inbox upload cap
 
@@ -214,6 +215,54 @@ function indexStats() {
   if (!idx) return null;
   return { builtAt: idx.builtAt, counts: idx.counts, durationMs: idx.durationMs, file: 'claude-dashboard/data/sharepoint-index.json' };
 }
+// Offline BREAKDOWN — navigate the static index as a tree, no Graph calls.
+function indexTree() {
+  const idx = U.safeJson(INDEX_FILE);
+  if (!idx) return { error: 'no index yet — build it first' };
+  return {
+    builtAt: idx.builtAt,
+    sites: (idx.sites || []).map(s => ({
+      name: s.name, webUrl: s.webUrl,
+      drives: (s.drives || []).map(d => ({ id: d.id, name: d.name, fileCount: (d.files || []).length })),
+    })).filter(s => s.drives.some(d => d.fileCount)),
+  };
+}
+function browseIndex(driveId, prefix) {
+  const idx = U.safeJson(INDEX_FILE);
+  if (!idx) return { error: 'no index yet — build it first' };
+  let drive = null, siteName = '';
+  for (const s of idx.sites || []) for (const d of s.drives || []) if (d.id === driveId) { drive = d; siteName = s.name; }
+  if (!drive) return { error: 'drive not in index' };
+  let pre = '/' + (prefix || '').replace(/^\/+|\/+$/g, '');
+  if (pre !== '/') pre += '/';
+  const folders = new Map(), files = [];
+  for (const f of drive.files || []) {
+    if (!f.p.startsWith(pre)) continue;
+    const rest = f.p.slice(pre.length), slash = rest.indexOf('/');
+    if (slash >= 0) { const n = rest.slice(0, slash); folders.set(n, (folders.get(n) || 0) + 1); }
+    else files.push({ name: rest, path: f.p, size: f.s, modified: f.m, id: f.id, driveId: drive.id });
+  }
+  return {
+    site: siteName, drive: drive.name, prefix: pre === '/' ? '' : pre.replace(/^\/|\/$/g, ''),
+    folders: [...folders].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name)),
+    files: files.sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+// Resolve a file's SharePoint webUrl on demand so the user can open it in
+// Office/PDF web viewers without downloading (requires sign-in).
+async function resolveWebUrl(driveId, itemId) {
+  if (!okId(driveId) || !okId(itemId)) return { error: 'bad drive/item id' };
+  const it = await g(`/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}?$select=webUrl,name`);
+  return { webUrl: it.webUrl || null, name: it.name };
+}
+// Timestamp when a graphify pass was last kicked off from the tab.
+function graphifyStamp() {
+  const at = new Date().toISOString();
+  fs.mkdirSync(DATA, { recursive: true });
+  fs.writeFileSync(GRAPHIFY_FILE, JSON.stringify({ at }));
+  return { at };
+}
+function graphifyInfo() { const j = U.safeJson(GRAPHIFY_FILE); return j && j.at ? { at: j.at } : null; }
 function searchIndex(q) {
   const idx = U.safeJson(INDEX_FILE);
   if (!idx) return { error: 'no index yet — build it first' };
@@ -289,6 +338,7 @@ async function handle(req, res, url) {
         tenant: cfg().tenant, clientId: cfg().clientId, customClient: cfg().clientId !== DEFAULT_CLIENT,
         pending: device ? { user_code: device.user_code, verification_uri: device.verification_uri, error: device.error } : null,
         index: indexStats(), crawl: crawl.running || crawl.phase !== 'idle' ? crawl : null,
+        graphify: graphifyInfo(),
       });
     } else if (p === '/api/sharepoint/config' && req.method === 'POST') {
       const b = JSON.parse(await U.readBody(req, 4000) || '{}');
@@ -329,6 +379,16 @@ async function handle(req, res, url) {
       send({ crawl, index: indexStats() });
     } else if (p === '/api/sharepoint/index/search' && req.method === 'GET') {
       send(searchIndex(url.searchParams.get('q') || ''));
+    } else if (p === '/api/sharepoint/index/tree' && req.method === 'GET') {
+      send(indexTree());
+    } else if (p === '/api/sharepoint/index/browse' && req.method === 'GET') {
+      const drive = url.searchParams.get('drive') || '';
+      if (!okId(drive)) return send({ error: 'bad drive id' }, 400), true;
+      send(browseIndex(drive, url.searchParams.get('path') || ''));
+    } else if (p === '/api/sharepoint/weburl' && req.method === 'GET') {
+      send(await resolveWebUrl(url.searchParams.get('drive') || '', url.searchParams.get('item') || ''));
+    } else if (p === '/api/sharepoint/graphify' && req.method === 'POST') {
+      send(graphifyStamp());
     } else if (p === '/api/sharepoint/pull' && req.method === 'POST') {
       const b = JSON.parse(await U.readBody(req, 8000) || '{}');
       send(await pull((b.drive || '').toString(), (b.item || '').toString(), (b.project || '').toString()));

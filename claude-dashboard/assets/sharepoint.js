@@ -13,6 +13,7 @@ renderers.sharepoint = async function () {
       <h2>SharePoint <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— browse live, pull into the inbox, index everything once</span></h2>
       <div class="row" id="spAuth"><div class="muted">Loading…</div></div>
       <div class="row" id="spIndex" style="margin-top:10px"></div>
+      <div class="row" id="spBreak" style="margin-top:10px"></div>
       <div class="row" id="spBrowse" style="margin-top:10px"></div>`;
   }
   await spStatus();
@@ -24,7 +25,8 @@ async function spStatus() {
   try { s = await api('/api/sharepoint/status'); } catch { $('#spAuth').innerHTML = '<div class="muted">SharePoint module unavailable.</div>'; return; }
   spRenderAuth(s);
   spRenderIndex(s);
-  if (s.authed) spRenderBrowse(); else $('#spBrowse').innerHTML = '<div class="muted">Sign in to browse SharePoint.</div>';
+  spRenderBreakdown(s);
+  if (s.authed) spRenderBrowse(); else $('#spBrowse').innerHTML = '<div class="muted">Sign in for the <strong>live</strong> browser (push/pull straight to SharePoint).</div>';
   if (s.pending && !s.pending.error) setTimeout(() => { if ($('#spAuth')) spStatus(); }, 3000);
 }
 
@@ -78,6 +80,7 @@ function spRenderIndex(s) {
     : '<span class="pill neutral">not built yet</span>'}
         ${running ? `<span class="pill warn">${esc(cr.phase)} — ${cr.files.toLocaleString()} files so far</span>` : ''}
         ${cr && cr.error ? `<span class="pill err">${esc(cr.error)}</span>` : ''}
+        ${s.graphify ? `<span class="pill neutral" title="Fable 5 graphify run last kicked off">⬡ graphified ${new Date(s.graphify.at).toLocaleString()}</span>` : ''}
       </span>
       <span class="flex">
         <button class="ghost" id="spBuild" ${running || !s.authed ? 'disabled' : ''} style="padding:6px 12px;font-size:11.5px">⟲ ${idx ? 'Rebuild' : 'Build'} index</button>
@@ -95,8 +98,9 @@ function spRenderIndex(s) {
   $('#spGraphify').onclick = async () => {
     const r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       prompt: '/graphify claude-dashboard/data/sharepoint-index.json — ingest the SharePoint file index (sites → drives → file paths with sizes and modified dates) into the knowledge graph, replacing any earlier SharePoint ingest, so future runs can locate SharePoint files and answer structure questions from the graph instead of calling Microsoft Graph or re-scanning.',
-      model: 'auto' }) });
-    $('#spGraphify').outerHTML = r.error ? `<span class="pill err">${esc(r.error)}</span>` : '<span class="pill ok">graphify run started — watch it in the Run tab</span>';
+      model: 'claude-fable-5' }) });
+    if (!r.error) api('/api/sharepoint/graphify', { method: 'POST' }).catch(() => {});
+    $('#spGraphify').outerHTML = r.error ? `<span class="pill err">${esc(r.error)}</span>` : '<span class="pill ok">Fable 5 graphify started — watch it in the Run tab</span>';
   };
   $('#spSearch').oninput = spDebounceSearch;
 }
@@ -115,6 +119,66 @@ async function spDoSearch() {
       <button class="ghost spPull" data-drive="${esc(h.driveId)}" data-item="${esc(h.itemId)}" style="padding:4px 10px;font-size:11px">⇩ Pull</button>
     </div>`).join('') + (r.truncated ? '<div class="muted" style="font-size:11px;margin-top:6px">200+ matches — narrow the search</div>' : '');
   box.querySelectorAll('.spPull').forEach(b => b.onclick = () => spPull(b));
+}
+
+/* Offline BREAKDOWN — navigate the built index as a tree with no Graph calls.
+   Files open in SharePoint's own PDF/Office web viewer (resolves webUrl on
+   click when signed in) or pull into the inbox. */
+const BRK = { drive: '', driveName: '', site: '', path: '', authed: false };
+async function spRenderBreakdown(s) {
+  const el = $('#spBreak');
+  BRK.authed = !!s.authed;
+  if (!s.index) { el.innerHTML = '<div class="muted">Breakdown appears once the index is built.</div>'; return; }
+  const t = await api('/api/sharepoint/index/tree').catch(() => ({ error: 'unavailable' }));
+  if (t.error) { el.innerHTML = `<div class="pill err">${esc(t.error)}</div>`; return; }
+  const opts = ['<option value="">— library —</option>'];
+  for (const site of t.sites) for (const d of site.drives)
+    opts.push(`<option value="${esc(d.id)}" data-site="${esc(site.name || '')}" data-name="${esc(d.name)}">${esc(site.name || 'site')} / ${esc(d.name)} · ${d.fileCount.toLocaleString()}</option>`);
+  el.innerHTML = `<div class="flex" style="flex-wrap:wrap;gap:8px">
+      <strong>Breakdown</strong>
+      <span class="muted" style="font-size:11.5px">navigate the indexed tree — instant, no Graph calls</span>
+      <select id="brkDrive" style="margin-left:auto">${opts.join('')}</select></div>
+    <div id="brkCrumbs" style="margin:10px 0 4px;font-size:12px"></div>
+    <div id="brkList"></div>`;
+  $('#brkDrive').onchange = () => {
+    const o = $('#brkDrive').selectedOptions[0];
+    BRK.drive = $('#brkDrive').value; BRK.driveName = o.dataset.name || ''; BRK.site = o.dataset.site || ''; BRK.path = '';
+    if (BRK.drive) brkList(); else { $('#brkCrumbs').innerHTML = ''; $('#brkList').innerHTML = ''; }
+  };
+  if (BRK.drive && [...$('#brkDrive').options].some(o => o.value === BRK.drive)) { $('#brkDrive').value = BRK.drive; brkList(); }
+}
+async function brkList() {
+  const segs = BRK.path ? BRK.path.split('/') : [];
+  const crumb = (label, path) => `<a class="link brkCrumb" data-path="${esc(path)}">${esc(label)}</a>`;
+  $('#brkCrumbs').innerHTML = [crumb(BRK.driveName || 'root', '')]
+    .concat(segs.map((seg, i) => crumb(seg, segs.slice(0, i + 1).join('/'))))
+    .join(' <span class="muted">/</span> ');
+  $('#brkCrumbs').querySelectorAll('.brkCrumb').forEach(a => a.onclick = () => { BRK.path = a.dataset.path; brkList(); });
+  $('#brkList').innerHTML = '<div class="muted">Loading…</div>';
+  const r = await api(`/api/sharepoint/index/browse?drive=${encodeURIComponent(BRK.drive)}&path=${encodeURIComponent(BRK.path)}`).catch(e => ({ error: e.message }));
+  if (r.error) { $('#brkList').innerHTML = `<div class="pill err">${esc(r.error)}</div>`; return; }
+  const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
+  const folders = r.folders.map(f => `
+    <div class="flex brkDir" data-path="${esc(BRK.path ? BRK.path + '/' + f.name : f.name)}" style="padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer">
+      <span>▸ <strong>${esc(f.name)}</strong> <span class="muted" style="font-size:11px">${f.count.toLocaleString()} files</span></span></div>`).join('');
+  const files = r.files.map(f => `
+    <div class="flex" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)">
+      <span style="min-width:0" class="mono" title="${esc(f.name)}">${esc(f.name)} <span class="muted" style="font-size:11px">${fmt(f.size)}${f.modified ? ' · ' + esc(f.modified) : ''}</span></span>
+      <span class="flex" style="gap:6px">
+        <button class="ghost brkOpen" data-drive="${esc(f.driveId)}" data-item="${esc(f.id)}" style="padding:4px 10px;font-size:11px" ${BRK.authed ? '' : 'disabled title="sign in to open"'}>↗ Open</button>
+        <button class="ghost spPull" data-drive="${esc(f.driveId)}" data-item="${esc(f.id)}" style="padding:4px 10px;font-size:11px">⇩ Pull</button>
+      </span></div>`).join('');
+  $('#brkList').innerHTML = (folders + files) || '<div class="muted">Empty folder.</div>';
+  $('#brkList').querySelectorAll('.brkDir').forEach(d => d.onclick = () => { BRK.path = d.dataset.path; brkList(); });
+  $('#brkList').querySelectorAll('.spPull').forEach(b => b.onclick = () => spPull(b));
+  $('#brkList').querySelectorAll('.brkOpen').forEach(b => b.onclick = () => brkOpen(b));
+}
+async function brkOpen(btn) {
+  btn.disabled = true; const was = btn.textContent; btn.textContent = '…';
+  const r = await api(`/api/sharepoint/weburl?drive=${encodeURIComponent(btn.dataset.drive)}&item=${encodeURIComponent(btn.dataset.item)}`).catch(e => ({ error: e.message }));
+  btn.disabled = false; btn.textContent = was;
+  if (r.error || !r.webUrl) { btn.outerHTML = `<span class="pill err" style="font-size:11px">${esc(r.error || 'no link')}</span>`; return; }
+  window.open(r.webUrl, '_blank', 'noopener');
 }
 
 function spPollCrawl() {
