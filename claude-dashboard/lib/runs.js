@@ -258,6 +258,39 @@ function finalizeRun(st) {
   dequeueNext();
 }
 
+// One complete stdout line from the claude CLI. Sniff the terminal `result`
+// event for session id / cost / duration / token usage before persisting the
+// line verbatim. Parse failures are swallowed — a malformed line still streams.
+function onStdoutLine(st, line) {
+  if (line.includes('"type":"result"')) {
+    try {
+      const r = JSON.parse(line);
+      if (r.type === 'result') {
+        st.meta.sessionId = r.session_id || st.meta.sessionId;
+        st.meta.costUsd = r.total_cost_usd ?? null;
+        st.meta.durationMs = r.duration_ms ?? null;
+        // usage → context analytics: tokensIn = full input context on the
+        // final turn (fresh + cached), tokensOut = generated tokens.
+        const u = r.usage || (r.message && r.message.usage);
+        if (u) {
+          const cin = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+          st.meta.tokensIn = cin || st.meta.tokensIn;
+          st.meta.tokensOut = u.output_tokens ?? st.meta.tokensOut;
+        }
+      }
+    } catch {}
+  }
+  pushLine(st, line);
+}
+
+// Process close: map exit code to terminal status (cancel wins over code) and
+// run the shared finalizer.
+function onExit(st, code) {
+  st.meta.exitCode = code;
+  st.meta.status = st.cancelled ? 'cancelled' : (code === 0 ? 'done' : 'error');
+  finalizeRun(st);
+}
+
 function launchClaude(st) {
   let child;
   try {
@@ -272,6 +305,8 @@ function launchClaude(st) {
   st.child = child;
   markRunning(st);
 
+  // Reassemble newline-delimited stream-json across chunk boundaries, then hand
+  // each complete line to onStdoutLine.
   let buf = '';
   child.stdout.on('data', d => {
     buf += d;
@@ -279,35 +314,12 @@ function launchClaude(st) {
     while ((nl = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, nl).replace(/\r$/, '');
       buf = buf.slice(nl + 1);
-      if (!line.trim()) continue;
-      if (line.includes('"type":"result"')) {
-        try {
-          const r = JSON.parse(line);
-          if (r.type === 'result') {
-            st.meta.sessionId = r.session_id || st.meta.sessionId;
-            st.meta.costUsd = r.total_cost_usd ?? null;
-            st.meta.durationMs = r.duration_ms ?? null;
-            // usage → context analytics: tokensIn = full input context on the
-            // final turn (fresh + cached), tokensOut = generated tokens.
-            const u = r.usage || (r.message && r.message.usage);
-            if (u) {
-              const cin = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
-              st.meta.tokensIn = cin || st.meta.tokensIn;
-              st.meta.tokensOut = u.output_tokens ?? st.meta.tokensOut;
-            }
-          }
-        } catch {}
-      }
-      pushLine(st, line);
+      if (line.trim()) onStdoutLine(st, line);
     }
   });
   child.stderr.on('data', d => { if (st.stderr.length < 20000) st.stderr += d; });
   child.on('error', e => { st.stderr += '\nspawn error: ' + e.message; });
-  child.on('close', (code) => {
-    st.meta.exitCode = code;
-    st.meta.status = st.cancelled ? 'cancelled' : (code === 0 ? 'done' : 'error');
-    finalizeRun(st);
-  });
+  child.on('close', code => onExit(st, code));
 }
 
 function dequeueNext() {
