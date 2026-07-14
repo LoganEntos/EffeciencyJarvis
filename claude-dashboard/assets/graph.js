@@ -176,33 +176,10 @@ function drawGraphViz(container, data) {
     nodes.length <= 90 ? nodes.map(n => n.id)
       : [...nodes].sort((a, b) => b.deg - a.deg).slice(0, 48).map(n => n.id));
 
-  // physics: pairwise repulsion + link springs + mild centering, clamped & damped
-  const few = nodes.length < 40; // module view: roomier springs, stronger repulsion
-  const REP = few ? 9000 : 2600, SPRING = 0.02, REST = few ? 170 : 95,
-    CENTER = 0.012, DAMP = 0.85, PAD = few ? 46 : 18, VMAX = 14;
-  let dragNode = null;
-  function step() {
-    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-      const a = nodes[i], b = nodes[j];
-      let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
-      if (d2 < 1) { dx = Math.random() - .5; dy = Math.random() - .5; d2 = dx * dx + dy * dy + .01; }
-      const d = Math.sqrt(d2), f = REP / d2, fx = f * dx / d, fy = f * dy / d;
-      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
-    }
-    for (const l of links) {
-      const dx = l.t.x - l.s.x, dy = l.t.y - l.s.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
-      const f = SPRING * (d - REST), fx = f * dx / d, fy = f * dy / d;
-      l.s.vx += fx; l.s.vy += fy; l.t.vx -= fx; l.t.vy -= fy;
-    }
-    for (const n of nodes) {
-      if (n === dragNode) { n.vx = 0; n.vy = 0; continue; }
-      n.vx = (n.vx + (W / 2 - n.x) * CENTER) * DAMP; n.vy = (n.vy + (H / 2 - n.y) * CENTER) * DAMP;
-      n.x += Math.max(-VMAX, Math.min(VMAX, n.vx));
-      n.y += Math.max(-VMAX, Math.min(VMAX, n.vy));
-      n.x = Math.max(PAD, Math.min(W - PAD, n.x)); n.y = Math.max(PAD, Math.min(H - PAD, n.y));
-    }
-  }
-  for (let k = 0; k < 60; k++) step(); // warmup before first paint
+  // physics lives in runForceLayout(): it owns the constants, the integration
+  // step, and drag pinning; here we just drive it and read node x/y to paint.
+  const layout = runForceLayout(nodes, links, W, H);
+  layout.warmup(60); // settle before first paint
 
   let hover = null, alpha = 1, selected = null;
   const matches = new Set(); // search hits — emphasized over everything else
@@ -250,7 +227,7 @@ function drawGraphViz(container, data) {
   function frame() {
     rafId = null;
     if (!canvas.isConnected) return; // section re-rendered — drop this instance
-    if (alpha > 0.02) { step(); alpha *= 0.985; }
+    if (alpha > 0.02) { layout.step(); alpha *= 0.985; }
     const hidden = document.getElementById('graph') && document.getElementById('graph').classList.contains('hidden');
     if (!hidden) draw();
     if (alpha > 0.02 && !hidden) rafId = requestAnimationFrame(frame);
@@ -258,16 +235,21 @@ function drawGraphViz(container, data) {
   function kick() { if (rafId == null && canvas.isConnected) rafId = requestAnimationFrame(frame); }
   kick();
 
+  // node inspection (detail panel + recursive neighbor hops) lives in
+  // NodeInspector(); it owns the DOM and drives `selected` (render highlight).
+  const inspector = NodeInspector(
+    document.querySelector('#nodeDetail'), byId, nbr,
+    n => { selected = n; }, kick);
+
   // mouse: hover tooltip + highlight, drag to pin, click → explain
   const pos = e => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) }; };
   const pick = p => { let best = null, bd = 1e9; for (const n of nodes) { const dx = n.x - p.x, dy = n.y - p.y, d = dx * dx + dy * dy, r = rad(n) + 6; if (d < r * r && d < bd) { best = n; bd = d; } } return best; };
   let downAt = null;
-  canvas.onmousedown = e => { dragNode = pick(pos(e)); downAt = { x: e.clientX, y: e.clientY }; if (dragNode) { alpha = 1; kick(); } };
+  canvas.onmousedown = e => { layout.drag = pick(pos(e)); downAt = { x: e.clientX, y: e.clientY }; if (layout.drag) { alpha = 1; kick(); } };
   canvas.onmousemove = e => {
-    if (dragNode) {
+    if (layout.drag) {
       const p = pos(e);
-      dragNode.x = Math.max(PAD, Math.min(W - PAD, p.x));
-      dragNode.y = Math.max(PAD, Math.min(H - PAD, p.y));
+      layout.dragTo(layout.drag, p.x, p.y);
       alpha = 1; tip.classList.add('hidden'); kick();
       return;
     }
@@ -284,16 +266,72 @@ function drawGraphViz(container, data) {
   };
   canvas.onmouseleave = () => { hover = null; tip.classList.add('hidden'); kick(); };
   window.addEventListener('mouseup', e => {
-    if (dragNode && downAt && Math.abs(e.clientX - downAt.x) < 4 && Math.abs(e.clientY - downAt.y) < 4) {
-      selectNode(dragNode);
+    if (layout.drag && downAt && Math.abs(e.clientX - downAt.x) < 4 && Math.abs(e.clientY - downAt.y) < 4) {
+      inspector.select(layout.drag);
     }
-    dragNode = null; downAt = null;
+    layout.drag = null; downAt = null;
   });
 
-  // ---- inspection panel: what IS this node, what touches it, one-click explain ----
-  const detail = document.querySelector('#nodeDetail');
-  function selectNode(n) {
-    selected = n;
+  return {
+    find(q) {
+      matches.clear();
+      if (q) for (const n of nodes) if ((n.label + ' ' + (n.file || '')).toLowerCase().includes(q)) matches.add(n.id);
+      kick(); // redraw the search highlight
+    },
+    selectFirst() {
+      const first = nodes.filter(n => matches.has(n.id)).sort((a, b) => b.deg - a.deg)[0];
+      if (first) inspector.select(first);
+    },
+  };
+}
+
+// Force-directed layout — pairwise repulsion + link springs + mild centering,
+// clamped & damped. Owns the physics constants, the integration step, and drag
+// pinning; the caller warms it up, runs the raf loop, and reads node x/y.
+function runForceLayout(nodes, links, W, H) {
+  const few = nodes.length < 40; // module view: roomier springs, stronger repulsion
+  const REP = few ? 9000 : 2600, SPRING = 0.02, REST = few ? 170 : 95,
+    CENTER = 0.012, DAMP = 0.85, PAD = few ? 46 : 18, VMAX = 14;
+  let dragNode = null;
+  function step() {
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+      if (d2 < 1) { dx = Math.random() - .5; dy = Math.random() - .5; d2 = dx * dx + dy * dy + .01; }
+      const d = Math.sqrt(d2), f = REP / d2, fx = f * dx / d, fy = f * dy / d;
+      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+    }
+    for (const l of links) {
+      const dx = l.t.x - l.s.x, dy = l.t.y - l.s.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const f = SPRING * (d - REST), fx = f * dx / d, fy = f * dy / d;
+      l.s.vx += fx; l.s.vy += fy; l.t.vx -= fx; l.t.vy -= fy;
+    }
+    for (const n of nodes) {
+      if (n === dragNode) { n.vx = 0; n.vy = 0; continue; }
+      n.vx = (n.vx + (W / 2 - n.x) * CENTER) * DAMP; n.vy = (n.vy + (H / 2 - n.y) * CENTER) * DAMP;
+      n.x += Math.max(-VMAX, Math.min(VMAX, n.vx));
+      n.y += Math.max(-VMAX, Math.min(VMAX, n.vy));
+      n.x = Math.max(PAD, Math.min(W - PAD, n.x)); n.y = Math.max(PAD, Math.min(H - PAD, n.y));
+    }
+  }
+  return {
+    step,
+    warmup(iters) { for (let k = 0; k < iters; k++) step(); },
+    get drag() { return dragNode; },
+    set drag(n) { dragNode = n; },
+    dragTo(n, x, y) {
+      n.x = Math.max(PAD, Math.min(W - PAD, x));
+      n.y = Math.max(PAD, Math.min(H - PAD, y));
+    },
+  };
+}
+
+// Node inspection panel: renders "what IS this node · what touches it · one-click
+// explain", and drives selection (recursive neighbor hops + graphify explain).
+// setSelected() updates the render highlight; kick() schedules a redraw.
+function NodeInspector(detail, byId, nbr, setSelected, kick) {
+  function select(n) {
+    setSelected(n);
     if (!n) { if (detail) detail.classList.add('hidden'); return; }
     const neighbors = [...nbr[n.id]].map(id => byId[id]).filter(Boolean).sort((a, b) => b.deg - a.deg);
     detail.classList.remove('hidden');
@@ -313,20 +351,9 @@ function drawGraphViz(container, data) {
       $('#graphQ').value = n.label;
       $('#graphBtn').click();
     };
-    detail.querySelector('#ndClear').onclick = () => selectNode(null);
-    detail.querySelectorAll('.ndnb').forEach(c => c.onclick = () => { const m = byId[c.dataset.id]; if (m) selectNode(m); });
+    detail.querySelector('#ndClear').onclick = () => select(null);
+    detail.querySelectorAll('.ndnb').forEach(c => c.onclick = () => { const m = byId[c.dataset.id]; if (m) select(m); });
     kick(); // redraw the selection highlight
   }
-
-  return {
-    find(q) {
-      matches.clear();
-      if (q) for (const n of nodes) if ((n.label + ' ' + (n.file || '')).toLowerCase().includes(q)) matches.add(n.id);
-      kick(); // redraw the search highlight
-    },
-    selectFirst() {
-      const first = nodes.filter(n => matches.has(n.id)).sort((a, b) => b.deg - a.deg)[0];
-      if (first) selectNode(first);
-    },
-  };
+  return { select };
 }
