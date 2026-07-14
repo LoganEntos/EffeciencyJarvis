@@ -313,7 +313,7 @@ function attachLiveRun(id, { startedAtMs, queued, seen } = {}) {
   chat.runId = id; chat.running = true; chat.seen = seen != null ? seen : -1;
   chat.t0 = startedAtMs || Date.now();
   chat.queued = !!queued;
-  chat.hb = null; chat.lastActivity = Date.now();
+  chat.hb = null; chat.lastActivity = Date.now(); chat.lastText = ''; // reset so a text-less run never speaks the previous reply
   $('#sendBtn').disabled = true;
   $('#cancelBtn').classList.remove('hidden');
   clearInterval(chat.timer);

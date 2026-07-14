@@ -175,7 +175,9 @@ async function handle(req, res, url) {
     const ctype = IMAGE_TYPES[ext];
     if (!ctype) { U.sendJson(res, { error: 'not a previewable image' }, 400); return true; }
     const st = fs.statSync(f.full);
-    res.writeHead(200, { 'Content-Type': ctype, 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60' });
+    // SVG can carry inline <script>; on direct navigation (not <img>) it would
+    // run in the hub's own origin. Sandbox it via CSP — harmless to <img> use.
+    res.writeHead(200, { 'Content-Type': ctype, 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
     fs.createReadStream(f.full).pipe(res);
     return true;
   }

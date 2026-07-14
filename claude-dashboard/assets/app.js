@@ -95,6 +95,10 @@ $('#navOverlay').onclick = () => closeNav();
 // ---- tab switching (persisted, keyboard-driven) ----
 let currentTab = 'run';
 const TABS = [...document.querySelectorAll('nav a')].map(a => a.dataset.tab);
+// Number-key → tab from the printed <kbd> hint, NOT DOM index: tabs without a
+// hint (SharePoint, Commands…) would otherwise shift keys 5–0 off by one.
+const KEY_TABS = {};
+document.querySelectorAll('nav a').forEach(a => { const k = a.querySelector('kbd'); if (k && a.dataset.tab) KEY_TABS[k.textContent.trim()] = a.dataset.tab; });
 function goTab(tab) {
   if (!renderers[tab]) return;
   currentTab = tab;
@@ -143,7 +147,7 @@ $('#refreshTab').onclick = () => load(currentTab, true);
 document.addEventListener('keydown', e => {
   const t = e.target.tagName;
   if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || e.ctrlKey || e.altKey || e.metaKey) return;
-  if (e.key >= '1' && e.key <= '9') { const tab = TABS[+e.key - 1]; if (tab) goTab(tab); }
+  if (/^[0-9]$/.test(e.key) && KEY_TABS[e.key]) { goTab(KEY_TABS[e.key]); }
   else if (e.key === '0') { const tab = TABS[9]; if (tab) goTab(tab); }
   else if (e.key === 'r' || e.key === 'R') { load(currentTab, true); }
   else if (e.key === '/') { const s = $('#' + currentTab + ' input.search'); if (s) { e.preventDefault(); s.focus(); } }
