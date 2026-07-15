@@ -74,6 +74,29 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
   dirs are gitignored (per-machine). The user drives push; don't push unprompted.
 
 ## Latest work shipped (2026-07-14 → 07-15)
+2026-07-15 late (commits `e844d02`→`5dc783b`, Opus 4.8 voice session):
+- **O1 diagnostics — client-error beacon (`e844d02`).** The Jarvis-tab error hunt
+  was blocked: no console access from a voice/phone session, so no catalog. Added
+  a zero-dep black-box recorder — `assets/clientlog.js` (loaded FIRST) traps
+  `window.onerror` + unhandledrejection + a console.error tap, tags each with the
+  visible tab, beacons to `lib/clientlog.js` (200-record capped ring in
+  `data/clientlog.json`, gitignored; POST token-guarded, GET reads back w/ `?tab=`).
+  **Static pass over jarvistab.js / voice.js / personas.js / index wiring was clean
+  — the errors are runtime/browser-specific.** ⚠ **NOT YET ACTIVE:** the 5757 hub
+  must restart to serve the new route + asset. NEXT SESSION: after a restart, open
+  Jarvis, exercise it (load, persona switch, tap-to-talk, hold-call, soul save),
+  then `GET /api/clientlog?tab=jarvis` (or read `data/clientlog.json`) and fix the
+  real errors precisely. Smoke +3 (all green on a throwaway 5772 instance).
+- **Token-efficiency protocol processed + wired (`502d57e`, `5dc783b`).** User
+  uploaded `PULSE-TOKEN-EFFICIENCY-COMPACTOR.md` (a portable protocol from another
+  agent system). ~80% was already the hub's ethos; distilled the coding-behavior
+  deltas to `docs/token-efficiency.md`, then wired a terse ≈60-token "Token
+  discipline" clause into `buildRunHint()` (`lib/util.js`) so every run gets it
+  (don't re-read context/just-written files, read slices not whole files, diffs
+  over rewrites, dense code, no preamble).
+- **OpenJarvis** already tracked in `lib/sources.json` (queued, Apache-2.0); user's
+  link carried an `mcp_token` credential — stripped, not stored.
+
 2026-07-14: **C1–C13 code-health** + **U1–U13 UI/a11y** rounds done; the 15-item
 P1/P2/P3 find-fix round closed; **N7 SharePoint Breakdown** shipped — see
 `docs/improvement-backlog.md` (all ✅) and `docs/roadmap.md`.
@@ -95,17 +118,22 @@ P1/P2/P3 find-fix round closed; **N7 SharePoint Breakdown** shipped — see
 
 ## EXECUTE NEXT — Opus 4.8 finish list (ordered; handoff 2026-07-15)
 
-**O1. Jarvis tab error hunt (P1 — user report 2026-07-15).** The user reports
-"loads of errors" persisting on the Jarvis tab; the run that was diagnosing it
-was cancelled, so **no error catalog exists yet**. Step 1: open the live hub →
-Jarvis tab with the browser console and catalog every error (tab load, persona
-switch, tap-to-talk, hold-for-call, soul editor save). Step 2: fix. User
-directive: **stop patching blind — research more sophisticated open-source
-prior art** for the voice/persona loop (OpenPersona is already adopted;
-open-jarvis/OpenJarvis sits unevaluated in the Sources intake list) and adopt a
-proven pattern natively (zero-dep, port the idea not the framework). Constraint:
-voice behavior itself (barge-in, Kokoro self-heal, reply queue) is now exactly
-as the user wants — fix the tab without touching that.
+**O1. Jarvis tab error hunt (P1 — user report 2026-07-15). DIAGNOSTIC NOW IN
+PLACE — finish the fix.** The user reports "loads of errors" on the Jarvis tab.
+A full static pass this session (jarvistab.js / voice.js / personas.js / index
+wiring) found the code clean, so the errors are runtime/browser-specific. The
+`e844d02` client-error beacon is the catalog tool (works on the phone — no
+console needed). **Step 1: restart the 5757 hub** (button in the header, or the
+user's next logon autostart) so `assets/clientlog.js` + `/api/clientlog` go live.
+**Step 2: exercise the Jarvis tab** — load, persona switch, tap-to-talk,
+hold-for-call, soul-editor save — then read the captured errors: `GET
+/api/clientlog?tab=jarvis` or open `data/clientlog.json`. **Step 3: fix** the
+real errors precisely. User directive still stands: **don't patch blind — research
+open-source prior art** for the voice/persona loop (OpenPersona already adopted;
+open-jarvis/OpenJarvis queued in `lib/sources.json`, still unevaluated) and port
+the idea natively (zero-dep). Constraint: voice behavior (barge-in, Kokoro
+self-heal, reply queue) is exactly as the user wants — fix the tab without
+touching it.
 
 **O2. Finish the skills-layer cleanup** (`docs/agent-skill-efficiency-report.md`,
 steps 4–6; steps 1–3 shipped in `bd09b68` + the global CLAUDE.md is clean).
