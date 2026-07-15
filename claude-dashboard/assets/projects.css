@@ -1,0 +1,22 @@
+/* ── Projects tab: workspace grid + detail (amber-agent-orb) ──
+   Split out of style.css to keep that file under the 500-line rule. Drives off
+   the same CSS variables; loaded after style.css in index.html. */
+.projbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.projbar .search{max-width:280px;margin:0}
+.pnewrow{border-color:var(--accent-dim)}
+.psection{display:flex;justify-content:space-between;align-items:center}
+.presetrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.presetchip{font-family:var(--font-mono);font-size:10.5px;padding:4px 10px;border-radius:20px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line);color:var(--muted);transition:border-color .12s,color .12s}
+.presetchip:hover{border-color:var(--accent-dim);color:var(--accent)}
+.pmanifest{margin:10px 0 0;max-height:200px;overflow:auto;font-size:11px;color:var(--muted);background:#0b0a08;
+  border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;white-space:pre;line-height:1.7}
+:root[data-theme="light"] .pmanifest{background:#efe9dc}
+table.pruns{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
+table.pruns th{text-align:left;font-family:var(--font-mono);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--dim);font-weight:400;padding:0 10px 6px;border-bottom:1px solid var(--line)}
+.pruns td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.pruns tr.prun{cursor:pointer;transition:background .12s}
+.pruns tr.prun:hover td{background:var(--panel2)}
+.pruns .ptrunc{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.pcharcount{font-family:var(--font-mono);font-size:10.5px;color:var(--dim)}

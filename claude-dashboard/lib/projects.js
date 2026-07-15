@@ -50,10 +50,58 @@ function projectFiles(slug) {
   return out.sort((a, b) => new Date(b.modified) - new Date(a.modified));
 }
 
-function shape(p) {
+function shape(p, stats) {
+  const s = stats || {};
   return { id: p.id, name: p.name, slug: p.slug, description: p.description || '',
     instructions: p.instructions || '', createdAt: p.createdAt, updatedAt: p.updatedAt,
-    fileCount: projectFiles(p.slug).length };
+    fileCount: projectFiles(p.slug).length,
+    runCount: s.count || 0, lastRunAt: s.last || null };
+}
+
+// Run activity per project, keyed by slug. Runs launched in a project carry
+// meta.projectSlug (see runs.js), so we bucket the existing run list — no new
+// store. require('./runs') is lazy: runs.js requires this module at load, so a
+// top-level require here would be circular; by request time both are resolved.
+function runStatsBySlug() {
+  let runs = [];
+  try { runs = require('./runs').listRuns(); } catch {}
+  const by = {};
+  for (const r of runs) {
+    if (!r.projectSlug) continue;
+    const b = by[r.projectSlug] || (by[r.projectSlug] = { count: 0, last: null });
+    b.count++;
+    const t = r.startedAt || r.queuedAt || '';
+    if (t && (!b.last || t > b.last)) b.last = t;
+  }
+  return by;
+}
+
+// The most recent runs launched in one project (listRuns is already newest-first).
+function runsForSlug(slug, limit = 8) {
+  let runs = [];
+  try { runs = require('./runs').listRuns(); } catch {}
+  return runs.filter(r => r.projectSlug === slug).slice(0, limit).map(r => ({
+    id: r.id, model: r.model || '?', status: r.status || '?', costUsd: r.costUsd || 0,
+    durationMs: r.durationMs || 0, startedAt: r.startedAt || r.queuedAt || null,
+    prompt: r.promptExcerpt || r.prompt || '' }));
+}
+
+// Adopt every inbox subfolder that isn't already a project. The folder name is
+// already a valid slug (files.js sanitized it), so slug=folder keeps the
+// existing files attached with no move. Titleize the folder for the name.
+function importInbox() {
+  const list = load();
+  const taken = new Set(list.map(x => x.slug));
+  const now = new Date().toISOString();
+  const created = [];
+  for (const e of U.listDir(INBOX)) {
+    if (!e.isDirectory() || taken.has(e.name)) continue;
+    const name = e.name.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).slice(0, 80);
+    const proj = { id: newId(), name, slug: e.name, description: 'Imported from inbox folder', instructions: '', createdAt: now, updatedAt: now };
+    list.push(proj); taken.add(e.name); created.push(shape(proj));
+  }
+  if (created.length) save(list);
+  return { ok: true, count: created.length, created };
 }
 
 function get(id) { return load().find(p => p.id === id) || null; }
@@ -94,7 +142,12 @@ function remove(id) {
 async function handle(req, res, url) {
   const p = url.pathname;
   if (p === '/api/projects' && req.method === 'GET') {
-    U.sendJson(res, { projects: load().map(shape) });
+    const stats = runStatsBySlug();
+    U.sendJson(res, { projects: load().map(x => shape(x, stats[x.slug])) });
+    return true;
+  }
+  if (p === '/api/projects/import' && req.method === 'POST') {
+    U.sendJson(res, importInbox());
     return true;
   }
   if (p === '/api/projects/get' && req.method === 'GET') {
@@ -103,7 +156,9 @@ async function handle(req, res, url) {
     const q = url.searchParams.get('q') || (proj.instructions + ' ' + proj.description) || proj.name;
     let mem = { items: [] };
     try { mem = memory.recallForProject(proj.slug, q, { limit: 6 }); } catch {}
-    U.sendJson(res, { project: shape(proj), files: projectFiles(proj.slug), memory: { items: mem.items } });
+    const stats = runStatsBySlug();
+    U.sendJson(res, { project: shape(proj, stats[proj.slug]), files: projectFiles(proj.slug),
+      memory: { items: mem.items }, runs: runsForSlug(proj.slug) });
     return true;
   }
   if (p === '/api/projects' && req.method === 'POST') {
