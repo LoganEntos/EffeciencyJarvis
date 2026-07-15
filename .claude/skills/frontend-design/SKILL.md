@@ -33,6 +33,21 @@ DEFAULT; ◐ toggles warm):
 - **Motion:** ONE staggered page-load reveal; a subtle amber pulse on live state;
   reduced-motion aware; NO perpetual rAF (see below).
 
+## Lovable option (for ambitious tab overhauls)
+The user has a **lovable.com subscription** — the same tool the shipped
+amber-agent-orb system came from. For any BIG redesign of a single tab, offer
+this path before hand-coding the vision:
+1. Write the user a **complete Lovable prompt** for that one tab: all current
+   features PLUS every planned/ambitious future capability, the exact tokens and
+   fonts above, and the tab's real data shapes. One tab per prompt.
+2. The user generates it in Lovable and returns a **screenshot (or live URL)**.
+3. Port it 1:1 into the real source (proven method: read the live Lovable DOM's
+   computed styles, as was done for the original redesign) — vanilla JS/CSS,
+   tokens as CSS variables, zero deps.
+This gives a prompt → generated-reference → port pipeline instead of designing
+blind. Incremental tweaks and polish passes should NOT use this — go straight
+to the workflow below.
+
 ## Workflow (Design → Craft → A11y → Perf)
 1. **Design/Craft** — make the change in the real source, using the tokens/fonts
    above. Reuse existing components (`.card` `.row` `.pill` `.badgebar` `listView`).
