@@ -23,6 +23,12 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ---
 
+## ✅ Shipped (2026-07-15)
+
+| # | Item | Where |
+|---|------|-------|
+| S-JV | **Jarvis tab (user request)** — the hub's voice face: large canvas orb mirroring HubVoice state (idle breath / listening ripples / thinking arc / speaking pulse / dashed call halo), tap-to-talk + hold-for-call delegating to the existing voice.js path, one-tap persona chips, fold-out soul editor (`/api/personas/get` + `/save`), and a one-shot soul handoff injected on persona switch (pattern from acnlabs/OpenPersona, commit 6cd71f2). Roster completed: Jarvis + Dispatch + Sage | `assets/jarvistab.js`, `assets/jarvis.css`, `lib/personas.js`, `personas/` |
+
 ## ✅ Shipped (2026-07-13)
 
 | # | Item | Where |

@@ -87,8 +87,8 @@
       "repo": "https://github.com/acnlabs/OpenPersona",
       "license": "MIT",
       "verified": true,
-      "status": "queued",
-      "usedFor": "QUEUED (top value from the 2026-07-14 Fable5 packet review) — soul-handoff prior art for docs/jarvis-soul.md: handoff.schema.json (previousPersona, conversationSummary, pendingItems, moodSnapshot, relationshipStage) and switcher.js marker-block edits (replaceMarkerBlock — edit delimited sections, never rewrite the file). Patterns only, never code: donor uses fs-extra + Mustache, hub is zero-dep. Reference-only donor in data/inbox/Jarvis-Fable5-Resource-Packet."
+      "status": "active",
+      "usedFor": "ADOPTED (2026-07-15, commit 6cd71f2) — soul-handoff pattern from switcher.js generateHandoff/renderHandoff + handoff.schema.json (previousPersona, pendingItems, timestamp) reimplemented zero-dep in lib/personas.js: switching persona A→B records the outgoing persona + open task queue and injects a one-shot <persona-handoff> block into the next run so the new persona takes over mid-conversation. Marker-block editing idea not needed (hub personas are whole files by design). Reference-only donor in data/inbox/Jarvis-Fable5-Resource-Packet; no code vendored."
     },
     {
       "kind": "incorporate",
