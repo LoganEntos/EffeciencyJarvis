@@ -53,7 +53,7 @@ docs/roadmap.md          the plan · improvement-backlog.md the live find-fix li
 ```
 Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Sources · Tools · Config (+ SharePoint).
 
-## Current truth (2026-07-14)
+## Current truth (2026-07-15)
 - **Engine = Claude ONLY.** The stack is Claude Code's own: auto model-routing +
   14 model-tiered subagents + agent teams (`lib/teams.js`). **hermes is DEPRECATED
   as too expensive** — not deleted, hidden behind `settings.hermesEnabled` (default
@@ -73,27 +73,61 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
   pull-rebase-then-push. `data/`, `.claude/settings.local.json`, and the sidecar
   dirs are gitignored (per-machine). The user drives push; don't push unprompted.
 
-## Latest work shipped (2026-07-14)
-The **C1–C13 code-health** round (split `runs.js`/`run.js`/`graph.js`, shared the
-MODELS allowlist, extracted duplicated builders) and the **U1–U13 UI/a11y** round
-(keyboard-reachable nav via a MutationObserver, Lucide-sprite nav icons, segmented
-voice-engine control, page-title scale, focus management, aria-live badges,
-WCAG-contrast label lift, amber runbar selects) are all done — see
-`docs/improvement-backlog.md` (every C/U item marked ✅). Smoke green.
+## Latest work shipped (2026-07-14 → 07-15)
+2026-07-14: **C1–C13 code-health** + **U1–U13 UI/a11y** rounds done; the 15-item
+P1/P2/P3 find-fix round closed; **N7 SharePoint Breakdown** shipped — see
+`docs/improvement-backlog.md` (all ✅) and `docs/roadmap.md`.
+2026-07-15 (commits `8627af2`→`310ef9d`):
+- **Jarvis tab** (`assets/jarvistab.js`/`jarvis.css`, `lib/personas.js`) — voice
+  face: state orb, persona chips (Jarvis/Dispatch/Sage), soul editor, OpenPersona
+  soul handoff on switch. ⚠ See O1 below — user reports it still errors.
+- **Voice hardening** — barge-in fix (stopped cutting the user off mid-sentence),
+  self-healing Kokoro sidecar (boot warm-start + on-demand respawn), 'ok' vs
+  'ready' status bug that muted mobile, streamed reply queue, ↻ Read-again button.
+  **The user has voice how they want it — do not regress this behavior.**
+- **Latency** — `/api/spend/today`, cached artifact counts.
+- **Projects tab overhaul** — run stats + recent-runs + inbox import, inline UI,
+  instruction presets, file manifest (`lib/projects.js`, `assets/projects.js`).
+- **Run-engine safety hint** — runs must never kill the 5757 listener (orphans
+  the run); verify server changes on port 5758 (`lib/util.js`).
+- **~190-entry claude-flow purge** (`bd09b68`) — 166 dead commands + 28 dead
+  skills removed per `docs/agent-skill-efficiency-report.md`.
 
-## EXECUTE NEXT
-The 2026-07-14 find-fix round is **fully closed** (Fable 5 pass, same day): all
-15 P1/P2/P3 items are ✅ in `docs/improvement-backlog.md` — 6 were already fixed
-by the C/U rounds, 9 fixed in the pass (rungauge.js split, mobile-voice probe +
-pointer-based `isMobileDevice()`, token-count, sessionModel scan, inbox rmdir…).
-**N7 SharePoint Breakdown SHIPPED** the same day: offline navigable tree under
-the SharePoint tab (index/tree + index/browse endpoints), file Open via
-SharePoint's own viewers, Pull to inbox, graphify-on-Opus with a last-run stamp.
-Next work comes from `docs/roadmap.md` — nothing is queued in the backlog.
+## EXECUTE NEXT — Opus 4.8 finish list (ordered; handoff 2026-07-15)
 
-Queued (do NOT build until the user greenlights): **N10 Council mode** (Claude-only
-fan-out + synthesis, `lib/council.js`), **N7 SharePoint Breakdown** (file-level
-index, first sweep by Fable 5), **N8 iPhone** (Tailscale PWA). See `docs/roadmap.md`.
+**O1. Jarvis tab error hunt (P1 — user report 2026-07-15).** The user reports
+"loads of errors" persisting on the Jarvis tab; the run that was diagnosing it
+was cancelled, so **no error catalog exists yet**. Step 1: open the live hub →
+Jarvis tab with the browser console and catalog every error (tab load, persona
+switch, tap-to-talk, hold-for-call, soul editor save). Step 2: fix. User
+directive: **stop patching blind — research more sophisticated open-source
+prior art** for the voice/persona loop (OpenPersona is already adopted;
+open-jarvis/OpenJarvis sits unevaluated in the Sources intake list) and adopt a
+proven pattern natively (zero-dep, port the idea not the framework). Constraint:
+voice behavior itself (barge-in, Kokoro self-heal, reply queue) is now exactly
+as the user wants — fix the tab without touching that.
+
+**O2. Finish the skills-layer cleanup** (`docs/agent-skill-efficiency-report.md`,
+steps 4–6; steps 1–3 shipped in `bd09b68` + the global CLAUDE.md is clean).
+Remaining: consolidate the design suite ~6→2 (keep `ui-ux-pro-max` as reference
+DB + `slides`; fold/drop `banner-design`, `brand`, `design`, `design-system`),
+decide the borderline three (`autonomous-loops`, `team-agent-orchestration`,
+`verification-loop` — keep only if actually invoked), check `data/teams.json`
+for references before deleting, then smoke + one hub run + optional
+`context-budget` before/after. ⚠ A background Fable 5 run was tasked with "ECC
+skills" on 07-15 — `git log` first and reconcile; don't duplicate its work.
+Ask the user whether the 5 logistics skills move to a separate work profile.
+
+**O3. Verify the unverified.** (a) Wake-word "Suzy" gate — needs a real-mic
+test with the user. (b) R5: schedules have never been stress-tested — create a
+near-future schedule, assert it fires into run history, tear down. (c) Projects
+tab — browser-verify at 375px.
+
+**O4. Then the roadmap queue** (`docs/roadmap.md`): N2 mobile ergonomic pass,
+R3 auto session summaries (cheap-model, cached), R4 image thumbnails + day
+grouping in Files, N8 iPhone polish (Tailscale PWA already live). 🙋 Q1
+Playwright still awaits the user's yes. **N10 Council is lowest priority —
+build last, if ever** (user call 2026-07-15).
 
 ## Pending USER actions (remind them; you can't do these)
 - **Permission allowlist for hub runs.** Auto-mode agents can't self-widen execution

@@ -4,18 +4,19 @@ Single source of truth for what to build next. Ordering rule: items that make
 every later item cheaper/better ship first. **Token efficiency is the north
 star** — prefer zero-dep, avoid always-on MCPs (they tax every run).
 
-> ⚠️ **STATUS BANNER (2026-07-14) — read before trusting the sections below.**
-> The engine is now **Claude-only**; **hermes was DEPRECATED as too expensive**
+> ⚠️ **STATUS BANNER (2026-07-15) — read before trusting the sections below.**
+> The engine is **Claude-only**; **hermes is DEPRECATED as too expensive**
 > (hidden behind `settings.hermesEnabled`, default off — see the `engine-claude-only`
-> memory + HANDOFF). So every "Hermes is the default / always-on engine" and
+> memory + HANDOFF). Every "Hermes is the default / always-on engine" and
 > "H2–H4 next" framing further down is **historical, not the plan** — kept as the
-> decision log, not active work. The clean-dark redesign shipped. The **C1–C13
-> code-health + U1–U13 UI/a11y rounds are DONE** (`docs/improvement-backlog.md`).
-> **What is actually next:** the 2026-07-14 P1→P3 find-fix items in
-> `docs/improvement-backlog.md` (SVG-inline-serve, `run.js` >500, stale voice
-> `lastText`, off-by-one tab keys, then P2/P3). Queued behind a user greenlight:
-> N7 SharePoint Breakdown, N8 iPhone. **N10 Council is deprioritized to the very
-> bottom** (user call 2026-07-15) — lowest-priority item, build last if ever.
+> decision log. The clean-dark redesign, the C/U rounds, the 07-14 find-fix round,
+> and N7 SharePoint Breakdown are all DONE.
+> **What is actually next: the Opus 4.8 finish list in `HANDOFF.md` → EXECUTE
+> NEXT (O1–O4)** — O1 Jarvis-tab error hunt (P1, user report), O2 finish the
+> skills cleanup (`docs/agent-skill-efficiency-report.md` steps 4–6), O3 verify
+> the unverified (wake word, R5 schedules, Projects @375px), O4 the queue below
+> (N2, R3, R4, N8). **N10 Council is deprioritized to the very bottom**
+> (user call 2026-07-15) — lowest-priority item, build last if ever.
 >
 > **Architecture decision log: `docs/open-issues.md`** — all six 2026-07-10 ISSUES
 > resolved (ruflo retired; hermes adopted-then-deprecated). No open architecture issues.
@@ -28,7 +29,11 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 | # | Item | Where |
 |---|------|-------|
-| S-JV | **Jarvis tab (user request)** — the hub's voice face: large canvas orb mirroring HubVoice state (idle breath / listening ripples / thinking arc / speaking pulse / dashed call halo), tap-to-talk + hold-for-call delegating to the existing voice.js path, one-tap persona chips, fold-out soul editor (`/api/personas/get` + `/save`), and a one-shot soul handoff injected on persona switch (pattern from acnlabs/OpenPersona, commit 6cd71f2). Roster completed: Jarvis + Dispatch + Sage | `assets/jarvistab.js`, `assets/jarvis.css`, `lib/personas.js`, `personas/` |
+| S-VH | **Voice hardening + latency (user-driven)** — barge-in fix (stopped interrupting the user mid-sentence — user confirms voice is now how they want it), self-healing Kokoro sidecar (boot warm-start + on-demand respawn), 'ok'-vs-'ready' status bug that muted mobile, streamed reply queue, ↻ Read-again button, `/api/spend/today` + cached artifact counts | `lib/voice.js`, `assets/voice.js`/`voicetts.js`, `lib/runs-query.js`, `assets/run.js` |
+| S-PJ | **Projects tab overhaul** — run stats + recent-runs + inbox import, inline UI (no popups), instruction presets, file manifest | `lib/projects.js`, `assets/projects.js`/`projects.css` |
+| S-PG | **claude-flow purge** — 166 dead commands + 28 dead skills removed (steps 1–3 of `docs/agent-skill-efficiency-report.md`; steps 4–6 = HANDOFF O2) | `.claude/commands/`, `.claude/skills/` |
+| S-RH | **Run-engine safety hint** — runs must never kill the 5757 listener (self-restart orphans the run); server changes verify on port 5758 | `lib/util.js` |
+| S-JV | **Jarvis tab (user request)** — the hub's voice face: large canvas orb mirroring HubVoice state (idle breath / listening ripples / thinking arc / speaking pulse / dashed call halo), tap-to-talk + hold-for-call delegating to the existing voice.js path, one-tap persona chips, fold-out soul editor (`/api/personas/get` + `/save`), and a one-shot soul handoff injected on persona switch (pattern from acnlabs/OpenPersona, commit 6cd71f2). Roster completed: Jarvis + Dispatch + Sage. **⚠ NOT stable — user reports "loads of errors" persist (2026-07-15); fix is HANDOFF O1** | `assets/jarvistab.js`, `assets/jarvis.css`, `lib/personas.js`, `personas/` |
 
 ## ✅ Shipped (2026-07-13)
 
