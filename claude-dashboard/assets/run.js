@@ -45,6 +45,7 @@ function ensureRunUI() {
         <input type="checkbox" id="runRecall"> ◇ memory recall</label>
       <button id="newChatBtn" class="ghost">＋ New chat</button>
       <span class="pill neutral hidden" id="chatSession" title="follow-up prompts resume this CLI session"></span>
+      <span class="pill hidden" id="runProjectTag" title="this chat is bound to a project — its instructions + memory are injected. Click to unbind." style="cursor:pointer;background:var(--accent-dim);color:var(--bg)"></span>
     </div>
     <div id="usageGauge"></div>
     <div class="chatlog" id="chatLog"><div class="msg sys">Type a prompt below — the claude CLI runs it inside the project directory and streams back here.</div></div>
@@ -52,6 +53,7 @@ function ensureRunUI() {
     <div class="composer">
       <textarea id="promptIn" placeholder="Ask Claude to do something in this project…"></textarea>
       <div class="btns">
+        <button id="rereadBtn" class="ghost" title="Read the last reply aloud again">↻ Read again</button>
         <button id="sendBtn">Send ▷</button>
         <button id="cancelBtn" class="danger hidden">Cancel ✕</button>
       </div>
@@ -62,6 +64,13 @@ function ensureRunUI() {
     <div id="runHistory"><div class="muted">Loading…</div></div>`;
   $('#sendBtn').onclick = sendPrompt;
   $('#cancelBtn').onclick = cancelRun;
+  // Re-read: speak the last assistant reply again via the same TTS path the run
+  // uses. Click is a real user gesture, so mobile autoplay policy is satisfied.
+  $('#rereadBtn').onclick = () => {
+    const t = (chat.lastText || '').trim();
+    if (!t) { addMsg('Nothing to read yet — send a prompt first.', 'sys'); return; }
+    if (window.HubVoice && HubVoice.speak) HubVoice.speak(t);
+  };
   $('#newChatBtn').onclick = newChat;
   // Enter sends (the expectation on phones/low-end browsers where Ctrl/Cmd is
   // awkward or absent); Shift+Enter inserts a newline. Ctrl/Cmd+Enter kept as
@@ -157,6 +166,22 @@ function prefillRun(text) {
   $('#promptIn').focus();
 }
 
+// Bind (or clear) the Run tab to a Project — its instructions + project-scoped
+// memory ride every prompt sent from here (see lib/runs.js projectId handling).
+// Called by the Projects tab's "Start a chat in this project" button.
+let runProject = null;
+function bindRunProject(p) {
+  runProject = p && p.id ? p : null;
+  ensureRunUI();
+  const tag = $('#runProjectTag');
+  if (!tag) return;
+  if (runProject) {
+    tag.textContent = '▤ ' + runProject.name;
+    tag.classList.remove('hidden');
+    tag.onclick = () => bindRunProject(null);
+  } else { tag.classList.add('hidden'); tag.onclick = null; }
+}
+
 // ---- chat log helpers ----
 function nearBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight < 80; }
 function addEl(html, cls) {
@@ -207,7 +232,11 @@ function renderLine(o) {
   if (o.type === 'assistant' && o.message && Array.isArray(o.message.content)) {
     for (const b of o.message.content) {
       if (!b) continue;
-      if (b.type === 'text' && b.text && b.text.trim()) { chat.lastText = b.text.trim(); addEl(mdToHtml(b.text.trim()), 'msg assistant'); }
+      if (b.type === 'text' && b.text && b.text.trim()) {
+        chat.lastText = b.text.trim(); addEl(mdToHtml(chat.lastText), 'msg assistant');
+        // live runs only (never history replays): voice the reply as it streams
+        if (chat.running && window.HubVoice && HubVoice.onAssistantText) HubVoice.onAssistantText(chat.lastText);
+      }
       else if (b.type === 'tool_use') {
         // hermes ACP tool calls carry a human title in input.title; prefer it
         const summ = (b.input && b.input.title) ? b.input.title : excerpt(b.input || {}, 90);
@@ -317,18 +346,24 @@ async function sendPrompt() {
   if (!prompt || chat.running) return;
   const engine = $('#runEngine') ? $('#runEngine').value : 'claude';
 
-  // Jarvis mode: buffer prompt + auto-route model
+  // Jarvis mode: buffer prompt + auto-route model. When Jarvis rewrites the
+  // prompt we show YOUR words in the user bubble and, right under it, a note
+  // with the exact distilled prompt Jarvis actually sent. That note is a 'sys'
+  // line — the ONE Jarvis-authored output that is shown but never spoken (the
+  // voice queue only ever reads assistant text + the final reply, never 'sys').
+  let displayPrompt = prompt, jarvisNote = null;
   const jarvisToggle = $('#jarvisToggle');
   if (jarvisToggle && jarvisToggle.checked && engine === 'claude') {
     const transform = jarvisTransform(prompt);
     if (transform) {
-      prompt = transform.buffered;
+      displayPrompt = transform.original; // bubble shows what you said…
+      prompt = transform.buffered;        // …while the cleaned version is what runs
       // If user hasn't pinned a model, use Jarvis's pick
       const userModel = $('#runModel').value;
       if (userModel === 'auto' || userModel === '') {
         $('#runModel').value = transform.complexity;
       }
-      addMsg(`✦ Jarvis: cleaned prompt (model: ${transform.complexity})`, 'sys');
+      jarvisNote = `✦ Jarvis distilled that → ${transform.buffered}  ·  model: ${transform.complexity}`;
     }
   }
 
@@ -336,11 +371,13 @@ async function sendPrompt() {
   try {
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, engine, model: $('#runModel').value, permissionMode: $('#runPerm').value,
-        resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked }) });
+        resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked,
+        projectId: (runProject && runProject.id) || '' }) });
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
   if (r.error) { addMsg(r.error, 'errmsg'); return; }
   ta.value = '';
-  addMsg(prompt, 'user');
+  addMsg(displayPrompt, 'user');
+  if (jarvisNote) addMsg(jarvisNote, 'sys jarvisnote'); // shown, never spoken
   chat.hermesEl = null; chat.hermesText = ''; // fresh bubble per hermes reply
   attachLiveRun(r.id, { startedAtMs: Date.now(), queued: r.queued });
   if (window.HubVoice) HubVoice.onRunStart();
