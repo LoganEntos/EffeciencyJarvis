@@ -65,6 +65,24 @@
     },
     {
       "kind": "incorporate",
+      "name": "Nimbalyst/nimbalyst",
+      "repo": "https://github.com/Nimbalyst/nimbalyst",
+      "license": "MIT",
+      "verified": true,
+      "status": "active",
+      "usedFor": "ADOPTED (2026-07-14, commit 7f15256) — transcript-hygiene patterns from ClaudeCodeSessionSync.ts reimplemented in lib/core.js parseTranscriptTail: CLI-bookkeeping filter (<command-name>/<system-reminder>/caveat wrappers), non-conversational entry-type skip list, and guarded <persisted-output> tool-result inlining. Reference-only donor in data/inbox/Jarvis-Fable5-Resource-Packet; no code vendored."
+    },
+    {
+      "kind": "incorporate",
+      "name": "DanWahlin/agent-sdk-core",
+      "repo": "https://github.com/DanWahlin/agent-sdk-core",
+      "license": "MIT",
+      "verified": true,
+      "status": "active",
+      "usedFor": "ADOPTED (2026-07-14, commit 6840108) — diagnoseError pattern from src/providers/diagnostics.ts reimplemented as lib/diagnose.js: data-driven {test, hint} rules mapping run stderr/exit to an actionable one-liner appended to errorExcerpt in lib/runs.js finalizeRun. Reference-only donor in data/inbox/Jarvis-Fable5-Resource-Packet; no code vendored."
+    },
+    {
+      "kind": "incorporate",
       "name": "unclecode/crawl4ai",
       "repo": "https://github.com/unclecode/crawl4ai",
       "license": "Apache-2.0",

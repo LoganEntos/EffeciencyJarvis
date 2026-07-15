@@ -15,8 +15,10 @@ const liveness = require('./liveness');
 const hermes = require('./hermes');
 const teams = require('./teams');
 const personas = require('./personas');
+const projects = require('./projects');
 const { listArtifacts, serveArtifact } = require('./artifacts');
 const { createQueries } = require('./runs-query');
+const { diagnose } = require('./diagnose');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
@@ -127,7 +129,7 @@ function pushLine(st, line) {
   broadcast(st, 'line', line, st.lines.length - 1);
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
+function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId }) {
   engine = ENGINES.includes(engine) ? engine : 'claude';
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
@@ -171,7 +173,23 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
     try { persona = personas.activePrefix(); } catch {}
     try { personaName = personas.activeName(); } catch {}
   }
-  const fullPrompt = persona + (recalled ? recalled.block + '\n\n' : '') + prompt + (team ? team.text : '') + hint;
+  // Project binding (Projects tab): the project's standing instructions lead the
+  // prompt like a persona does, plus a small project-scoped engram recall block
+  // (this project's own past runs/notes). Claude engine only; token-neutral when
+  // no project is bound. See lib/projects.js.
+  let projectPrefix = '', projectName = null, projectSlug = null, projRecall = null;
+  if (engine === 'claude' && projectId) {
+    try {
+      const pr = projects.get(projectId);
+      if (pr) {
+        projectName = pr.name; projectSlug = pr.slug;
+        if (pr.instructions && pr.instructions.trim()) projectPrefix = `<project name="${pr.name}">\n${pr.instructions.trim()}\n</project>\n\n`;
+        try { projRecall = memory.recallForProject(pr.slug, prompt, { forInjection: true }).injection; } catch {}
+      }
+    } catch {}
+  }
+  const fullPrompt = persona + projectPrefix + (recalled ? recalled.block + '\n\n' : '')
+    + (projRecall ? projRecall.block + '\n\n' : '') + prompt + (team ? team.text : '') + hint;
   let args = null, hermesCfg = null;
   // Default is bypassPermissions: hub runs are headless (`-p`), so there is no
   // approval prompt — under acceptEdits/default every Bash/MCP call is silently
@@ -198,6 +216,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
     costUsd: null, durationMs: null, tokensIn: null, tokensOut: null,
     team: teamName, persona: personaName, routedReason, recallCount: recalled ? recalled.count : 0,
+    project: projectName, projectSlug: projectSlug || null,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);
@@ -206,6 +225,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine }) {
   if (recalled) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◇ memory recall: ${recalled.count} relevant memor${recalled.count === 1 ? 'y' : 'ies'} injected` }));
   if (team) pushLine(st, JSON.stringify({ type: 'hub_status', text: `⛬ team: ${team.name} — steering delegation to its specialists` }));
   if (personaName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◈ persona: ${personaName} — communication bearing active` }));
+  if (projectName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `▤ project: ${projectName} — instructions${projRecall ? ` + ${projRecall.count} memor${projRecall.count === 1 ? 'y' : 'ies'}` : ''} injected` }));
   if (runningCount() < MAX_ACTIVE) launch(st);
   else {
     queue.push(id);
@@ -254,6 +274,13 @@ function finalizeRun(st) {
       } catch {}
     }
     st.meta.errorExcerpt = ex || `exit code ${st.meta.exitCode}`;
+  }
+  if (st.meta.status === 'error') {
+    // Append an actionable diagnosis (lib/diagnose.js) — raw excerpt stays intact.
+    const hint = diagnose(st.stderr + '\n' + (st.meta.errorExcerpt || ''), st.meta.exitCode);
+    if (hint && !(st.meta.errorExcerpt || '').includes(hint)) {
+      st.meta.errorExcerpt = ((st.meta.errorExcerpt || '') + '\nlikely cause: ' + hint).trim();
+    }
   }
   if (st.out) st.out.end();
   writeMeta(st);
@@ -422,6 +449,7 @@ async function handle(req, res, url) {
       resume: (b.resume || '').toString(),
       recall: b.recall === true,
       engine: (b.engine || '').toString(),
+      projectId: (b.projectId || '').toString(),
     });
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;

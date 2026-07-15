@@ -114,6 +114,33 @@ function sessions() {
   }).sort((a, b) => new Date(b.modified) - new Date(a.modified));
 }
 
+// ---- transcript hygiene (adapted from Nimbalyst's ClaudeCodeSessionSync) ----
+// Entry types that are SDK/CLI bookkeeping, never conversation: queue
+// enqueue/dequeue records, the rolling last-prompt bookmark (duplicates the
+// real user entry), file-edit snapshots, and LLM session summaries.
+const SKIP_ENTRY_TYPES = new Set(['queue-operation', 'last-prompt', 'file-history-snapshot', 'summary']);
+// CLI bookkeeping wrapped inside user-role messages: slash-command wrappers,
+// local-command stdout, caveats, system reminders. Looks like a prompt in the
+// JSONL but is CLI-generated — never render it as a user message.
+const BOOKKEEPING_RE = /<command-name>|<command-message>|<local-command-stdout>|<local-command-caveat>|<system-reminder>|caveat: the messages below were generated/i;
+// Claude Code 2.1.x stashes large tool results in <session>/tool-results/<id>.txt
+// and inlines a <persisted-output> marker (abs path + 2KB preview) instead.
+const PERSISTED_RE = /<persisted-output>[\s\S]*?Full output saved to:\s*(.+?)\s*\n[\s\S]*?<\/persisted-output>/;
+
+// Substitute a <persisted-output> marker with the stashed file's real content —
+// but ONLY when the path resolves inside the session's own sibling dir
+// (traversal guard, same startsWith pattern as artifacts.js; case-folded
+// because Windows paths are case-insensitive). Otherwise keep the preview.
+function resolvePersisted(text, sessionBase) {
+  const m = text.match(PERSISTED_RE);
+  if (!m) return text;
+  const target = path.normalize(m[1].trim());
+  if (!path.isAbsolute(target)) return text;
+  if (!target.toLowerCase().startsWith((sessionBase + path.sep).toLowerCase())) return text;
+  const full = U.safeRead(target);
+  return full === null ? text : text.replace(m[0], full);
+}
+
 // Parse the last `bytes` of a .jsonl transcript into [{time, kind, text}] events.
 // kind ∈ user | assistant | tool; text is capped at 200 chars (tool → tool name).
 function parseTranscriptTail(file, size, bytes) {
@@ -124,24 +151,30 @@ function parseTranscriptTail(file, size, bytes) {
   finally { if (fd !== undefined) { try { fs.closeSync(fd); } catch {} } }
   const lines = buf.toString('utf8').split(/\r?\n/);
   if (start > 0) lines.shift(); // first line is likely a partial JSON line — drop it
+  const sessionBase = file.replace(/\.jsonl$/i, ''); // sibling dir holding tool-results/
   const events = [];
   for (const line of lines) {
     if (!line.trim()) continue;
     let o; try { o = JSON.parse(line); } catch { continue; }
+    if (SKIP_ENTRY_TYPES.has(o.type)) continue; // bookkeeping, not conversation
     const time = o.timestamp || null;
     const msg = o.message;
     if (!msg) continue;
     if (o.type === 'user') {
       // content is a string for real prompts, or an array (tool_result blocks — skip those).
       const c = msg.content;
-      const txt = typeof c === 'string' ? c
+      let txt = typeof c === 'string' ? c
         : Array.isArray(c) ? c.filter(b => b && b.type === 'text').map(b => b.text).join(' ') : '';
+      if (BOOKKEEPING_RE.test(txt)) continue; // CLI wrapper posing as a prompt
+      if (txt.includes('<persisted-output>')) txt = resolvePersisted(txt, sessionBase);
       if (txt && txt.trim()) events.push({ time, kind: 'user', text: txt.trim().slice(0, 200) });
     } else if (o.type === 'assistant' && Array.isArray(msg.content)) {
       for (const b of msg.content) {
         if (!b) continue;
-        if (b.type === 'text' && b.text && b.text.trim()) events.push({ time, kind: 'assistant', text: b.text.trim().slice(0, 200) });
-        else if (b.type === 'tool_use') events.push({ time, kind: 'tool', text: b.name || 'tool' });
+        if (b.type === 'text' && b.text && b.text.trim()) {
+          const t = b.text.includes('<persisted-output>') ? resolvePersisted(b.text, sessionBase) : b.text;
+          events.push({ time, kind: 'assistant', text: t.trim().slice(0, 200) });
+        } else if (b.type === 'tool_use') events.push({ time, kind: 'tool', text: b.name || 'tool' });
       }
     }
   }
