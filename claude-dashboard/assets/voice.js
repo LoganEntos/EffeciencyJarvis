@@ -415,14 +415,22 @@
     // Mobile auto-read depends on the Kokoro sidecar (speak() routes phones
     // through the neural audio-element path because iOS blocks async
     // speechSynthesis, and the browser fallback is that same blocked path).
-    // If Kokoro isn't up, the phone would just be silent with no explanation —
-    // probe once and say why, instead of leaving a dead voice.
+    // The hub self-heals the sidecar (boot warm-start + on-demand respawn in
+    // lib/voice.js); if the probe still finds it down, nudge it awake so the
+    // first reply doesn't pay the model-load wait. Only a missing INSTALL is
+    // worth a message — that needs the PC once.
     if (isMobileDevice() && store.engine === 'browser') {
       fetch('/api/voice/status?engine=kokoro').then(r => r.json()).then(s => {
-        if (s && s.status !== 'ok') say(
-          s.installed
-            ? 'Spoken replies need the Kokoro voice engine — start it on the PC: Config → Voice → ⚡ Start engine.'
-            : 'Spoken replies need the Kokoro voice engine, which isn\'t installed yet — see Config → Voice on the PC (one-time ~340 MB setup).', 'sys');
+        // health statuses: "loading" | "ready" | "error" — "ready" serves.
+        // (the old check here compared against 'ok', which the sidecar never
+        // reports, so phones were told to start an engine that WAS running)
+        if (!s || s.status === 'ready' || s.status === 'loading') return;
+        if (s.installed) fetch('/api/voice/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Hub-Token': (typeof HUB_TOKEN !== 'undefined' ? HUB_TOKEN : '') },
+          body: JSON.stringify({ engine: 'kokoro' }),
+        }).catch(() => {});
+        else say('Spoken replies need the Kokoro voice engine, which isn\'t installed yet — see Config → Voice on the PC (one-time ~340 MB setup).', 'sys');
       }).catch(() => {});
     }
     // The moment you start texting me, I go quiet — stop the reply mid-sentence.

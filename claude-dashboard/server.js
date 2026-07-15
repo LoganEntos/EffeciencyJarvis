@@ -246,6 +246,7 @@ server.listen(PORT, HOST, () => {
   bindTries = 0;
   schedules.startTicker(); // scheduled runs fire only while the hub is up
   autopilot.startTicker(); // self-improvement loop — no-op unless enabled in Config
+  voice.autoStart();       // warm the Kokoro sidecar — mobile auto-read depends on it
   // tell the old process (if this is a supervised restart) that we're serving
   if (IS_RESTART_CHILD) {
     try {

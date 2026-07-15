@@ -110,6 +110,45 @@ function killByPort(port) {
   });
 }
 
+// Sidecar /health statuses are "loading" | "ready" | "error" (see scripts/
+// kokoro-server.py); "ready" is the only serving state.
+const isUp = (h) => !!h && h.status === 'ready';
+
+// Poll an engine's /health every 500 ms until it serves or `ms` elapses.
+function waitReady(target, ms) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    (function tick() {
+      health(target).then(h => {
+        if (isUp(h)) return resolve(true);
+        if (Date.now() - t0 >= ms) return resolve(false);
+        setTimeout(tick, 500);
+      });
+    })();
+  });
+}
+
+// Make sure an engine is serving before a TTS request is forwarded: already
+// healthy → true; installed but offline → spawn it and wait for the model to
+// load. Mobile auto-read depends on Kokoro (iOS blocks async speechSynthesis),
+// so a dead sidecar must self-heal rather than leave the phone silent.
+async function ensureUp(engine, target) {
+  if (isUp(await health(target))) return true;
+  if (!fs.existsSync(venvPy(engine))) return false;
+  const r = startSidecar(engine, target);
+  if (r.error) return false;
+  return waitReady(target, engine === 'kokoro' ? 25000 : 60000);
+}
+
+// Boot-time warm start: bring Kokoro up as soon as the hub is listening (when
+// installed), so the first spoken reply doesn't pay the model-load wait.
+// Fire-and-forget; CSM stays manual — it's slow, heavy, and opt-in.
+function autoStart() {
+  const target = targetFor('kokoro');
+  if (!target || !fs.existsSync(venvPy('kokoro'))) return;
+  health(target).then(h => { if (!isUp(h)) startSidecar('kokoro', target); });
+}
+
 // Stop an engine's sidecar: kill the child this hub spawned (if any), then clear
 // any other listener still holding the port. So the UI's "Stop" reliably takes
 // the engine offline regardless of who started it.
@@ -165,6 +204,12 @@ async function handle(req, res, url) {
     return true;
   }
 
+  // Self-heal: if the sidecar died (or was never started), spawn it and wait
+  // for /health before forwarding — otherwise phones sit silent with no way
+  // to press the desktop Start button. Falls through on failure so the client
+  // still gets the clean 502 it uses to fall back to browser TTS.
+  await ensureUp(engine, target);
+
   const payload = JSON.stringify({ text, speaker });
   await new Promise((resolve) => {
     const fwd = http.request(target, {
@@ -204,4 +249,4 @@ async function handle(req, res, url) {
   return true;
 }
 
-module.exports = { handle, targetFor };
+module.exports = { handle, targetFor, autoStart };
