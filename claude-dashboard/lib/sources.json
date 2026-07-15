@@ -83,6 +83,33 @@
     },
     {
       "kind": "incorporate",
+      "name": "acnlabs/OpenPersona",
+      "repo": "https://github.com/acnlabs/OpenPersona",
+      "license": "MIT",
+      "verified": true,
+      "status": "queued",
+      "usedFor": "QUEUED (top value from the 2026-07-14 Fable5 packet review) — soul-handoff prior art for docs/jarvis-soul.md: handoff.schema.json (previousPersona, conversationSummary, pendingItems, moodSnapshot, relationshipStage) and switcher.js marker-block edits (replaceMarkerBlock — edit delimited sections, never rewrite the file). Patterns only, never code: donor uses fs-extra + Mustache, hub is zero-dep. Reference-only donor in data/inbox/Jarvis-Fable5-Resource-Packet."
+    },
+    {
+      "kind": "incorporate",
+      "name": "hotovo/aider-desk",
+      "repo": "https://github.com/hotovo/aider-desk",
+      "license": "Apache-2.0",
+      "verified": true,
+      "status": "queued",
+      "usedFor": "QUEUED — subagent/task-orchestration prior art (subagent.ts: buildRestrictedSubagentProfile permission-scoped child agents, RunSubagentTaskParams/Result, createSubagentPromptContext). Compare against lib/tasks.js and the hub's 14 tiered subagents before borrowing; adopt patterns only. Reference-only donor in data/inbox/Jarvis-Fable5-Resource-Packet."
+    },
+    {
+      "kind": "incorporate",
+      "name": "DanWahlin/ai-agent-board",
+      "repo": "https://github.com/DanWahlin/ai-agent-board",
+      "license": "MIT",
+      "verified": true,
+      "status": "queued",
+      "usedFor": "QUEUED (lowest priority in the 2026-07-14 packet review) — event/type shapes for agent boards; sibling of the adopted agent-sdk-core diagnostics. Reference-only donor in data/inbox/Jarvis-Fable5-Resource-Packet; nothing vendored."
+    },
+    {
+      "kind": "incorporate",
       "name": "unclecode/crawl4ai",
       "repo": "https://github.com/unclecode/crawl4ai",
       "license": "Apache-2.0",
