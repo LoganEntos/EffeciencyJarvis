@@ -205,7 +205,7 @@ async function handle(req, res, url) {
       if (!f) continue;
       if (f.exists && !overwrite) { conflicts.push(f.safe); continue; }
       fs.writeFileSync(f.full, part.data);
-      saved.push({ name: f.safe, size: part.data.length });
+      saved.push({ name: f.safe, size: part.data.length, path: f.full });
     }
     if (conflicts.length && !saved.length) { U.sendJson(res, { error: 'exists', conflicts }, 409); return true; }
     U.sendJson(res, { saved, conflicts });

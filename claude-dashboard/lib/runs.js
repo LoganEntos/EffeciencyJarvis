@@ -129,7 +129,24 @@ function pushLine(st, line) {
   broadcast(st, 'line', line, st.lines.length - 1);
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId }) {
+const INBOX_DIR = path.join(DASH_DIR, 'data', 'inbox');
+// Pasted/dropped images the browser uploaded to data/inbox/ before the run.
+// Confine to the inbox (they arrive as our own /api/files response paths) and
+// keep only real files, so a stray client path can't make Claude read the disk.
+function resolveImages(images) {
+  if (!Array.isArray(images)) return [];
+  const out = [];
+  for (const p of images.slice(0, 8)) {
+    try {
+      const abs = path.resolve(String(p));
+      if (!abs.startsWith(INBOX_DIR + path.sep)) continue;
+      if (fs.statSync(abs).isFile()) out.push(abs);
+    } catch {}
+  }
+  return out;
+}
+
+function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images }) {
   engine = ENGINES.includes(engine) ? engine : 'claude';
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
@@ -188,8 +205,16 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
       }
     } catch {}
   }
+  // Pasted images: reference their absolute inbox paths so Claude reads them
+  // with its Read tool (the CLI has no native image arg in print mode). Sits
+  // right after the user's words, before the team/hint boilerplate.
+  const imgPaths = resolveImages(images);
+  const imgBlock = imgPaths.length
+    ? `\n\nAttached image${imgPaths.length > 1 ? 's' : ''} (read ${imgPaths.length > 1 ? 'each' : 'it'} with the Read tool):\n`
+      + imgPaths.map(p => `- ${p}`).join('\n')
+    : '';
   const fullPrompt = persona + projectPrefix + (recalled ? recalled.block + '\n\n' : '')
-    + (projRecall ? projRecall.block + '\n\n' : '') + prompt + (team ? team.text : '') + hint;
+    + (projRecall ? projRecall.block + '\n\n' : '') + prompt + imgBlock + (team ? team.text : '') + hint;
   let args = null, hermesCfg = null;
   // Default is bypassPermissions: hub runs are headless (`-p`), so there is no
   // approval prompt — under acceptEdits/default every Bash/MCP call is silently
@@ -216,6 +241,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
     costUsd: null, durationMs: null, tokensIn: null, tokensOut: null,
     team: teamName, persona: personaName, routedReason, recallCount: recalled ? recalled.count : 0,
+    imageCount: imgPaths.length,
     project: projectName, projectSlug: projectSlug || null,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
@@ -453,6 +479,7 @@ async function handle(req, res, url) {
       recall: b.recall === true,
       engine: (b.engine || '').toString(),
       projectId: (b.projectId || '').toString(),
+      images: Array.isArray(b.images) ? b.images : [],
     });
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;

@@ -51,7 +51,8 @@ function ensureRunUI() {
     <div class="chatlog" id="chatLog"><div class="msg sys">Type a prompt below — the claude CLI runs it inside the project directory and streams back here.</div></div>
     <div class="badgebar" id="runStatus" style="margin-bottom:10px"></div>
     <div class="composer">
-      <textarea id="promptIn" placeholder="Ask Claude to do something in this project…"></textarea>
+      <div id="attachStrip" class="attachstrip hidden"></div>
+      <textarea id="promptIn" placeholder="Ask Claude to do something in this project… (paste or drop an image to attach it)"></textarea>
       <div class="btns">
         <button id="rereadBtn" class="ghost" title="Read the last reply aloud again">↻ Read again</button>
         <button id="sendBtn">Send ▷</button>
@@ -79,6 +80,20 @@ function ensureRunUI() {
     if (e.key !== 'Enter' || e.shiftKey) return;
     e.preventDefault();
     sendPrompt();
+  };
+  // Paste or drop an image → upload to the inbox, attach it to the next run.
+  const ta = $('#promptIn');
+  ta.onpaste = e => {
+    const imgs = [...(e.clipboardData?.items || [])].filter(i => i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
+    if (imgs.length) { e.preventDefault(); attachImages(imgs); }
+  };
+  const comp = ta.closest('.composer');
+  comp.ondragover = e => { e.preventDefault(); comp.classList.add('drag'); };
+  comp.ondragleave = () => comp.classList.remove('drag');
+  comp.ondrop = e => {
+    e.preventDefault(); comp.classList.remove('drag');
+    const imgs = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
+    if (imgs.length) attachImages(imgs);
   };
   $('#histFilter').oninput = renderHistory;
   // engine/model/permission choices survive reloads
@@ -339,11 +354,56 @@ function renderRunStatus() {
   el.innerHTML = html;
 }
 
+// ---- pasted/dropped image attachments ----
+// Uploaded to data/inbox/pasted/ so the run can reference their absolute paths;
+// held here until the next Send, then cleared.
+chat.pendingImages = [];
+async function attachImages(files) {
+  for (const file of files) {
+    const stamp = Date.now() + '-' + Math.floor(Math.random() * 1e4);
+    const ext = (file.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+    const named = new File([file], `paste-${stamp}.${ext}`, { type: file.type });
+    const fd = new FormData(); fd.append('file', named);
+    const chip = { name: named.name, url: URL.createObjectURL(file), path: null, pending: true };
+    chat.pendingImages.push(chip);
+    renderAttachStrip();
+    try {
+      const r = await api('/api/files?project=pasted&overwrite=1', { method: 'POST', body: fd, timeoutMs: 60000 });
+      const saved = r && r.saved && r.saved[0];
+      if (saved && saved.path) { chip.path = saved.path; chip.pending = false; }
+      else throw new Error((r && r.error) || 'upload failed');
+    } catch (e) {
+      chat.pendingImages = chat.pendingImages.filter(c => c !== chip);
+      addMsg('Image attach failed: ' + (e.message || 'upload error'), 'errmsg');
+    }
+    renderAttachStrip();
+  }
+}
+function removeImage(i) {
+  const c = chat.pendingImages[i];
+  if (c) { try { URL.revokeObjectURL(c.url); } catch {} chat.pendingImages.splice(i, 1); }
+  renderAttachStrip();
+}
+function renderAttachStrip() {
+  const el = $('#attachStrip'); if (!el) return;
+  const imgs = chat.pendingImages;
+  el.classList.toggle('hidden', !imgs.length);
+  el.innerHTML = imgs.map((c, i) =>
+    `<span class="attachchip${c.pending ? ' pending' : ''}"><img src="${c.url}" alt="">`
+    + `<button class="x" onclick="removeImage(${i})" title="remove">✕</button></span>`).join('');
+}
+
 // ---- live run flow ----
 async function sendPrompt() {
   const ta = $('#promptIn');
   let prompt = ta.value.trim();
-  if (!prompt || chat.running) return;
+  if (chat.running) return;
+  // Attached images: block while any is still uploading; allow an image-only
+  // send by supplying a default instruction.
+  if (chat.pendingImages.some(c => c.pending)) { addMsg('Still uploading an image — try again in a moment.', 'sys'); return; }
+  const imgs = chat.pendingImages.filter(c => c.path);
+  if (!prompt && !imgs.length) return;
+  if (!prompt && imgs.length) prompt = 'Take a look at the attached image' + (imgs.length > 1 ? 's' : '') + '.';
   const engine = $('#runEngine') ? $('#runEngine').value : 'claude';
 
   // Jarvis mode: buffer prompt + auto-route model. When Jarvis rewrites the
@@ -372,11 +432,15 @@ async function sendPrompt() {
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, engine, model: $('#runModel').value, permissionMode: $('#runPerm').value,
         resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked,
-        projectId: (runProject && runProject.id) || '' }) });
+        projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.path) }) });
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
   if (r.error) { addMsg(r.error, 'errmsg'); return; }
   ta.value = '';
   addMsg(displayPrompt, 'user');
+  if (imgs.length) {
+    addEl(imgs.map(c => `<img src="${c.url}" alt="attached image">`).join(''), 'msg user attachimgs');
+    chat.pendingImages = []; renderAttachStrip();
+  }
   if (jarvisNote) addMsg(jarvisNote, 'sys jarvisnote'); // shown, never spoken
   chat.hermesEl = null; chat.hermesText = ''; // fresh bubble per hermes reply
   attachLiveRun(r.id, { startedAtMs: Date.now(), queued: r.queued });
