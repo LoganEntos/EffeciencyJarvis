@@ -38,9 +38,11 @@ renderers.projects = async function () {
         <option value="active">Most runs</option>
       </select>
       <span style="flex:1"></span>
-      <button id="pImport" class="ghost" title="Adopt every data/inbox/ folder that isn't already a project">⇊ Import inbox</button>
-      <button id="pNew">＋ New project</button>
+      <button id="pImportClaude" title="Find your Claude Code projects (~/.claude/projects) and archive them here">⇊ Import Claude projects</button>
+      <button id="pImport" class="ghost" title="Adopt every data/inbox/ folder that isn't already a project">Import inbox</button>
+      <button id="pNew" class="ghost">＋ New project</button>
     </div>
+    <div id="pClaudePicker"></div>
     <div id="pNewForm"></div>
     <div id="pToast" class="muted" style="font-size:12px;margin-bottom:10px;min-height:0"></div>
     <div id="pGridWrap"></div>`;
@@ -49,6 +51,7 @@ renderers.projects = async function () {
   $('#pSort').onchange = e => { projSort = e.target.value; paintCards(); };
   $('#pNew').onclick = toggleNewForm;
   $('#pImport').onclick = importInbox;
+  $('#pImportClaude').onclick = openClaudePicker;
   if (projShowNew) renderNewForm();
   paintCards();
 };
@@ -77,16 +80,19 @@ function paintCards() {
 }
 
 function projCard(p) {
+  const claude = p.kind === 'claude';
   const runs = `${p.runCount || 0} run${p.runCount === 1 ? '' : 's'}`;
   const meta = p.lastRunAt ? 'last run ' + rel(p.lastRunAt) : 'updated ' + rel(p.updatedAt);
+  const desc = claude
+    ? `<div class="mono muted" style="margin-top:6px;font-size:11px;word-break:break-all">${esc(p.cwd || '')}</div>`
+    : (p.description ? `<div class="desc" style="margin-top:6px">${esc(p.description)}</div>` : '<div class="muted" style="font-size:12px;margin-top:6px">No description</div>');
+  const pills = claude
+    ? `<span class="pill accent">Claude Code</span><span class="pill neutral">${p.sessionCount} session${p.sessionCount === 1 ? '' : 's'}</span>`
+    : `<span class="pill neutral">${p.fileCount} file${p.fileCount === 1 ? '' : 's'}</span><span class="pill neutral">${runs}</span>${p.instructions ? '<span class="pill ok">instructions</span>' : '<span class="pill warn">no instructions</span>'}`;
   return `<div class="card clickable" data-id="${esc(p.id)}">
     <div class="name" style="font-size:15px;font-weight:700">${esc(p.name)}</div>
-    ${p.description ? `<div class="desc" style="margin-top:6px">${esc(p.description)}</div>` : '<div class="muted" style="font-size:12px;margin-top:6px">No description</div>'}
-    <div class="flex" style="margin-top:12px;gap:8px;flex-wrap:wrap">
-      <span class="pill neutral">${p.fileCount} file${p.fileCount === 1 ? '' : 's'}</span>
-      <span class="pill neutral">${runs}</span>
-      ${p.instructions ? '<span class="pill ok">instructions</span>' : '<span class="pill warn">no instructions</span>'}
-    </div>
+    ${desc}
+    <div class="flex" style="margin-top:12px;gap:8px;flex-wrap:wrap">${pills}</div>
     <div class="muted" style="font-size:11px;margin-top:10px">${meta}</div>
   </div>`;
 }
@@ -131,6 +137,59 @@ async function importInbox() {
   projToast(`Imported ${r.count} project${r.count === 1 ? '' : 's'} from inbox folders.`);
 }
 
+// -------------------------------------------------- import real Claude projects
+// Discover ~/.claude/projects workspaces and let the user pick which to archive.
+let claudePickerOpen = false;
+async function openClaudePicker() {
+  const host = $('#pClaudePicker');
+  if (!host) return;
+  if (claudePickerOpen) { claudePickerOpen = false; host.innerHTML = ''; return; }
+  claudePickerOpen = true;
+  host.innerHTML = '<div class="row"><span class="muted">Scanning ~/.claude/projects…</span></div>';
+  let d;
+  try { d = await api('/api/projects/claude'); }
+  catch (e) { host.innerHTML = `<div class="row"><span class="muted">Couldn't scan: ${esc(e.message || 'network error')}</span></div>`; return; }
+  const ws = (d && d.workspaces) || [];
+  const fresh = ws.filter(w => !w.imported);
+  if (!ws.length) { host.innerHTML = '<div class="row"><span class="muted">No Claude Code projects found on this machine.</span></div>'; return; }
+  host.innerHTML = `<div class="row" style="padding:14px 16px">
+    <div class="flex" style="justify-content:space-between;align-items:center">
+      <span class="name">⇊ Your Claude Code projects <span class="muted" style="font-weight:400;font-size:11.5px">— ${ws.length} found, ${fresh.length} not yet archived</span></span>
+      <button class="ghost close" style="padding:5px 11px;font-size:11px">✕</button></div>
+    <div class="cpick" style="margin-top:12px;display:grid;gap:8px">${ws.map(claudeRow).join('')}</div>
+    <div class="flex" style="margin-top:14px;gap:8px">
+      <button id="pcImport">Archive selected</button>
+      <button id="pcAll" class="ghost">Select all new</button>
+      <span id="pcMsg" class="muted" style="font-size:11.5px;align-self:center"></span></div></div>`;
+  host.querySelector('.close').onclick = () => { claudePickerOpen = false; host.innerHTML = ''; };
+  const boxes = () => [...host.querySelectorAll('input[type=checkbox]:not(:disabled)')];
+  $('#pcAll').onclick = () => boxes().forEach(b => { b.checked = true; });
+  $('#pcImport').onclick = async () => {
+    const dirs = boxes().filter(b => b.checked).map(b => b.value);
+    if (!dirs.length) { $('#pcMsg').textContent = 'Select at least one project.'; return; }
+    $('#pcMsg').textContent = `Archiving ${dirs.length}…`;
+    let r;
+    try { r = await api('/api/projects/import-claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dirs }) }); }
+    catch (e) { $('#pcMsg').textContent = 'Failed: ' + (e.message || 'network error'); return; }
+    claudePickerOpen = false; host.innerHTML = '';
+    try { const data = await api('/api/projects'); projCache = (data && data.projects) || []; } catch {}
+    paintCards();
+    projToast(`Archived ${r.count} Claude project${r.count === 1 ? '' : 's'}. They're kept here now.`);
+  };
+}
+
+function claudeRow(w) {
+  const dis = w.imported ? ' disabled' : '';
+  return `<label class="flex" style="gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r);${w.imported ? 'opacity:.55' : ''}">
+    <input type="checkbox" value="${esc(w.dir)}"${dis}>
+    <div style="flex:1;min-width:0">
+      <div class="mono" style="font-size:12px;word-break:break-all">${esc(w.cwd || w.dir)}</div>
+      <div class="muted" style="font-size:11px;margin-top:2px">${w.sessionCount} session${w.sessionCount === 1 ? '' : 's'}${w.branch ? ' · ' + esc(w.branch) : ''}${w.lastAt ? ' · last ' + rel(w.lastAt) : ''}</div>
+    </div>
+    ${w.imported ? '<span class="pill ok" style="font-size:10px">archived</span>' : ''}
+  </label>`;
+}
+
 // -------------------------------------------------------------- detail state
 async function renderProjectDetail(id) {
   const el = $('#projects');
@@ -140,6 +199,7 @@ async function renderProjectDetail(id) {
   catch (e) { el.innerHTML = `<div class="note">Couldn't load project — ${esc(e.message || 'network error')}.</div>`; return; }
   if (d.error) { projSel = null; return renderers.projects(); }
   const p = d.project, files = d.files || [], mem = (d.memory && d.memory.items) || [], runs = d.runs || [];
+  const sessions = d.sessions || [], claude = p.kind === 'claude';
   el.innerHTML = `
     <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:6px">
       <button id="pBack" class="ghost" style="padding:6px 12px;font-size:12px">← All projects</button>
@@ -148,10 +208,16 @@ async function renderProjectDetail(id) {
     <input id="pName" value="${esc(p.name)}" style="font-family:var(--font-body);font-size:26px;font-weight:800;letter-spacing:-.02em;background:none;border:none;padding:0;margin:2px 0;width:100%">
     <input class="search" id="pDesc" value="${esc(p.description)}" placeholder="Short description (optional)" style="max-width:560px;margin:4px 0 18px">
     <div class="badgebar" style="margin:-8px 0 18px">
-      <span class="pill neutral">${files.length} file${files.length === 1 ? '' : 's'}</span>
-      <span class="pill neutral">${p.runCount || 0} run${p.runCount === 1 ? '' : 's'}</span>
+      ${claude ? `<span class="pill accent">Claude Code</span><span class="pill neutral">${sessions.length} session${sessions.length === 1 ? '' : 's'}</span>`
+               : `<span class="pill neutral">${files.length} file${files.length === 1 ? '' : 's'}</span><span class="pill neutral">${p.runCount || 0} run${p.runCount === 1 ? '' : 's'}</span>`}
       <span class="pill neutral">${mem.length} memor${mem.length === 1 ? 'y' : 'ies'}</span>
     </div>
+    ${claude ? `<div class="row">
+      <div class="psection"><span class="name">◷ Sessions <span class="muted" style="font-weight:400;font-size:11.5px">— your Claude Code conversations in this workspace, archived here</span></span></div>
+      <div class="mono muted" style="font-size:11px;margin:2px 0 4px;word-break:break-all">${esc(p.cwd || '')}</div>
+      <div class="note" style="font-size:11.5px;margin:8px 0">To continue a session, open a terminal in that folder and run <span class="mono">claude --resume &lt;id&gt;</span>. Each session opens read-only here for reference.</div>
+      <div id="pSessions" style="display:grid;gap:8px;margin-top:6px">${sessions.length ? sessions.map(sessionRow).join('') : '<div class="muted">No sessions in this workspace.</div>'}</div>
+    </div>` : ''}
 
     <div class="row">
       <div class="psection"><span class="name">▤ Instructions <span class="muted" style="font-weight:400;font-size:11.5px">— injected ahead of every run started in this project</span></span>
@@ -235,6 +301,9 @@ async function renderProjectDetail(id) {
     if (typeof openRun === 'function') openRun(rid);
     else if (typeof showTab === 'function') showTab('sessions');
   });
+
+  // Claude sessions → open the transcript read-only
+  el.querySelectorAll('.psession-row[data-sid]').forEach(row => row.onclick = () => showTranscript(p.id, row.dataset.sid, row.dataset.title));
 
   // project memory note
   $('#pNoteAdd').onclick = async () => {
@@ -334,6 +403,53 @@ async function projUpload(slug, fileList, overwrite) {
   }
   if (r.error && r.error !== 'exists') { if (st) st.innerHTML = `<span class="pill err">${esc(r.error)}</span>`; return; }
   if (projSel) renderProjectDetail(projSel);
+}
+
+// One archived Claude Code session, clickable to open its transcript read-only.
+function sessionRow(s) {
+  const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
+  const title = s.title || '(no opening message)';
+  return `<div class="psession-row card clickable" data-sid="${esc(s.sid)}" data-title="${esc(title)}" style="padding:11px 13px">
+    <div class="name" style="font-size:13px;font-weight:600">${esc(title.slice(0, 120))}</div>
+    <div class="flex muted" style="gap:8px;flex-wrap:wrap;font-size:11px;margin-top:5px">
+      <span>${s.messages} message${s.messages === 1 ? '' : 's'}</span>
+      ${s.branch ? `<span>· ${esc(s.branch)}</span>` : ''}
+      <span>· ${fmt(s.sizeBytes)}</span>
+      ${s.lastAt ? `<span>· ${rel(s.lastAt)}</span>` : ''}
+      <span class="mono" style="margin-left:auto">${esc(s.sid.slice(0, 8))}</span>
+    </div>
+  </div>`;
+}
+
+// Read-only transcript viewer overlay for an archived Claude session.
+async function showTranscript(projId, sid, title) {
+  let ov = $('#projTranscript');
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'projTranscript';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:200;background:#000000cc;display:grid;place-items:center;padding:24px';
+  ov.innerHTML = `<div style="width:min(860px,94vw);max-height:90vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)">
+    <div class="flex" style="justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)">
+      <span class="name" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(title || sid)}</span>
+      <button class="ghost close" style="padding:5px 12px;font-size:12px">Close ✕</button></div>
+    <div id="ptBody" style="overflow:auto;padding:16px 18px"><div class="muted">Loading transcript…</div></div></div>`;
+  ov.onclick = e => { if (e.target === ov || e.target.classList.contains('close')) ov.remove(); };
+  document.body.appendChild(ov);
+  let d;
+  try { d = await api('/api/projects/session?id=' + encodeURIComponent(projId) + '&sid=' + encodeURIComponent(sid)); }
+  catch (e) { $('#ptBody').innerHTML = `<div class="note">Couldn't load: ${esc(e.message || 'network error')}</div>`; return; }
+  if (!d.session) { $('#ptBody').innerHTML = '<div class="note">Session not found.</div>'; return; }
+  const s = d.session;
+  const turns = (s.messages || []).map(m => {
+    const who = m.role === 'user' ? 'You' : 'Claude';
+    const tools = (m.tools && m.tools.length) ? `<div class="muted mono" style="font-size:10.5px;margin-top:4px">▷ ${m.tools.map(esc).join(' · ')}</div>` : '';
+    return `<div style="margin-bottom:14px">
+      <div class="name" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:${m.role === 'user' ? 'var(--accent)' : 'var(--muted)'}">${who}</div>
+      ${m.text ? `<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.55;margin-top:3px">${esc(m.text)}</div>` : ''}
+      ${tools}</div>`;
+  }).join('');
+  $('#ptBody').innerHTML = (turns || '<div class="muted">Empty transcript.</div>')
+    + (s.truncated ? '<div class="note" style="font-size:11.5px">Transcript truncated — showing the first 600 turns.</div>' : '');
 }
 
 // Image lightbox — its own overlay (the shared app overlay renders a <pre>).

@@ -245,6 +245,7 @@ button.danger:hover{background:#e0525233;box-shadow:none}
 .navOverlay{display:none}
 .pill.err{background:#e0525218;color:#f0908f;border:1px solid #e0525245}
 .pill.neutral{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-dim)}
+.pill.accent{background:var(--accent);color:var(--bg);border:1px solid var(--accent);font-weight:600}
 /* live: a run confirmed alive by the server heartbeat — gently pulses so it
    reads as "breathing", distinct from a static status badge */
 .pill.live{background:#4bc47a14;color:var(--green);border:1px solid #4bc47a40;animation:livepulse 1.8s ease-in-out infinite}
