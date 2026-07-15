@@ -302,6 +302,10 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
   border-bottom-left-radius:4px}
 .msg.sys{align-self:center;background:transparent;border:none;color:var(--dim);font-size:11.5px;
   padding:2px 8px;max-width:100%;font-family:var(--font-mono)}
+/* Jarvis's distilled-prompt note: a silent, left-aligned amber whisper under
+   your own bubble — visibly Jarvis's, never read aloud. */
+.msg.sys.jarvisnote{align-self:flex-end;text-align:right;color:var(--accent);
+  opacity:.82;border-right:2px solid var(--accent-dim);padding-right:10px;max-width:82%}
 .msg.result{align-self:center;background:#4bc47a0d;border:1px solid #4bc47a33;color:var(--muted);
   font-size:11.5px;max-width:100%;font-family:var(--font-mono)}
 .msg.errmsg{align-self:center;background:#e052520d;border:1px solid #e0525240;color:#f0908f;

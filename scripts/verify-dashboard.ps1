@@ -48,6 +48,7 @@ Check "GET /api/sessions"      "$base/api/sessions"
 Check "GET /api/activity"      "$base/api/activity"
 Check "GET /api/graph/stats"   "$base/api/graph/stats"
 Check "GET /api/runs"          "$base/api/runs"
+Check "GET /api/spend/today"   "$base/api/spend/today"
 Check "GET /api/files"         "$base/api/files"
 Check "GET /api/tasks"         "$base/api/tasks"
 Check "GET /api/schedules"     "$base/api/schedules"
@@ -92,6 +93,7 @@ CheckPost "POST /api/memory w/o token (403)"      "$base/api/memory"      '{"tex
 CheckPost "POST /api/schedules w/o token (403)"   "$base/api/schedules"   '{"prompt":"x","kind":"daily","at":"08:00"}' 403
 CheckPost "POST /api/voice/tts w/o token (403)"   "$base/api/voice/tts"   '{"text":"x"}' 403
 CheckPost "POST /api/voice/start w/o token (403)" "$base/api/voice/start" '{}' 403
+CheckPost "POST /api/voice/stop w/o token (403)"  "$base/api/voice/stop"  '{}' 403
 CheckPost "POST /api/autopilot/toggle w/o token (403)" "$base/api/autopilot/toggle" '{}' 403
 CheckPost "POST /api/usage/config w/o token (403)" "$base/api/usage/config" '{"dailyBudgetUsd":5}' 403
 CheckPost "POST /api/sharepoint/pull w/o token (403)" "$base/api/sharepoint/pull" '{"drive":"x","item":"y"}' 403

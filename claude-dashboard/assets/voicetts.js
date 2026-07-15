@@ -20,8 +20,13 @@ window.HubVoiceTTS = function (ctx) {
     if (store.voiceURI) { const m = voices.find(v => v.voiceURI === store.voiceURI); if (m) return m; }
     return voices.find(v => /en[-_]US/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang)) || voices[0];
   }
-  // speak(text) → true iff it will produce audio (the call loop relies on this)
-  function speak(text) {
+  // synth(text, onDone) → true iff it will produce audio (the queue in voice.js
+  // relies on this). onDone fires when this utterance finishes (or its fallback
+  // does); the queue uses it to play the next block and, when drained, to
+  // re-open the mic / idle the orb. The engines themselves no longer own that
+  // transition — a single run streams several blocks and only the LAST should
+  // trigger it.
+  function synth(text, onDone) {
     let clean = String(text || '').replace(/```[\s\S]*?```/g, ' (code block) ').replace(/[*_`#>]/g, '').trim();
     // CSM generates at ~0.4x realtime on this GPU, so its spoken cap is much
     // tighter: long replies would take longer to synthesize than anyone waits.
@@ -42,12 +47,12 @@ window.HubVoiceTTS = function (ctx) {
     // which iOS honors once the element is unlocked on first tap (primeAudio).
     // speakCSM's csmFetch defaults to Kokoro when the stored engine is browser.
     const mobileNeural = isMobileDevice() && store.engine === 'browser';
-    return (store.neural || mobileNeural) ? speakCSM(clean) : speakBrowser(clean);
+    return (store.neural || mobileNeural) ? speakCSM(clean, onDone) : speakBrowser(clean, onDone);
   }
   // iOS/Chrome both suspend speechSynthesis after ~15 s, cutting long replies
   // off mid-sentence; a periodic pause()+resume() keeps the queue alive.
   function stopTtsKeepAlive() { if (V.ttsKA) { clearInterval(V.ttsKA); V.ttsKA = null; } }
-  function speakBrowser(clean) {
+  function speakBrowser(clean, onDone) {
     if (!SS || !clean) return false;
     SS.cancel();
     const u = new SpeechSynthesisUtterance(clean);
@@ -56,7 +61,9 @@ window.HubVoiceTTS = function (ctx) {
     u.onstart = () => { setState('speaking'); stopTtsKeepAlive(); V.ttsKA = setInterval(() => { try { if (SS.speaking) { SS.pause(); SS.resume(); } } catch {} }, 9000); };
     u.onend = u.onerror = () => {
       stopTtsKeepAlive();
-      if (V.call) reListenSoon(200);        // reply finished → your turn again
+      // onDone → the queue advances (next block / re-listen / idle). No onDone
+      // (e.g. the Config test button) → self-contained idle transition.
+      if (onDone) onDone();
       else if (V.state === 'speaking') setState('idle');
     };
     SS.speak(u); SS.resume();               // resume: iOS parks the queue post-gesture
@@ -153,8 +160,8 @@ window.HubVoiceTTS = function (ctx) {
   // Returns true optimistically (the wav arrives async). Drives a ChunkPipeline:
   // if the FIRST chunk fails, falls back to browser TTS for the whole utterance
   // so the call loop stays alive; a mid-utterance failure just ends the reply.
-  function speakCSM(clean) {
-    stopSpeak();
+  function speakCSM(clean, onDone) {
+    haltAudio();                              // cancel any prior audio — NOT the queue (we're mid-drain)
     const gen = ++V.csmGen;
     V.csmPending = true; // stays true across inter-chunk gaps (barge-in guard)
     const stale = () => gen !== V.csmGen;
@@ -165,8 +172,7 @@ window.HubVoiceTTS = function (ctx) {
       onDone: () => {
         if (stale()) return;
         V.csmPending = false;
-        if (V.call) reListenSoon(200);
-        else if (V.state === 'speaking') setState('idle');
+        if (onDone) onDone();               // queue advances (next block / re-listen / idle)
       },
       onError: (e, firstUnplayed) => {
         if (!csmWarned) {
@@ -176,10 +182,7 @@ window.HubVoiceTTS = function (ctx) {
         }
         if (firstUnplayed) {                  // nothing spoken yet — full fallback
           V.csmPending = false;
-          if (!speakBrowser(clean)) {
-            if (V.call) reListenSoon(400);
-            else if (V.state === 'speaking' || V.state === 'thinking') setState('idle');
-          }
+          if (!speakBrowser(clean, onDone) && onDone) onDone(); // keep the queue moving even if both engines fail
         }
       },
     }).start();
@@ -188,9 +191,9 @@ window.HubVoiceTTS = function (ctx) {
 
   // True while ANY engine is (or is about to be) talking — barge-in guard.
   const speakingNow = () => (SS && SS.speaking) || V.csmPending || (V.audioEl && !V.audioEl.paused);
-  // The one place speech dies (SS + in-flight CSM fetch + CSM audio element);
-  // every barge-in path — typing, Esc, run start, orb click — funnels here.
-  function stopSpeak() {
+  // Cancel in-flight audio only (SS + CSM fetch + CSM audio element). This is
+  // the low-level halt; the queue-clearing barge-in is stopSpeak() below.
+  function haltAudio() {
     stopTtsKeepAlive();
     if (SS) SS.cancel();
     V.csmGen++; V.csmPending = false;
@@ -199,5 +202,54 @@ window.HubVoiceTTS = function (ctx) {
     if (V.state === 'speaking') setState('idle');
   }
 
-  return { speak, speakBrowser, speakCSM, stopSpeak, speakingNow, csmFetch, playBlob };
+  // ---- reply speech queue --------------------------------------------------
+  // A single run streams several assistant text blocks: progress narration
+  // between tool calls ("Let me check the routing…"), then the final answer.
+  // Each must be SPOKEN IN ORDER — speaking block N once cancelled block N-1
+  // (SS.cancel inside the engine), which clipped the narration to fragments.
+  // Now blocks queue and play back-to-back. The mic re-opens (call mode) / the
+  // orb idles only when the queue is EMPTY and the run has stopped streaming —
+  // never between two blocks of the same reply.
+  const Q = { items: [], active: false, last: '', streaming: false };
+  function enqueueSpeak(text) {
+    const t = String(text || '').trim();
+    if (!t || t === Q.last) return !!t;        // dedupe: replyDone repeats the final block
+    Q.last = t; Q.items.push(t);
+    if (!Q.active) drainSpeak();
+    return true;
+  }
+  function drainSpeak() {
+    if (!Q.items.length) { Q.active = false; if (!Q.streaming) afterReply(); return; }
+    Q.active = true;
+    if (!synth(Q.items.shift(), drainSpeak)) drainSpeak(); // nothing audible → skip to next
+  }
+  function afterReply() {
+    if (V.call) reListenSoon(200);             // your turn again
+    else if (V.state === 'speaking' || V.state === 'thinking') setState('idle');
+  }
+  // Queue-clearing barge-in: every caller in voice.js (typing, Esc, orb click,
+  // run start) funnels here, so a new prompt never leaks the prior reply's
+  // remaining blocks.
+  function stopSpeak() { Q.items.length = 0; Q.active = false; Q.last = ''; Q.streaming = false; haltAudio(); }
+  const queueBusy = () => speakingNow() || Q.active;
+  // Read replies aloud right now? The Jarvis tab is a voice-first surface, so it
+  // always speaks; elsewhere follow the call / talk-back toggle / mobile rules.
+  function wantSpeak() {
+    return V.call || store.talk || isMobileDevice()
+      || (typeof currentTab !== 'undefined' && currentTab === 'jarvis');
+  }
+
+  // ---- run-reply hooks (voice.js onRunStart/onAssistantText/onRunDone) ------
+  function replyStart() { stopSpeak(); Q.streaming = true; if (!V.listening) setState('thinking'); }
+  function replyText(text) { if (text && wantSpeak()) enqueueSpeak(text); }
+  function replyDone(text) {
+    Q.streaming = false;                       // no more blocks — the queue may transition
+    if (wantSpeak() && text) enqueueSpeak(text);
+    if (!Q.active) drainSpeak();               // finish the queue, or (empty) re-listen / idle
+  }
+  // one-shot public speak (persona-switch confirmations etc.) — a plain enqueue
+  function speak(text) { return enqueueSpeak(text); }
+
+  return { synth, speak, speakBrowser, stopSpeak, speakingNow, queueBusy, csmFetch, playBlob,
+           replyStart, replyText, replyDone };
 };

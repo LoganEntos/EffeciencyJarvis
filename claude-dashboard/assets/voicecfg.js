@@ -53,6 +53,7 @@
           <input type="number" id="vCsmSpk" min="0" max="9" step="1" value="${store.csmSpeaker}" style="width:58px">
           <span id="vCsmEng" class="pill neutral" style="font-size:11px">engine: checking…</span>
           <button class="ghost hidden" id="vCsmStart" style="padding:6px 12px;font-size:11.5px">⚡ Start engine</button>
+          <button class="danger hidden" id="vCsmStop" style="padding:6px 12px;font-size:11.5px">⏻ Stop engine</button>
           <button class="ghost" id="vCsmTest" style="padding:6px 12px;font-size:11.5px">▶ Test voice</button>
           <span id="vCsmStat" class="pill neutral" style="font-size:11px;display:none"></span>
         </div>
@@ -80,14 +81,21 @@
     // ---- CSM engine status + one-click start ----
     const eng = container.querySelector('#vCsmEng');
     const startBtn = container.querySelector('#vCsmStart');
+    const stopBtn = container.querySelector('#vCsmStop');
+    // Stop is only meaningful while the sidecar is up (ready/loading); Start only
+    // when it's installed-but-down. They're mutually exclusive.
+    function setBtns(canStart, canStop) {
+      startBtn.classList.toggle('hidden', !canStart);
+      stopBtn.classList.toggle('hidden', !canStop);
+    }
     function paintEngine(j) {
       if (!eng) return;
       const s = (j && j.status) || 'offline';
       const nm = neuralEngine(), dir = nm === 'kokoro' ? '.kokoro' : '.csm';
-      if (s === 'ready') { eng.className = 'pill ok'; eng.textContent = `${nm}: ready · ${esc(j.device || '?')}${j.model ? ' · ' + esc(String(j.model).split('/').pop()) : ''}`; startBtn.classList.add('hidden'); }
-      else if (s === 'loading') { eng.className = 'pill warn'; eng.textContent = `${nm}: loading model…`; startBtn.classList.add('hidden'); }
-      else if (s === 'error') { eng.className = 'pill err'; eng.textContent = `${nm}: error — see ${dir}/server.log`; startBtn.classList.remove('hidden'); }
-      else { eng.className = 'pill ' + (j && j.installed ? 'warn' : 'err'); eng.textContent = j && j.installed ? `${nm}: offline` : `${nm}: not installed`; if (j && j.installed) startBtn.classList.remove('hidden'); else startBtn.classList.add('hidden'); }
+      if (s === 'ready') { eng.className = 'pill ok'; eng.textContent = `${nm}: ready · ${esc(j.device || '?')}${j.model ? ' · ' + esc(String(j.model).split('/').pop()) : ''}`; setBtns(false, true); }
+      else if (s === 'loading') { eng.className = 'pill warn'; eng.textContent = `${nm}: loading model…`; setBtns(false, true); }
+      else if (s === 'error') { eng.className = 'pill err'; eng.textContent = `${nm}: error — see ${dir}/server.log`; setBtns(true, true); }
+      else { eng.className = 'pill ' + (j && j.installed ? 'warn' : 'err'); eng.textContent = j && j.installed ? `${nm}: offline` : `${nm}: not installed`; setBtns(!!(j && j.installed), false); }
       return s;
     }
     async function pollEngine(times) {
@@ -107,6 +115,16 @@
         if (r.error) { eng.className = 'pill err'; eng.textContent = nm + ': ' + r.error.slice(0, 80); return; }
       } catch (e) { eng.className = 'pill err'; eng.textContent = nm + ': start failed'; return; }
       pollEngine(20); // follow it through loading → ready
+    };
+    stopBtn.onclick = async () => {
+      const nm = neuralEngine();
+      stopSpeak(); // don't leave a half-spoken reply hanging when the engine dies
+      eng.className = 'pill warn'; eng.textContent = nm + ': stopping…'; setBtns(false, false);
+      try {
+        const r = await api('/api/voice/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ engine: nm }) });
+        if (r.error) { eng.className = 'pill err'; eng.textContent = nm + ': ' + r.error.slice(0, 80); setBtns(true, true); return; }
+      } catch (e) { eng.className = 'pill err'; eng.textContent = nm + ': stop failed'; setBtns(true, true); return; }
+      setTimeout(() => pollEngine(4), 700); // give the port a moment to free, then confirm offline
     };
 
     // Test = one real /api/voice/tts round-trip against the selected neural engine

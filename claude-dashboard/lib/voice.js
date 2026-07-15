@@ -24,7 +24,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const U = require('./util');
 
 const TTS_TIMEOUT_MS = 120000; // first CSM call is slow; Kokoro is quick but share the ceiling
@@ -93,6 +93,35 @@ function startSidecar(engine, target) {
   }
 }
 
+// Kill any process LISTENING on a loopback port. Windows-only best effort:
+// fixed argv arrays (netstat, then taskkill by PID) — no shell, no user input,
+// the port is an integer from our own ENGINES table. Fire-and-forget; used to
+// clear a sidecar this hub boot didn't spawn (e.g. a leftover from an earlier
+// process) so "Stop" actually frees the port rather than only our own child.
+function killByPort(port) {
+  execFile('netstat', ['-ano', '-p', 'tcp'], { windowsHide: true }, (err, out) => {
+    if (err || !out) return;
+    const pids = new Set();
+    for (const line of out.split(/\r?\n/)) {
+      const m = line.match(/:(\d+)\s+\S+\s+LISTENING\s+(\d+)/i);
+      if (m && parseInt(m[1], 10) === port && m[2] !== '0' && m[2] !== String(process.pid)) pids.add(m[2]);
+    }
+    for (const pid of pids) { try { execFile('taskkill', ['/PID', pid, '/F', '/T'], { windowsHide: true }, () => {}); } catch {} }
+  });
+}
+
+// Stop an engine's sidecar: kill the child this hub spawned (if any), then clear
+// any other listener still holding the port. So the UI's "Stop" reliably takes
+// the engine offline regardless of who started it.
+function stopSidecar(engine) {
+  const cur = children[engine];
+  let killed = false;
+  if (cur && cur.exitCode === null) { try { cur.kill(); killed = true; } catch {} }
+  children[engine] = null;
+  try { killByPort(ENGINES[engine].port); } catch {}
+  return { ok: true, killed };
+}
+
 async function handle(req, res, url) {
   if (url.pathname === '/api/voice/status' && req.method === 'GET') {
     const engine = engineKey(url.searchParams.get('engine'));
@@ -111,6 +140,13 @@ async function handle(req, res, url) {
     const target = targetFor(engine);
     const r = target ? startSidecar(engine, target) : { error: ENGINES[engine].urlEnv + ' must be a loopback http URL' };
     U.sendJson(res, r, r.error ? 400 : 200);
+    return true;
+  }
+  if (url.pathname === '/api/voice/stop' && req.method === 'POST') {
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 4 * 1024) || '{}'); } catch {}
+    const engine = engineKey(b.engine || url.searchParams.get('engine'));
+    U.sendJson(res, stopSidecar(engine));
     return true;
   }
   if (url.pathname !== '/api/voice/tts' || req.method !== 'POST') return false;

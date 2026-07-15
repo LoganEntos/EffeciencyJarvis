@@ -20,7 +20,10 @@ renderers.graph = async function () {
     else { stopAgentViz(); await renderCodeGraph($('#graphBody')); }
   };
   document.querySelectorAll('.modeChip').forEach(c => c.onclick = () => setMode(c.dataset.m));
-  await setMode(localStorage.getItem('hub.graphmode') || 'agents');
+  // deep-linkable: ?tab=graph&graphmode=code&codeview=symbols
+  let mode = null;
+  try { mode = new URLSearchParams(location.search).get('graphmode'); } catch {}
+  await setMode(mode === 'code' || mode === 'agents' ? mode : (localStorage.getItem('hub.graphmode') || 'agents'));
 };
 renderers.graph.noSkeleton = true;
 
@@ -90,7 +93,9 @@ async function renderCodeGraph(body) {
       f.onkeydown = e => { if (e.key === 'Enter') viz.selectFirst(); };
     };
     document.querySelectorAll('.viewChip').forEach(c => c.onclick = () => show(c.dataset.v));
-    show(localStorage.getItem('hub.codeview') || 'modules');
+    let view = null;
+    try { view = new URLSearchParams(location.search).get('codeview'); } catch {}
+    show(view === 'symbols' || view === 'modules' ? view : (localStorage.getItem('hub.codeview') || 'modules'));
   });
 };
 
@@ -132,7 +137,8 @@ function moduleGraph(g) {
 
 function drawGraphViz(container, data) {
   const W = container.clientWidth || 800, DPR = window.devicePixelRatio || 1;
-  const H = Math.max(520, Math.min(780, Math.round(data.nodes.length * 1.6))); // more nodes → taller canvas
+  const dense = data.nodes.length >= 40; // all-symbols view: cluster + de-emphasize edges
+  const H = Math.max(520, Math.min(820, Math.round(data.nodes.length * 2.4))); // more nodes → taller canvas
   const rootCss = getComputedStyle(document.documentElement);
   const BG = (rootCss.getPropertyValue('--bg') || '#0e0d0b').trim();
   const LINE = (rootCss.getPropertyValue('--line') || '#2a251d').trim();
@@ -179,7 +185,7 @@ function drawGraphViz(container, data) {
   // physics lives in runForceLayout(): it owns the constants, the integration
   // step, and drag pinning; here we just drive it and read node x/y to paint.
   const layout = runForceLayout(nodes, links, W, H);
-  layout.warmup(60); // settle before first paint
+  layout.warmup(dense ? 160 : 60); // settle before first paint (clusters need longer)
 
   let hover = null, alpha = 1, selected = null;
   const matches = new Set(); // search hits — emphasized over everything else
@@ -194,15 +200,18 @@ function drawGraphViz(container, data) {
     const focus = hover || selected;
     for (const l of links) {
       const lit = focus && (l.s === focus || l.t === focus);
-      ctx.strokeStyle = lit ? ACCENT : LINE;
-      ctx.lineWidth = lit ? 1.6 : 0.7 + Math.min(2.6, l.weight / 5);
-      ctx.globalAlpha = matches.size ? .25 : 1;
+      // dense view: faint edges tinted by the source community, so cross-cluster
+      // wiring reads as colored threads instead of a grey hairball
+      if (lit) { ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.6; ctx.globalAlpha = .95; }
+      else if (dense) { ctx.strokeStyle = hue(l.s.community); ctx.lineWidth = .6; ctx.globalAlpha = matches.size ? .06 : .16; }
+      else { ctx.strokeStyle = LINE; ctx.lineWidth = .7 + Math.min(2.6, l.weight / 5); ctx.globalAlpha = matches.size ? .25 : 1; }
       ctx.beginPath(); ctx.moveTo(l.s.x, l.s.y); ctx.lineTo(l.t.x, l.t.y); ctx.stroke();
     }
     for (const n of nodes) {
       ctx.globalAlpha = emphasis(n);
       ctx.beginPath(); ctx.arc(n.x, n.y, rad(n) + (n === hover || n === selected ? 2 : 0), 0, 6.2832);
       ctx.fillStyle = hue(n.community); ctx.fill();
+      if (dense) { ctx.strokeStyle = BG; ctx.lineWidth = 1.2; ctx.stroke(); } // rim keeps packed dots distinct
       if (n === hover) { ctx.strokeStyle = TXT; ctx.lineWidth = 1.5; ctx.stroke(); }
       if (n === selected) { ctx.strokeStyle = ACCENT; ctx.lineWidth = 2.2; ctx.stroke(); }
       if (matches.has(n.id)) { ctx.strokeStyle = '#e0a63f'; ctx.lineWidth = 1.8; ctx.stroke(); }
@@ -290,15 +299,39 @@ function drawGraphViz(container, data) {
 // pinning; the caller warms it up, runs the raf loop, and reads node x/y.
 function runForceLayout(nodes, links, W, H) {
   const few = nodes.length < 40; // module view: roomier springs, stronger repulsion
-  const REP = few ? 9000 : 2600, SPRING = 0.02, REST = few ? 170 : 95,
-    CENTER = 0.012, DAMP = 0.85, PAD = few ? 46 : 18, VMAX = 14;
+  const REP = few ? 9000 : 2600, SPRING = few ? 0.02 : 0.012, REST = few ? 170 : 70,
+    CENTER = 0.012, DAMP = 0.85, PAD = few ? 46 : 22, VMAX = 14;
   let dragNode = null;
+  // Dense (all-symbols) view: give every community its own gravity well on a
+  // grid across the canvas — the hairball resolves into distinct color-matched
+  // clusters, with springs relegated to gentle intra/cross-cluster pull.
+  let anchor = null;
+  if (!few) {
+    const comms = [...new Set(nodes.map(n => n.community))].sort((a, b) => a - b);
+    const cols = Math.max(2, Math.ceil(Math.sqrt(comms.length * W / H)));
+    const rows = Math.ceil(comms.length / cols);
+    anchor = {};
+    comms.forEach((c, i) => {
+      anchor[c] = {
+        x: ((i % cols) + 0.5) * (W / cols),
+        y: (Math.floor(i / cols) + 0.5) * (H / rows),
+      };
+    });
+    const k = {}; // reseed each node on a tight spiral around its well
+    for (const n of nodes) {
+      const i = (k[n.community] = (k[n.community] || 0) + 1), wl = anchor[n.community];
+      n.x = wl.x + 9 * Math.sqrt(i) * Math.cos(i * 2.399963);
+      n.y = wl.y + 9 * Math.sqrt(i) * Math.sin(i * 2.399963);
+    }
+  }
   function step() {
     for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i], b = nodes[j];
       let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
       if (d2 < 1) { dx = Math.random() - .5; dy = Math.random() - .5; d2 = dx * dx + dy * dy + .01; }
-      const d = Math.sqrt(d2), f = REP / d2, fx = f * dx / d, fy = f * dy / d;
+      // clustered view: soften repulsion inside a community so clusters condense
+      const rep = anchor ? REP * (a.community === b.community ? 0.4 : 0.8) : REP;
+      const d = Math.sqrt(d2), f = rep / d2, fx = f * dx / d, fy = f * dy / d;
       a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
     }
     for (const l of links) {
@@ -308,7 +341,9 @@ function runForceLayout(nodes, links, W, H) {
     }
     for (const n of nodes) {
       if (n === dragNode) { n.vx = 0; n.vy = 0; continue; }
-      n.vx = (n.vx + (W / 2 - n.x) * CENTER) * DAMP; n.vy = (n.vy + (H / 2 - n.y) * CENTER) * DAMP;
+      const gx = anchor ? anchor[n.community].x : W / 2, gy = anchor ? anchor[n.community].y : H / 2;
+      const g = anchor ? 0.07 : CENTER;
+      n.vx = (n.vx + (gx - n.x) * g) * DAMP; n.vy = (n.vy + (gy - n.y) * g) * DAMP;
       n.x += Math.max(-VMAX, Math.min(VMAX, n.vx));
       n.y += Math.max(-VMAX, Math.min(VMAX, n.vy));
       n.x = Math.max(PAD, Math.min(W - PAD, n.x)); n.y = Math.max(PAD, Math.min(H - PAD, n.y));

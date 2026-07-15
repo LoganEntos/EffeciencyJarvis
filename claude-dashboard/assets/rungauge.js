@@ -14,7 +14,9 @@ async function renderUsageGauge() {
     }
     const u = usageData.today;
     if (u.budget == null) {
-      el.innerHTML = `<div class="note" style="margin:0 0 16px 0;font-size:11.5px">No daily budget set — set a limit in Config to see usage remaining.</div>`;
+      // no budget configured → show nothing (the hint text was visual clutter;
+      // the Config tab already explains how to set a limit)
+      el.innerHTML = '';
       return;
     }
     const pct = u.pctUsed || 0;

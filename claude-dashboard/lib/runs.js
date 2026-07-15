@@ -16,7 +16,7 @@ const hermes = require('./hermes');
 const teams = require('./teams');
 const personas = require('./personas');
 const projects = require('./projects');
-const { listArtifacts, serveArtifact } = require('./artifacts');
+const { listArtifacts, serveArtifact, countArtifacts } = require('./artifacts');
 const { createQueries } = require('./runs-query');
 const { diagnose } = require('./diagnose');
 
@@ -104,7 +104,7 @@ function runningCount() {
 // Read-side queries (list/routingStats/transcript/getRunMeta) live in
 // runs-query.js to keep this file under the 500-line rule; they share the
 // live `active` Map so in-flight runs read back the same as finished ones.
-const { listRuns, routingStats, transcript, getRunMeta } = createQueries({ RUNS_DIR, active, okId });
+const { listRuns, routingStats, transcript, getRunMeta, spendToday } = createQueries({ RUNS_DIR, active, okId });
 
 // Every line event carries `id:` = its index in the run, so EventSource
 // auto-reconnects (which send Last-Event-ID) never duplicate rendered lines.
@@ -283,6 +283,9 @@ function finalizeRun(st) {
     }
   }
   if (st.out) st.out.end();
+  // Freeze the artifact count into meta now that the run can't write more —
+  // so listing history never re-walks every run's artifact tree on each poll.
+  try { st.meta.artifactCount = countArtifacts(st.meta.id); } catch {}
   writeMeta(st);
   try { memory.captureRun(st.meta); } catch {} // engram-style episodic capture (rule-based, no LLM)
   broadcast(st, 'done', JSON.stringify(st.meta));
@@ -470,6 +473,7 @@ async function handle(req, res, url) {
   }
   if (p === '/api/run/stream') { streamRun(req, res, url.searchParams.get('id') || ''); return true; }
   if (p === '/api/runs') { U.sendJson(res, listRuns()); return true; }
+  if (p === '/api/spend/today') { U.sendJson(res, spendToday()); return true; }
   if (p === '/api/routing') { U.sendJson(res, routingStats()); return true; }
   if (p === '/api/run/transcript') {
     const t = transcript(url.searchParams.get('id') || '');

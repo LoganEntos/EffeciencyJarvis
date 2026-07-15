@@ -5,21 +5,56 @@
  * state (RUNS_DIR, active Map, okId guard) so both modules see the same runs.
  */
 'use strict';
+const fs = require('fs');
 const path = require('path');
 const U = require('./util');
 const liveness = require('./liveness');
 const { countArtifacts } = require('./artifacts');
 
 function createQueries({ RUNS_DIR, active, okId }) {
+  // Artifact count for one run WITHOUT re-walking the tree when we already
+  // know it: finished runs freeze it into meta.artifactCount at finalize, so
+  // the only walk is for live runs (few) or legacy metas (lazily backfilled
+  // to disk on first read, so it converges to zero walks).
+  function artifactCountFor(id, meta, live) {
+    if (live) return countArtifacts(id);
+    if (typeof meta.artifactCount === 'number') return meta.artifactCount;
+    const n = countArtifacts(id);
+    meta.artifactCount = n;
+    try { fs.writeFileSync(path.join(RUNS_DIR, id, 'meta.json'), JSON.stringify(meta, null, 2)); } catch {}
+    return n;
+  }
+
   function listRuns() {
     const rows = [];
     for (const e of U.listDir(RUNS_DIR)) {
       if (!e.isDirectory() || !okId(e.name)) continue;
       const live = active.get(e.name);
       const meta = live ? live.meta : U.safeJson(path.join(RUNS_DIR, e.name, 'meta.json'));
-      if (meta) rows.push(Object.assign({ artifactCount: countArtifacts(e.name) }, liveness.annotate(meta, live)));
+      if (meta) rows.push(Object.assign({ artifactCount: artifactCountFor(e.name, meta, live) }, liveness.annotate(meta, live)));
     }
     return rows.sort((a, b) => (b.queuedAt || b.startedAt || '').localeCompare(a.queuedAt || a.startedAt || '')).slice(0, 200);
+  }
+
+  // Today's total spend — the header badge polls this every 60s, so it must be
+  // cheap: run ids are UTC-ISO timestamps, so today's runs carry today's or (at
+  // the UTC/local midnight boundary) yesterday's date prefix. Read only those
+  // metas, skip the artifact walk entirely, and return a single number instead
+  // of the whole runs array over the wire (matters on mobile over Tailscale).
+  function spendToday() {
+    const localToday = new Date().toDateString();
+    const now = new Date();
+    const p1 = now.toISOString().slice(0, 10);
+    const p0 = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
+    let total = 0;
+    for (const e of U.listDir(RUNS_DIR)) {
+      if (!e.isDirectory() || !okId(e.name)) continue;
+      if (!e.name.startsWith(p1) && !e.name.startsWith(p0)) continue;
+      const live = active.get(e.name);
+      const meta = live ? live.meta : U.safeJson(path.join(RUNS_DIR, e.name, 'meta.json'));
+      if (meta && new Date(meta.startedAt || meta.queuedAt || 0).toDateString() === localToday) total += meta.costUsd || 0;
+    }
+    return { spendUsd: +total.toFixed(4), day: localToday };
   }
 
   // N4: routing-accuracy feedback — how routeModel()'s auto picks are working
@@ -67,10 +102,10 @@ function createQueries({ RUNS_DIR, active, okId }) {
     const live = active.get(id);
     const meta = live ? live.meta : U.safeJson(path.join(RUNS_DIR, id, 'meta.json'));
     if (!meta) return null;
-    return Object.assign({ artifactCount: countArtifacts(id) }, liveness.annotate(meta, live));
+    return Object.assign({ artifactCount: artifactCountFor(id, meta, live) }, liveness.annotate(meta, live));
   }
 
-  return { listRuns, routingStats, transcript, getRunMeta };
+  return { listRuns, routingStats, transcript, getRunMeta, spendToday };
 }
 
 module.exports = { createQueries };

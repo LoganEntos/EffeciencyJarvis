@@ -109,9 +109,15 @@
   const earOpen = () => tone([620, 880], 0.09);   // "your turn"
   const earClose = () => tone([560, 360], 0.10);   // "hanging up"
 
-  // Surface a message in the chat log so mic problems are never silent.
+  // Surface a message in the chat log so mic problems are never silent. On the
+  // Jarvis tab, stay put (it IS a voice surface) and flash its status line too.
   function say(msg, cls) {
-    try { goTab('run'); ensureRunUI(); if (typeof addMsg === 'function') addMsg(msg, cls || 'sys'); } catch {}
+    try {
+      ensureRunUI(); if (typeof addMsg === 'function') addMsg(msg, cls || 'sys');
+      if (typeof currentTab !== 'undefined' && currentTab === 'jarvis') {
+        const j = $('#jmsg'); if (j) { j.textContent = msg; j.style.color = cls === 'errmsg' ? 'var(--red)' : 'var(--muted)'; }
+      } else goTab('run');
+    } catch {}
   }
   // Why the mic can't run right now (null = it can). The #1 cause is an
   // insecure origin — Web Speech only works on https or localhost/127.0.0.1.
@@ -148,7 +154,7 @@
       clearTimeout(V.press);
       if (V.longPressed) { V.longPressed = false; return; } // long-press already acted
       if (V.call) { endCall(); return; }                    // click hangs up a call
-      if (V.state === 'speaking') { stopSpeak(); return; }
+      if (queueBusy()) { stopSpeak(); return; }             // click hushes a reply (incl. mid-queue)
       const blocked = micBlockReason();
       if (blocked) { say(blocked, 'errmsg'); return; }        // tell the user why, don't sit silent
       if (e.shiftKey) { beginCall(); return; }               // Shift+click = start call
@@ -208,13 +214,16 @@
   function startListen() {
     const blocked = micBlockReason();
     if (blocked) { say(blocked, 'errmsg'); if (V.call) endCall(); return; }
-    if (speakingNow()) stopSpeak();
+    if (queueBusy()) stopSpeak();
     const rec = new SR();
     // continuous=true so a pause mid-thought doesn't end the turn; we decide when
     // you're done ourselves via a silence timer, so you never get cut off.
     rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
     V.rec = rec; V.listening = true; V.sentByTimer = false; setState('listening');
-    goTab('run'); ensureRunUI();
+    // The Jarvis tab is its own voice stage — opening the mic there must not
+    // yank the user to Run (the V-key/orb "takes me to the Run tab" bug).
+    if (typeof currentTab === 'undefined' || currentTab !== 'jarvis') goTab('run');
+    ensureRunUI();
     const ta = $('#promptIn'); const pre = ta ? ta.value : '';
     rec.onresult = (e) => {
       // rebuild the whole transcript each event (results accumulate with continuous)
@@ -312,7 +321,11 @@
   // pull the resulting functions back into this closure so every call site
   // below is unchanged. (voicetts.js loads before voice.js in index.html.)
   const _tts = window.HubVoiceTTS({ SS, store, V, setState, reListenSoon, say, isMobileDevice });
-  const { speak, speakBrowser, speakCSM, stopSpeak, speakingNow, csmFetch, playBlob } = _tts;
+  // The reply speech queue + run-reply hooks (replyStart/Text/Done) live in
+  // voicetts.js alongside the engines they drive; voice.js keeps the mic, orb,
+  // call loop, and hotkeys. stopSpeak here is the queue-aware barge-in.
+  const { speak, speakBrowser, stopSpeak, speakingNow, queueBusy, csmFetch, playBlob,
+          replyStart, replyText, replyDone } = _tts;
 
   // ---- gesture unlock (mobile autoplay) ------------------------------------
   // Mobile browsers (iOS Safari especially, Android Chrome too) only let
@@ -377,21 +390,13 @@
   }
 
   // ---- run lifecycle hooks (called from run.js) ----------------------------
-  // Any new prompt — typed OR spoken — silences an in-progress reply at once.
-  function onRunStart() { if (!VOICE_DISABLED) { if (speakingNow()) stopSpeak(); if (!V.listening) setState('thinking'); } }
-  function onRunDone(text) {
-    if (VOICE_DISABLED) return;
-    // During a call, always talk back (it's a conversation) and keep the loop
-    // alive even when a run returns no text (error/cancel) by re-opening the mic.
-    if (V.call) {
-      // speak's onend re-opens the mic; if there's nothing to say, re-open directly
-      if (!(text && speak(text))) reListenSoon(500);
-      return;
-    }
-    // Auto-read on mobile; on desktop respect the "Speak replies out loud" toggle.
-    if ((store.talk || isMobileDevice()) && text) speak(text);
-    else if (V.state === 'thinking') setState('idle');
-  }
+  // Thin wrappers over the reply queue in voicetts.js. onRunStart opens a fresh
+  // queue (barge-in on the previous reply); onAssistantText speaks each block as
+  // it streams (progress narration + the answer) so long CLI wind-down doesn't
+  // read as lag; onRunDone closes the queue so the mic/orb transitions once.
+  function onRunStart() { if (!VOICE_DISABLED) replyStart(); }
+  function onAssistantText(text) { if (!VOICE_DISABLED) replyText(text); }
+  function onRunDone(text) { if (!VOICE_DISABLED) replyDone(text); }
 
   function init() {
     if (VOICE_DISABLED) return; // see kill switch note at top of file
@@ -425,11 +430,11 @@
     //  during talk-back — see startListen's SS.cancel for the manual version.)
     document.addEventListener('input', e => {
       const t = e.target;
-      if (t && t.id === 'promptIn' && speakingNow()) stopSpeak();
+      if (t && t.id === 'promptIn' && queueBusy()) stopSpeak();
     });
     document.addEventListener('keydown', e => {
-      // Esc always kills talk-back (both engines), even when a call isn't active
-      if (e.key === 'Escape' && speakingNow()) stopSpeak();
+      // Esc always kills talk-back (both engines + the queue), even when a call isn't active
+      if (e.key === 'Escape' && queueBusy()) stopSpeak();
     });
     window.addEventListener('keydown', e => {
       if (e.key === 'Escape' && V.call) { e.preventDefault(); endCall(); return; }
@@ -445,7 +450,7 @@
   }
 
   window.HubVoice = {
-    init, onRunStart, onRunDone, speak, beginCall, endCall,
+    init, onRunStart, onRunDone, onAssistantText, speak, beginCall, endCall,
     _state: () => V.state, _call: () => V.call,
     _disabled: VOICE_DISABLED,
     // closure internals for the Config settings panel (assets/voicecfg.js,

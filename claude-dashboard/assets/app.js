@@ -37,18 +37,15 @@ async function api(p, opts = {}) {
   } catch (e) { markServer(false); throw e; }
   finally { clearTimeout(t); }
 }
-function spendToday(runs) {
-  const today = new Date().toDateString();
-  return runs.filter(m => new Date(m.startedAt || m.queuedAt || 0).toDateString() === today)
-    .reduce((s, m) => s + (m.costUsd || 0), 0);
-}
 // Compact on phones — "today" was the part getting clipped by the 120px
 // mobile max-width (screenshot bug: "$58.11 to..."). Number alone always fits.
+// Dedicated /api/spend/today endpoint (one number, no artifact walk) — this
+// polls every 60s always-on, so it must not pull the whole runs array.
 async function updateSpendBadge() {
   const el = $('#spendBadge');
   if (!el) return;
   try {
-    const spend = spendToday(await api('/api/runs'));
+    const spend = (await api('/api/spend/today')).spendUsd || 0;
     el.textContent = window.innerWidth <= 760 ? `$${spend.toFixed(2)}` : `$${spend.toFixed(2)} today`;
   } catch {}
 }
@@ -376,16 +373,19 @@ function boot() {
   }).catch(() => {});
   updateSpendBadge();
   setInterval(updateSpendBadge, 60000); // header badge, not tab-scoped — the one thing mobile must always show while autopilot dispatches runs unattended
-  // Theme toggle (◐): warm terminal-amber (default) ↔ clean-dark "sleek" (the
-  // amber-agent-orb design target). Both variable sets live in style.css; the
-  // light theme is still defined there but no longer on the toggle path.
-  try { if (localStorage.getItem('hub.theme') !== 'warm') document.documentElement.setAttribute('data-theme', 'dark'); } catch {}
+  // Theme toggle (◐): clean-dark (default) ↔ light, matching the button's
+  // "dark / light" tooltip. The old warm terminal-amber set stays in style.css
+  // as the bare :root fallback only — it looked identical enough to clean-dark
+  // that toggling to it read as "button does nothing". Legacy stored values
+  // ('warm', unset) fall through to dark.
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem('hub.theme'); } catch {}
+  document.documentElement.setAttribute('data-theme', savedTheme === 'light' ? 'light' : 'dark');
   const tt = $('#themeTab');
   if (tt) tt.onclick = () => {
-    const sleek = document.documentElement.getAttribute('data-theme') !== 'dark';
-    if (sleek) document.documentElement.setAttribute('data-theme', 'dark');
-    else document.documentElement.removeAttribute('data-theme');
-    try { localStorage.setItem('hub.theme', sleek ? 'dark' : 'warm'); } catch {}
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('hub.theme', next); } catch {}
   };
   // Restart button (beside the theme toggle): tell the server to respawn, then
   // poll the same port until the fresh process answers and hard-reload — the
