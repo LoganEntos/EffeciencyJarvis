@@ -59,6 +59,8 @@ Check "GET /api/personas/get"  "$base/api/personas/get?id=jarvis"
 Check "GET /api/personas/get (bad id 404)" "$base/api/personas/get?id=..%2Fserver" 404
 Check "GET /assets/jarvistab.js" "$base/assets/jarvistab.js"
 Check "GET /assets/jarvis.css" "$base/assets/jarvis.css"
+Check "GET /assets/clientlog.js" "$base/assets/clientlog.js"
+Check "GET /api/clientlog"      "$base/api/clientlog"
 Check "GET /api/projects"      "$base/api/projects"
 Check "GET /assets/projects.js" "$base/assets/projects.js"
 Check "GET /assets/projects.css" "$base/assets/projects.css"
@@ -91,6 +93,7 @@ Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2F
 CheckPost "POST /api/run w/o token (403)"        "$base/api/run"        '{"prompt":"x"}' 403
 CheckPost "POST /api/run/delete w/o token (403)" "$base/api/run/delete" '{"id":"x"}' 403
 CheckPost "POST /api/files/delete w/o token (403)" "$base/api/files/delete" '{"name":"x"}' 403
+CheckPost "POST /api/clientlog w/o token (403)"  "$base/api/clientlog"  '{"msg":"x"}' 403
 CheckPost "POST /api/projects/import w/o token (403)" "$base/api/projects/import" '{}' 403
 CheckPost "POST /api/projects/delete w/o token (403)" "$base/api/projects/delete" '{"id":"x"}' 403
 CheckPost "POST /api/tasks w/o token (403)"       "$base/api/tasks"       '{"prompt":"x"}' 403
