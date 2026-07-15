@@ -14,7 +14,8 @@ star** — prefer zero-dep, avoid always-on MCPs (they tax every run).
 > **What is actually next:** the 2026-07-14 P1→P3 find-fix items in
 > `docs/improvement-backlog.md` (SVG-inline-serve, `run.js` >500, stale voice
 > `lastText`, off-by-one tab keys, then P2/P3). Queued behind a user greenlight:
-> N10 Council, N7 SharePoint Breakdown, N8 iPhone.
+> N7 SharePoint Breakdown, N8 iPhone. **N10 Council is deprioritized to the very
+> bottom** (user call 2026-07-15) — lowest-priority item, build last if ever.
 >
 > **Architecture decision log: `docs/open-issues.md`** — all six 2026-07-10 ISSUES
 > resolved (ruflo retired; hermes adopted-then-deprecated). No open architecture issues.
@@ -256,7 +257,8 @@ more efficient at the initial sweep), then hand maintenance to Opus 4.8.
 Shape TBD: likely `data/breakdown.json` + a Library tab section; refresh via a
 scheduled run (S17). **User said: to-do list only for now.**
 
-### N10. Council mode (user link 2026-07-12: karpathy/llm-council — SCOPED, not built yet)
+### N10. Council mode 🔮 LOWEST PRIORITY (deprioritized 2026-07-15 — build last, if ever)
+(user link 2026-07-12: karpathy/llm-council — SCOPED, not built yet)
 Prior art: llm-council fans a query out to several LLMs, has each anonymously
 rank the others' answers, then a "Chairman" model synthesizes a final answer.
 Mapped onto the hub (Claude-only, no cross-provider keys — see
