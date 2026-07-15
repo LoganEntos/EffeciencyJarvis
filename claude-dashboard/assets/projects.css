@@ -20,3 +20,10 @@ table.pruns th{text-align:left;font-family:var(--font-mono);font-size:10px;lette
 .pruns tr.prun:hover td{background:var(--panel2)}
 .pruns .ptrunc{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 .pcharcount{font-family:var(--font-mono);font-size:10.5px;color:var(--dim)}
+.xfer{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--accent-dim);
+  border-radius:var(--r);padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.xfer .psection{margin-bottom:10px}
+.xfertext{width:100%;min-height:300px;resize:vertical;font-family:var(--font-mono);font-size:12px;line-height:1.6;
+  color:var(--txt);background:#0b0a08;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.xfertext:focus{outline:none;border-color:var(--accent-dim)}
+:root[data-theme="light"] .xfertext{background:#efe9dc}

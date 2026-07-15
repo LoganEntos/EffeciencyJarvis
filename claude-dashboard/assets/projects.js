@@ -11,6 +11,7 @@ let projCache = [];        // last-loaded project list (search/sort re-render fr
 let projShowNew = false;   // inline "new project" form visible
 let projSort = 'recent';   // recent | name | active
 let projQuery = '';        // grid search
+let projShowXfer = false;  // transfer-prompt panel visible
 
 // Instruction starter templates — chips insert these so a blank project isn't
 // a blank page. Kept deliberately terse; the user fills the specifics.
@@ -38,10 +39,12 @@ renderers.projects = async function () {
         <option value="active">Most runs</option>
       </select>
       <span style="flex:1"></span>
+      <button id="pXfer" class="ghost" title="The SharePoint file-transfer prompt — copy it to paste into a project run, and edit it to taste">⧉ Transfer prompt</button>
       <button id="pImportClaude" title="Find your Claude Code projects (~/.claude/projects) and archive them here">⇊ Import Claude projects</button>
       <button id="pImport" class="ghost" title="Adopt every data/inbox/ folder that isn't already a project">Import inbox</button>
       <button id="pNew" class="ghost">＋ New project</button>
     </div>
+    <div id="pXferPanel"></div>
     <div id="pClaudePicker"></div>
     <div id="pNewForm"></div>
     <div id="pToast" class="muted" style="font-size:12px;margin-bottom:10px;min-height:0"></div>
@@ -52,7 +55,9 @@ renderers.projects = async function () {
   $('#pNew').onclick = toggleNewForm;
   $('#pImport').onclick = importInbox;
   $('#pImportClaude').onclick = openClaudePicker;
+  $('#pXfer').onclick = () => { projShowXfer = !projShowXfer; renderXfer(); };
   if (projShowNew) renderNewForm();
+  if (projShowXfer) renderXfer();
   paintCards();
 };
 
