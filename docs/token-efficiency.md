@@ -28,10 +28,9 @@ needed for these.
 
 ## Where these actually belong
 - The spoken/reply brevity is already enforced by the Jarvis persona.
-- The coding rules matter on **runs that edit code**. The candidate wiring is a
-  ~5-line addition to `buildRunHint()` (`lib/util.js`) — net-positive only because
-  it's terse (≈60 tokens/run) and can save hundreds on a coding run. **Not wired
-  yet** — pending the user's ok, since it touches every run's context.
+- The coding rules matter on **runs that edit code**. ✅ **Wired 2026-07-15** as a
+  terse one-line "Token discipline" clause in `buildRunHint()` (`lib/util.js`) —
+  ≈60 tokens/run, net-positive since it can save hundreds on a coding run.
 
 ## What NOT to port
 PULSE's PA/AF agent roster, its `gemma4` model refs, its `inner-log.md` /
