@@ -364,13 +364,16 @@ async function attachImages(files) {
     const ext = (file.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
     const named = new File([file], `paste-${stamp}.${ext}`, { type: file.type });
     const fd = new FormData(); fd.append('file', named);
-    const chip = { name: named.name, url: URL.createObjectURL(file), path: null, pending: true };
+    const chip = { name: named.name, url: URL.createObjectURL(file), ref: null, pending: true };
     chat.pendingImages.push(chip);
     renderAttachStrip();
     try {
       const r = await api('/api/files?project=pasted&overwrite=1', { method: 'POST', body: fd, timeoutMs: 60000 });
       const saved = r && r.saved && r.saved[0];
-      if (saved && saved.path) { chip.path = saved.path; chip.pending = false; }
+      // ref = absolute path when the server sends it, else the inbox-relative
+      // name (older servers). Either form the run engine resolves under the inbox.
+      const ref = saved && (saved.path || saved.name);
+      if (ref) { chip.ref = ref; chip.pending = false; }
       else throw new Error((r && r.error) || 'upload failed');
     } catch (e) {
       chat.pendingImages = chat.pendingImages.filter(c => c !== chip);
@@ -401,7 +404,7 @@ async function sendPrompt() {
   // Attached images: block while any is still uploading; allow an image-only
   // send by supplying a default instruction.
   if (chat.pendingImages.some(c => c.pending)) { addMsg('Still uploading an image — try again in a moment.', 'sys'); return; }
-  const imgs = chat.pendingImages.filter(c => c.path);
+  const imgs = chat.pendingImages.filter(c => c.ref);
   if (!prompt && !imgs.length) return;
   if (!prompt && imgs.length) prompt = 'Take a look at the attached image' + (imgs.length > 1 ? 's' : '') + '.';
   const engine = $('#runEngine') ? $('#runEngine').value : 'claude';
@@ -432,7 +435,7 @@ async function sendPrompt() {
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, engine, model: $('#runModel').value, permissionMode: $('#runPerm').value,
         resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked,
-        projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.path) }) });
+        projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.ref) }) });
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
   if (r.error) { addMsg(r.error, 'errmsg'); return; }
   ta.value = '';

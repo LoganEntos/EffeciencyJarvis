@@ -136,10 +136,15 @@ const INBOX_DIR = path.join(DASH_DIR, 'data', 'inbox');
 function resolveImages(images) {
   if (!Array.isArray(images)) return [];
   const out = [];
-  for (const p of images.slice(0, 8)) {
+  for (const ref of images.slice(0, 8)) {
     try {
-      const abs = path.resolve(String(p));
-      if (!abs.startsWith(INBOX_DIR + path.sep)) continue;
+      const s = String(ref || '');
+      // Accept an absolute path OR an inbox-relative name like "pasted/x.png"
+      // (older clients send the name). Either way it must land inside the inbox.
+      const abs = path.isAbsolute(s)
+        ? path.resolve(s)
+        : path.join(INBOX_DIR, ...s.split(/[/\\]/).map(seg => path.basename(seg)));
+      if (abs !== INBOX_DIR && !abs.startsWith(INBOX_DIR + path.sep)) continue;
       if (fs.statSync(abs).isFile()) out.push(abs);
     } catch {}
   }
