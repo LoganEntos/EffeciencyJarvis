@@ -354,6 +354,12 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 @keyframes attachpulse{50%{opacity:.85}}
 .attachchip .x{position:absolute;top:2px;right:2px;width:16px;height:16px;padding:0;line-height:14px;
   border:none;border-radius:50%;background:#000a;color:#fff;font-size:10px;cursor:pointer}
+/* Named (non-image) attachment: an auto-width pill instead of a 56px thumbnail. */
+.attachchip.file{width:auto;height:auto;max-width:220px;padding:6px 24px 6px 8px;gap:6px;
+  align-items:center;background:var(--accent-soft,#1a1712)}
+.attachchip.file .ficon{font-size:14px;line-height:1}
+.attachchip.file .fname{font:500 12px/1.3 var(--mono,monospace);color:var(--txt);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .msg.attachimgs{display:flex;flex-wrap:wrap;gap:6px;padding:6px;background:transparent;border:none}
 .msg.attachimgs img{max-width:180px;max-height:180px;border-radius:8px;border:1px solid var(--accent-dim)}
 .artifact{align-self:stretch;max-width:100%;background:var(--panel);border:1px solid var(--line);

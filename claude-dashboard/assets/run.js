@@ -52,8 +52,10 @@ function ensureRunUI() {
     <div class="badgebar" id="runStatus" style="margin-bottom:10px"></div>
     <div class="composer">
       <div id="attachStrip" class="attachstrip hidden"></div>
-      <textarea id="promptIn" placeholder="Ask Claude to do something in this project… (paste or drop an image to attach it)"></textarea>
+      <textarea id="promptIn" placeholder="Ask Claude to do something in this project… (paste, drop, or 📎 attach files)"></textarea>
+      <input type="file" id="fileIn" multiple hidden>
       <div class="btns">
+        <button id="attachBtn" class="ghost" title="Attach files to this run">📎 Attach</button>
         <button id="rereadBtn" class="ghost" title="Read the last reply aloud again">↻ Read again</button>
         <button id="sendBtn">Send ▷</button>
         <button id="cancelBtn" class="danger hidden">Cancel ✕</button>
@@ -81,19 +83,26 @@ function ensureRunUI() {
     e.preventDefault();
     sendPrompt();
   };
-  // Paste or drop an image → upload to the inbox, attach it to the next run.
+  // Paste, drop, or 📎 pick → upload to the inbox, attach to the next run.
+  // Images come through clipboard `items` (screenshots have no File in `.files`);
+  // any other pasted/dropped file is taken as-is so docs/PDFs/CSVs attach too.
   const ta = $('#promptIn');
   ta.onpaste = e => {
-    const imgs = [...(e.clipboardData?.items || [])].filter(i => i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
-    if (imgs.length) { e.preventDefault(); attachImages(imgs); }
+    const cd = e.clipboardData; if (!cd) return;
+    const imgs = [...(cd.items || [])].filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
+    const docs = [...(cd.files || [])].filter(f => !f.type.startsWith('image/'));
+    const all = [...imgs, ...docs];
+    if (all.length) { e.preventDefault(); attachFiles(all); }
   };
+  $('#attachBtn').onclick = () => $('#fileIn').click();
+  $('#fileIn').onchange = e => { const f = [...(e.target.files || [])]; if (f.length) attachFiles(f); e.target.value = ''; };
   const comp = ta.closest('.composer');
   comp.ondragover = e => { e.preventDefault(); comp.classList.add('drag'); };
   comp.ondragleave = () => comp.classList.remove('drag');
   comp.ondrop = e => {
     e.preventDefault(); comp.classList.remove('drag');
-    const imgs = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
-    if (imgs.length) attachImages(imgs);
+    const files = [...(e.dataTransfer?.files || [])];
+    if (files.length) attachFiles(files);
   };
   $('#histFilter').oninput = renderHistory;
   // engine/model/permission choices survive reloads
@@ -354,21 +363,27 @@ function renderRunStatus() {
   el.innerHTML = html;
 }
 
-// ---- pasted/dropped image attachments ----
+// ---- pasted/dropped/picked attachments (images + documents) ----
 // Uploaded to data/inbox/pasted/ so the run can reference their absolute paths;
-// held here until the next Send, then cleared.
-chat.pendingImages = [];
-async function attachImages(files) {
+// held here until the next Send, then cleared. Images keep a thumbnail; other
+// files show as a named chip. The run engine tells Claude to Read each path.
+chat.pendingFiles = [];
+async function attachFiles(files) {
   for (const file of files) {
+    const isImage = (file.type || '').startsWith('image/');
     const stamp = Date.now() + '-' + Math.floor(Math.random() * 1e4);
+    // Keep a readable, sanitized name for non-images; stamp-prefix so repeat
+    // names don't collide in the shared pasted/ folder.
+    const safe = (file.name || 'file').replace(/[^\w.\-]+/g, '_').slice(0, 80) || 'file';
     const ext = (file.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
-    const named = new File([file], `paste-${stamp}.${ext}`, { type: file.type });
+    const outName = isImage ? `paste-${stamp}.${ext}` : `${stamp}-${safe}`;
+    const named = new File([file], outName, { type: file.type || 'application/octet-stream' });
     const fd = new FormData(); fd.append('file', named);
-    const chip = { name: named.name, url: URL.createObjectURL(file), ref: null, pending: true };
-    chat.pendingImages.push(chip);
+    const chip = { name: file.name || outName, url: isImage ? URL.createObjectURL(file) : null, ref: null, pending: true, isImage };
+    chat.pendingFiles.push(chip);
     renderAttachStrip();
     try {
-      const r = await api('/api/files?project=pasted&overwrite=1', { method: 'POST', body: fd, timeoutMs: 60000 });
+      const r = await api('/api/files?project=pasted&overwrite=1', { method: 'POST', body: fd, timeoutMs: 120000 });
       const saved = r && r.saved && r.saved[0];
       // ref = absolute path when the server sends it, else the inbox-relative
       // name (older servers). Either form the run engine resolves under the inbox.
@@ -376,24 +391,27 @@ async function attachImages(files) {
       if (ref) { chip.ref = ref; chip.pending = false; }
       else throw new Error((r && r.error) || 'upload failed');
     } catch (e) {
-      chat.pendingImages = chat.pendingImages.filter(c => c !== chip);
-      addMsg('Image attach failed: ' + (e.message || 'upload error'), 'errmsg');
+      chat.pendingFiles = chat.pendingFiles.filter(c => c !== chip);
+      addMsg('Attach failed: ' + (e.message || 'upload error'), 'errmsg');
     }
     renderAttachStrip();
   }
 }
-function removeImage(i) {
-  const c = chat.pendingImages[i];
-  if (c) { try { URL.revokeObjectURL(c.url); } catch {} chat.pendingImages.splice(i, 1); }
+function removeFile(i) {
+  const c = chat.pendingFiles[i];
+  if (c) { try { if (c.url) URL.revokeObjectURL(c.url); } catch {} chat.pendingFiles.splice(i, 1); }
   renderAttachStrip();
 }
 function renderAttachStrip() {
   const el = $('#attachStrip'); if (!el) return;
-  const imgs = chat.pendingImages;
-  el.classList.toggle('hidden', !imgs.length);
-  el.innerHTML = imgs.map((c, i) =>
-    `<span class="attachchip${c.pending ? ' pending' : ''}"><img src="${c.url}" alt="">`
-    + `<button class="x" onclick="removeImage(${i})" title="remove">✕</button></span>`).join('');
+  const items = chat.pendingFiles;
+  el.classList.toggle('hidden', !items.length);
+  el.innerHTML = items.map((c, i) => c.isImage
+    ? `<span class="attachchip${c.pending ? ' pending' : ''}"><img src="${c.url}" alt="">`
+      + `<button class="x" onclick="removeFile(${i})" title="remove">✕</button></span>`
+    : `<span class="attachchip file${c.pending ? ' pending' : ''}" title="${esc(c.name)}">`
+      + `<span class="ficon">📄</span><span class="fname">${esc(c.name)}</span>`
+      + `<button class="x" onclick="removeFile(${i})" title="remove">✕</button></span>`).join('');
 }
 
 // ---- live run flow ----
@@ -401,12 +419,17 @@ async function sendPrompt() {
   const ta = $('#promptIn');
   let prompt = ta.value.trim();
   if (chat.running) return;
-  // Attached images: block while any is still uploading; allow an image-only
+  // Attachments: block while any is still uploading; allow an attachment-only
   // send by supplying a default instruction.
-  if (chat.pendingImages.some(c => c.pending)) { addMsg('Still uploading an image — try again in a moment.', 'sys'); return; }
-  const imgs = chat.pendingImages.filter(c => c.ref);
-  if (!prompt && !imgs.length) return;
-  if (!prompt && imgs.length) prompt = 'Take a look at the attached image' + (imgs.length > 1 ? 's' : '') + '.';
+  if (chat.pendingFiles.some(c => c.pending)) { addMsg('Still uploading an attachment — try again in a moment.', 'sys'); return; }
+  const atts = chat.pendingFiles.filter(c => c.ref);
+  const imgs = atts.filter(c => c.isImage);
+  const docs = atts.filter(c => !c.isImage);
+  if (!prompt && !atts.length) return;
+  if (!prompt && atts.length) {
+    const noun = imgs.length && !docs.length ? ('image' + (imgs.length > 1 ? 's' : '')) : ('file' + (atts.length > 1 ? 's' : ''));
+    prompt = 'Take a look at the attached ' + noun + '.';
+  }
   const engine = $('#runEngine') ? $('#runEngine').value : 'claude';
 
   // Jarvis mode: buffer prompt + auto-route model. When Jarvis rewrites the
@@ -435,14 +458,15 @@ async function sendPrompt() {
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, engine, model: $('#runModel').value, permissionMode: $('#runPerm').value,
         resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked,
-        projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.ref) }) });
+        projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
   if (r.error) { addMsg(r.error, 'errmsg'); return; }
   ta.value = '';
   addMsg(displayPrompt, 'user');
-  if (imgs.length) {
-    addEl(imgs.map(c => `<img src="${c.url}" alt="attached image">`).join(''), 'msg user attachimgs');
-    chat.pendingImages = []; renderAttachStrip();
+  if (atts.length) {
+    if (imgs.length) addEl(imgs.map(c => `<img src="${c.url}" alt="attached image">`).join(''), 'msg user attachimgs');
+    if (docs.length) addMsg('📎 ' + docs.map(c => c.name).join(', '), 'sys');
+    chat.pendingFiles = []; renderAttachStrip();
   }
   if (jarvisNote) addMsg(jarvisNote, 'sys jarvisnote'); // shown, never spoken
   chat.hermesEl = null; chat.hermesText = ''; // fresh bubble per hermes reply

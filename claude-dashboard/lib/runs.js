@@ -151,7 +151,7 @@ function resolveImages(images) {
   return out;
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images }) {
+function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files }) {
   engine = ENGINES.includes(engine) ? engine : 'claude';
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
@@ -218,8 +218,15 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     ? `\n\nAttached image${imgPaths.length > 1 ? 's' : ''} (read ${imgPaths.length > 1 ? 'each' : 'it'} with the Read tool):\n`
       + imgPaths.map(p => `- ${p}`).join('\n')
     : '';
+  // Non-image attachments (docs/PDFs/CSVs/…): same inbox-confined resolve, listed
+  // so Claude opens each with its Read tool.
+  const filePaths = resolveImages(files);
+  const fileBlock = filePaths.length
+    ? `\n\nAttached file${filePaths.length > 1 ? 's' : ''} (read ${filePaths.length > 1 ? 'each' : 'it'} with the Read tool):\n`
+      + filePaths.map(p => `- ${p}`).join('\n')
+    : '';
   const fullPrompt = persona + projectPrefix + (recalled ? recalled.block + '\n\n' : '')
-    + (projRecall ? projRecall.block + '\n\n' : '') + prompt + imgBlock + (team ? team.text : '') + hint;
+    + (projRecall ? projRecall.block + '\n\n' : '') + prompt + imgBlock + fileBlock + (team ? team.text : '') + hint;
   let args = null, hermesCfg = null;
   // Default is bypassPermissions: hub runs are headless (`-p`), so there is no
   // approval prompt — under acceptEdits/default every Bash/MCP call is silently
@@ -485,6 +492,7 @@ async function handle(req, res, url) {
       engine: (b.engine || '').toString(),
       projectId: (b.projectId || '').toString(),
       images: Array.isArray(b.images) ? b.images : [],
+      files: Array.isArray(b.files) ? b.files : [],
     });
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;
