@@ -54,6 +54,10 @@ Check "GET /api/schedules"     "$base/api/schedules"
 Check "GET /api/assets"        "$base/api/assets"
 Check "GET /api/sources"       "$base/api/sources"
 Check "GET /api/personas"      "$base/api/personas"
+Check "GET /api/personas/get"  "$base/api/personas/get?id=jarvis"
+Check "GET /api/personas/get (bad id 404)" "$base/api/personas/get?id=..%2Fserver" 404
+Check "GET /assets/jarvistab.js" "$base/assets/jarvistab.js"
+Check "GET /assets/jarvis.css" "$base/assets/jarvis.css"
 Check "GET /api/agentgraph"    "$base/api/agentgraph"
 Check "GET /api/hermes"        "$base/api/hermes"
 Check "GET /vendor/css/fonts.css" "$base/vendor/css/fonts.css"
@@ -92,6 +96,8 @@ CheckPost "POST /api/autopilot/toggle w/o token (403)" "$base/api/autopilot/togg
 CheckPost "POST /api/usage/config w/o token (403)" "$base/api/usage/config" '{"dailyBudgetUsd":5}' 403
 CheckPost "POST /api/sharepoint/pull w/o token (403)" "$base/api/sharepoint/pull" '{"drive":"x","item":"y"}' 403
 CheckPost "POST /api/sharepoint/auth/start w/o token (403)" "$base/api/sharepoint/auth/start" '{}' 403
+CheckPost "POST /api/personas/active w/o token (403)" "$base/api/personas/active" '{"id":"jarvis"}' 403
+CheckPost "POST /api/personas/save w/o token (403)" "$base/api/personas/save" '{"id":"x","body":"y"}' 403
 
 if ($fails -eq 0) { Write-Host "`nAll checks passed." -ForegroundColor Green; exit 0 }
 Write-Host "`n$fails check(s) failed." -ForegroundColor Red
