@@ -45,14 +45,19 @@ function buildEpisodicRecord(meta, promptText) {
   const outcome = meta.status === 'done' ? 'succeeded'
     : meta.status === 'error' ? 'FAILED: ' + (meta.errorExcerpt || 'error') : (meta.status || 'ran');
   const importance = meta.status === 'error' ? 0.8 : (meta.artifactCount ? 0.6 : 0.4);
+  const tags = keywords(prompt);
+  // A run launched inside a Project is tagged with its slug, so project-scoped
+  // recall (recallForProject) can find this run's episode next time — the loop
+  // that makes a Project "function with memory" without any vectors.
+  if (meta.projectSlug) tags.unshift(meta.projectSlug);
   return {
     id: newId(), type: 'episodic',
     title: (meta.promptExcerpt || prompt).slice(0, 80),
     text: `Run ${outcome} on ${(meta.model || 'default')}. Prompt: ${prompt.slice(0, 400)}`,
-    tags: keywords(prompt), importance,
+    tags, importance,
     createdAt: meta.startedAt || meta.queuedAt || new Date().toISOString(),
     sourceRunId: meta.id,
-    fields: { status: meta.status, model: meta.model, costUsd: meta.costUsd, artifactCount: meta.artifactCount || 0, error: meta.errorExcerpt || null },
+    fields: { status: meta.status, model: meta.model, costUsd: meta.costUsd, artifactCount: meta.artifactCount || 0, error: meta.errorExcerpt || null, projectSlug: meta.projectSlug || null },
   };
 }
 
@@ -103,15 +108,11 @@ function score(rec, qTokens, qSet, idf, now) {
   return lex + tagBoost + recency + imp;
 }
 
-function search(q, opts = {}) {
-  const list = load();
-  const type = TYPES.includes(opts.type) ? opts.type : null;
-  const pool = type ? list.filter(m => m.type === type) : list;
+// Rank a given pool of records against a query (shared by search + project
+// recall). idf is computed over the pool so scoring adapts to its size.
+function rank(pool, q, limit, dropZero) {
   const qTokens = tokenize(q).filter(t => !STOP.has(t));
-  if (!qTokens.length) {
-    return pool.slice(0, opts.limit || 20).map(m => ({ ...m, _score: 0 }));
-  }
-  // idf across the pool
+  if (!qTokens.length) return pool.slice(0, limit).map(m => ({ ...m, _score: 0 }));
   const df = {}; const qSet = new Set(qTokens);
   for (const rec of pool) {
     const seen = new Set(tokenize(rec.title + ' ' + rec.text + ' ' + (rec.tags || []).join(' ')));
@@ -121,10 +122,39 @@ function search(q, opts = {}) {
   const idf = {};
   for (const t of qTokens) idf[t] = Math.log(1 + (N - (df[t] || 0) + 0.5) / ((df[t] || 0) + 0.5));
   const now = Date.now();
-  return pool.map(m => ({ ...m, _score: score(m, qTokens, qSet, idf, now) }))
-    .filter(m => m._score > 0)
-    .sort((a, b) => b._score - a._score)
-    .slice(0, opts.limit || 20);
+  let out = pool.map(m => ({ ...m, _score: score(m, qTokens, qSet, idf, now) }));
+  if (dropZero) out = out.filter(m => m._score > 0);
+  return out.sort((a, b) => b._score - a._score).slice(0, limit);
+}
+
+function search(q, opts = {}) {
+  const list = load();
+  const type = TYPES.includes(opts.type) ? opts.type : null;
+  const pool = type ? list.filter(m => m.type === type) : list;
+  return rank(pool, q, opts.limit || 20, true);
+}
+
+// Project-scoped recall — the same engram scoring restricted to records tagged
+// with a project's slug (its own runs + notes). No vectors, no LLM: just the
+// project's own pool ranked by lexical + tag + recency + importance. Returns
+// the ranked items (for the Projects tab) and, when forInjection, a small
+// capped context block for the run prompt (only genuinely relevant hits).
+function recallForProject(slug, query, opts = {}) {
+  const pool = load().filter(m => (m.tags || []).includes(slug));
+  if (!pool.length) return { items: [], injection: null };
+  const items = rank(pool, query || slug, opts.limit || 5, false);
+  if (!opts.forInjection) return { items, injection: null };
+  const strong = items.filter(m => m._score > 1);
+  const lines = []; let used = 0; const cap = opts.capChars || 1000;
+  for (const m of strong) {
+    const line = `- [${m.type}] ${m.title}: ${m.text}`.slice(0, 300);
+    if (used + line.length > cap) break;
+    lines.push(line); used += line.length;
+  }
+  const injection = lines.length
+    ? { count: lines.length, block: `[Project memory — relevant past work in this project, use if helpful:\n${lines.join('\n')}]` }
+    : null;
+  return { items, injection };
 }
 
 // ---------- recall into runs (N3.5, opt-in) ----------
@@ -233,4 +263,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, captureRun, reindexRuns, search, recall, distill };
+module.exports = { handle, captureRun, reindexRuns, search, recall, recallForProject, addNote, distill };
