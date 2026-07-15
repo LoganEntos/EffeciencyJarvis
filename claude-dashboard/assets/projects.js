@@ -40,9 +40,9 @@ renderers.projects = async function () {
       </select>
       <span style="flex:1"></span>
       <button id="pXfer" class="ghost" title="The SharePoint file-transfer prompt — copy it to paste into a project run, and edit it to taste">⧉ Transfer prompt</button>
-      <button id="pImportClaude" title="Find your Claude Code projects (~/.claude/projects) and archive them here">⇊ Import Claude projects</button>
+      <button id="pImportClaude" class="ghost" title="Find your Claude Code projects (~/.claude/projects) and archive them here">⇊ Import Claude projects</button>
       <button id="pImport" class="ghost" title="Adopt every data/inbox/ folder that isn't already a project">Import inbox</button>
-      <button id="pNew" class="ghost">＋ New project</button>
+      <button id="pNew">＋ New project</button>
     </div>
     <div id="pXferPanel"></div>
     <div id="pClaudePicker"></div>
@@ -89,16 +89,16 @@ function projCard(p) {
   const runs = `${p.runCount || 0} run${p.runCount === 1 ? '' : 's'}`;
   const meta = p.lastRunAt ? 'last run ' + rel(p.lastRunAt) : 'updated ' + rel(p.updatedAt);
   const desc = claude
-    ? `<div class="mono muted" style="margin-top:6px;font-size:11px;word-break:break-all">${esc(p.cwd || '')}</div>`
-    : (p.description ? `<div class="desc" style="margin-top:6px">${esc(p.description)}</div>` : '<div class="muted" style="font-size:12px;margin-top:6px">No description</div>');
+    ? `<div class="pcard-cwd">${esc(p.cwd || '')}</div>`
+    : (p.description ? `<div class="pcard-desc">${esc(p.description)}</div>` : '<div class="pcard-desc empty">No description</div>');
   const pills = claude
     ? `<span class="pill accent">Claude Code</span><span class="pill neutral">${p.sessionCount} session${p.sessionCount === 1 ? '' : 's'}</span>`
     : `<span class="pill neutral">${p.fileCount} file${p.fileCount === 1 ? '' : 's'}</span><span class="pill neutral">${runs}</span>${p.instructions ? '<span class="pill ok">instructions</span>' : '<span class="pill warn">no instructions</span>'}`;
   return `<div class="card clickable" data-id="${esc(p.id)}">
-    <div class="name" style="font-size:15px;font-weight:700">${esc(p.name)}</div>
+    <div class="pcard-name">${esc(p.name)}</div>
     ${desc}
-    <div class="flex" style="margin-top:12px;gap:8px;flex-wrap:wrap">${pills}</div>
-    <div class="muted" style="font-size:11px;margin-top:10px">${meta}</div>
+    <div class="pcard-pills">${pills}</div>
+    <div class="pcard-meta">${meta}</div>
   </div>`;
 }
 
@@ -110,10 +110,10 @@ function renderNewForm() {
   const host = $('#pNewForm');
   if (!host) return;
   if (!projShowNew) { host.innerHTML = ''; return; }
-  host.innerHTML = `<div class="row pnewrow">
+  host.innerHTML = `<div class="pnewrow">
     <span class="name">＋ New project</span>
-    <input class="search" id="pnName" placeholder="Project name" style="max-width:380px;margin-top:8px">
-    <input class="search" id="pnDesc" placeholder="Short description (optional)" style="max-width:380px;margin-top:8px">
+    <input class="search pform-field" id="pnName" placeholder="Project name">
+    <input class="search pform-field" id="pnDesc" placeholder="Short description (optional)">
     <div class="flex" style="margin-top:10px"><button id="pnCreate">Create</button><button id="pnCancel" class="ghost">Cancel</button></div>
     <div id="pnErr" class="muted" style="font-size:11.5px;margin-top:6px;color:var(--red)"></div></div>`;
   $('#pnName').focus();
@@ -161,8 +161,8 @@ async function openClaudePicker() {
     <div class="flex" style="justify-content:space-between;align-items:center">
       <span class="name">⇊ Your Claude Code projects <span class="muted" style="font-weight:400;font-size:11.5px">— ${ws.length} found, ${fresh.length} not yet archived</span></span>
       <button class="ghost close" style="padding:5px 11px;font-size:11px">✕</button></div>
-    <div class="cpick" style="margin-top:12px;display:grid;gap:8px">${ws.map(claudeRow).join('')}</div>
-    <div class="flex" style="margin-top:14px;gap:8px">
+    <div class="cpick" style="margin-top:10px;display:grid;gap:8px">${ws.map(claudeRow).join('')}</div>
+    <div class="flex" style="margin-top:10px;gap:8px">
       <button id="pcImport">Archive selected</button>
       <button id="pcAll" class="ghost">Select all new</button>
       <span id="pcMsg" class="muted" style="font-size:11.5px;align-self:center"></span></div></div>`;
@@ -206,13 +206,13 @@ async function renderProjectDetail(id) {
   const p = d.project, files = d.files || [], mem = (d.memory && d.memory.items) || [], runs = d.runs || [];
   const sessions = d.sessions || [], claude = p.kind === 'claude';
   el.innerHTML = `
-    <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-      <button id="pBack" class="ghost" style="padding:6px 12px;font-size:12px">← All projects</button>
-      <button id="pDel" class="danger" style="padding:6px 12px;font-size:11.5px">Delete project</button>
+    <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+      <button id="pBack" class="ghost" style="padding:5px 11px;font-size:11.5px">← All projects</button>
+      <button id="pDel" class="danger" style="padding:5px 11px;font-size:11px">Delete project</button>
     </div>
-    <input id="pName" value="${esc(p.name)}" style="font-family:var(--font-body);font-size:26px;font-weight:800;letter-spacing:-.02em;background:none;border:none;padding:0;margin:2px 0;width:100%">
-    <input class="search" id="pDesc" value="${esc(p.description)}" placeholder="Short description (optional)" style="max-width:560px;margin:4px 0 18px">
-    <div class="badgebar" style="margin:-8px 0 18px">
+    <input id="pName" value="${esc(p.name)}" style="font-family:var(--font-body);font-size:24px;font-weight:800;letter-spacing:-.02em;background:none;border:none;padding:0;margin:2px 0;width:100%">
+    <input class="search" id="pDesc" value="${esc(p.description)}" placeholder="Short description (optional)" style="max-width:560px;margin:4px 0 10px">
+    <div class="badgebar" style="margin:0 0 14px">
       ${claude ? `<span class="pill accent">Claude Code</span><span class="pill neutral">${sessions.length} session${sessions.length === 1 ? '' : 's'}</span>`
                : `<span class="pill neutral">${files.length} file${files.length === 1 ? '' : 's'}</span><span class="pill neutral">${p.runCount || 0} run${p.runCount === 1 ? '' : 's'}</span>`}
       <span class="pill neutral">${mem.length} memor${mem.length === 1 ? 'y' : 'ies'}</span>
@@ -228,7 +228,7 @@ async function renderProjectDetail(id) {
       <div class="psection"><span class="name">▤ Instructions <span class="muted" style="font-weight:400;font-size:11.5px">— injected ahead of every run started in this project</span></span>
         <span id="pSaved" class="pcharcount"></span></div>
       <div class="presetrow">${P_PRESETS.map((x, i) => `<span class="presetchip" data-preset="${i}">+ ${esc(x.label)}</span>`).join('')}</div>
-      <textarea id="pInstr" style="min-height:140px;margin-top:8px;resize:vertical" placeholder="e.g. You are working on the Jarvis persona. Prefer the donor patterns in the attached files. Keep replies short…">${esc(p.instructions)}</textarea>
+      <textarea id="pInstr" style="min-height:120px;margin:8px 0 0;resize:vertical" placeholder="e.g. You are working on the Jarvis persona. Prefer the donor patterns in the attached files. Keep replies short…">${esc(p.instructions)}</textarea>
       <div class="flex" style="margin-top:8px"><button id="pSave" class="ghost">Save instructions</button>
         <button id="pChat" style="margin-left:auto">▷ Start a chat in this project</button></div>
     </div>
@@ -237,21 +237,21 @@ async function renderProjectDetail(id) {
       <div class="psection"><span class="name">◇ Attached files <span class="muted" style="font-weight:400;font-size:11.5px">— ${files.length} in this project</span></span>
         ${files.length ? '<button id="pManifest" class="ghost" style="padding:5px 11px;font-size:11px">Show manifest</button>' : ''}</div>
       <div id="pManifestBox" class="hidden"></div>
-      <div class="dropzone" id="pDrop" style="margin-top:10px">Drop files here or click to add<br><span class="muted" style="font-size:11.5px">50 MB per upload · grouped under data/inbox/${esc(p.slug)}/</span></div>
+      <div class="dropzone" id="pDrop" style="margin-top:8px">Drop files here or click to add<br><span class="muted" style="font-size:11.5px">50 MB per upload · grouped under data/inbox/${esc(p.slug)}/</span></div>
       <input type="file" id="pFileIn" multiple class="hidden">
       <div id="pUpStatus" class="badgebar" style="margin:8px 0"></div>
-      <div id="pFiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">${files.length ? files.map(projFileTile).join('') : '<div class="muted">No files yet.</div>'}</div>
+      <div id="pFiles" class="pfiles-grid">${files.length ? files.map(projFileTile).join('') : '<div class="muted">No files yet.</div>'}</div>
     </div>
 
     <div class="row">
       <span class="name">▷ Recent runs <span class="muted" style="font-weight:400;font-size:11.5px">— launched in this project</span></span>
-      ${runs.length ? runsTable(runs) : '<div class="muted" style="margin-top:8px">No runs yet. Start a chat here and it shows up in this list.</div>'}
+      ${runs.length ? runsTable(runs) : '<div class="muted" style="margin-top:6px">No runs yet. Start a chat here and it shows up in this list.</div>'}
     </div>
 
     <div class="row">
       <span class="name">✦ Project memory <span class="muted" style="font-weight:400;font-size:11.5px">— engram recall scoped to this project (its own runs + notes; no vectors)</span></span>
       <div id="pMem" style="margin-top:8px">${mem.length ? mem.map(memTile).join('') : '<div class="muted">No project memories yet. Runs started here, and notes you add, become recallable context.</div>'}</div>
-      <div class="flex" style="margin-top:10px"><input class="search" id="pNote" placeholder="Add a note to project memory…" style="max-width:520px"><button id="pNoteAdd" class="ghost">Add note</button></div>
+      <div class="flex" style="margin-top:8px"><input class="search" id="pNote" placeholder="Add a note to project memory…" style="max-width:520px;margin:0"><button id="pNoteAdd" class="ghost">Add note</button></div>
     </div>`;
 
   $('#pBack').onclick = () => { projSel = null; renderers.projects(); };
@@ -351,8 +351,8 @@ function runRow(r) {
 // ------------------------------------------------------------- file tiles etc.
 const P_IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
 const P_TILE = 'background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);overflow:hidden';
-const P_THUMB = 'width:100%;height:96px;object-fit:cover;display:block;background:var(--bg)';
-const P_THUMB_DOC = 'width:100%;height:96px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:18px';
+const P_THUMB = 'width:100%;height:78px;object-fit:cover;display:block;background:var(--bg)';
+const P_THUMB_DOC = 'width:100%;height:78px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:16px';
 // Packet files arrive flattened as owner__repo__path.with.dots.ext (see the
 // inbox INDEX.md). Recover a readable label: short filename up front, repo +
 // directory path muted below. Non-matching names pass through untouched.
