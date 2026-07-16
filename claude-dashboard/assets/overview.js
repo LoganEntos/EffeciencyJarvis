@@ -1,254 +1,300 @@
-/* Overview tab: context-window + efficiency focus (no monetary values).
-   Hero = context utilization of the current chat (latest run); stat cards =
-   success / routing / lean-model share / avg run / active; a "current chat"
-   analytics card; model-mix bar; recent runs; raw session feed.
-   Split from app.js; loaded after it (uses global api/$/esc/goTab/rel/
-   startFeed/openRun/ensureRunUI/load). */
+/* Overview tab — ported 1:1 from the amber-agent-orb Lovable build (project
+   7ce003de, /src/routes/overview.tsx). A command-bridge cockpit: hero context
+   ring, five efficiency stat cards with sparklines, per-engine panels (claude
+   live from run history · hermes DORMANT at 0 until activated — never started
+   here), a model-distribution/success table, a current-chat strip, then recent
+   runs + system status + routing disagreements, and a live server-event tail.
+   No dollar figures anywhere — tokens + % rates only. Styling: overview.css.
+   Loaded after app.js (uses api/$/esc/goTab/rel/startFeed/openRun/ensureRunUI). */
 'use strict';
 
-// context-window capacity (tokens) per model — Claude models are 200K standard.
-const CTX_WINDOW = {
-  opus: 200000, 'claude-opus-4-8': 200000,
-  sonnet: 200000, 'claude-sonnet-5': 200000, 'anthropic/claude-sonnet-5': 200000,
-  haiku: 200000, 'claude-haiku-4-5': 200000, 'claude-haiku-4-5-20251001': 200000,
-  fable: 200000, 'claude-fable-5': 200000,
-};
-function ctxWindow(model) { return CTX_WINDOW[model] || 200000; }
-// cheap = haiku/fable, mid = sonnet, heavy = opus (unknown → mid)
+const CTX_WINDOW = 200000; // every current Claude model is a 200K window
+function ctxWindow(model) { return CTX_WINDOW; }
 function modelTier(model) {
   const m = (model || '').toLowerCase();
   if (m.includes('opus')) return 'heavy';
   if (m.includes('haiku') || m.includes('fable')) return 'cheap';
-  if (m.includes('sonnet')) return 'mid';
   return 'mid';
 }
 function shortK(n) {
   if (n == null) return '—';
-  return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'K' : String(n);
+  return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(n);
 }
 function shortDur(ms) {
   if (ms == null) return '—';
   const s = ms / 1000;
-  return s < 60 ? s.toFixed(s < 10 ? 1 : 0) + 's' : (s / 60).toFixed(1) + 'm';
+  if (s < 60) return (s < 10 ? s.toFixed(1) : Math.round(s)) + 's';
+  const m = Math.floor(s / 60), r = Math.round(s % 60);
+  return r ? `${m}m${r}s` : `${m}m`;
 }
 
-// context-utilisation ring — conic-gradient, no canvas/svg. pct 0-100 used.
-function ctxRing(pct, size, label) {
+// hero conic ring — reproduces the Lovable markup exactly.
+function ovRing(pct, size) {
   const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
-  const danger = p >= 90, warn = p >= 70 && !danger;
-  const color = danger ? 'var(--red)' : (warn ? 'var(--amber)' : 'var(--accent)');
-  return `<div style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;
-    background:conic-gradient(${color} ${p * 3.6}deg, var(--line) 0deg);
-    display:flex;align-items:center;justify-content:center">
-    <div style="width:${size - 16}px;height:${size - 16}px;border-radius:50%;background:var(--panel);
-      display:flex;align-items:center;justify-content:center;flex-direction:column">
-      <span class="mono" style="font-size:${size > 100 ? 20 : 15}px;font-weight:700;color:${color}">${pct == null ? '—' : p + '%'}</span>
-      <span class="mono" style="font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase">${label || 'used'}</span>
+  const color = p >= 90 ? 'var(--red)' : (p >= 70 ? 'var(--amber)' : 'var(--accent)');
+  return `<div class="ov-ring" style="width:${size}px;height:${size}px;background:conic-gradient(${color} ${(p * 3.6).toFixed(1)}deg, color-mix(in oklab, var(--txt) 8%, transparent) 0)">
+    <div class="ov-ring-inner">
+      <span class="ov-ring-num" style="color:${color}">${pct == null ? '—' : p + '%'}</span>
+      <span class="ov-ring-cap">ctx</span>
     </div></div>`;
 }
 
-// Lovable redesign prompt for this tab — editable, persisted, one-click copy
-// (same pattern as the Projects SharePoint transfer-prompt panel).
-const OVPROMPT_KEY = 'hub.overview.lovablePrompt';
-const DEFAULT_OVPROMPT = `Design a dark operator-cockpit "Overview" dashboard screen for a personal AI agent hub. This is the landing tab — it should read as command-center status, not a generic admin panel.
-
-Design tokens (reuse exactly, this must match the rest of the app):
-- Background #0c0b0a, panel #17140f, panel-2 #141210, hairline #ffffff12 (stronger #ffffff24), text #f2ece0, muted #a79e8c
-- Accent amber #e8a33d (soft fill #e8a33d1a, dim #e8a33d40), success green #4bc47a, error red #e05252
-- Fonts: Bricolage Grotesque for display/headings (800 weight for h1, 600 for h2), JetBrains Mono for every number/metric/label/control, Instrument Serif reserved for exactly one large hero number
-- Shapes: 4px radius cards, 3px radius controls, pill badges at 20px radius, subtle inset top-highlight line on panels. No drop shadows, no glassmorphism, no purple gradients.
-
-Critical framing: there is NO API that exposes Claude subscription plan usage. Kill any "plan usage %" bars entirely — every metric must be something the hub can actually measure from real run history.
-
-Hero (top, full-width): one big Instrument Serif number = current chat's context-window utilization (e.g. "34%"), subtext in mono: "68K of 200K tokens · claude-sonnet-5 · 2m ago". Small conic-gradient ring next to it (amber under 70%, warm-amber warn 70-90%, red 90%+).
-
-Row of 5 compact stat cards (mono numerals, Bricolage label above): Success rate, Routing accuracy, Lean-model share, Avg run duration, Active runs.
-
-Model distribution & success-rate panel (centerpiece): one row per model seen in run history — name, a share bar sized to % of finished runs (colored by cost tier: cheap=amber, mid=warm amber, heavy=red), share % and count, a success-rate pill (green >=90%, amber 70-89%, red <70%), avg duration and avg tokens in dim mono. Sort by run count descending.
-
-Current-chat analytics card: context ring + model/tier badges + token in/out + duration + memory-recall count + artifact count + routing reason. One dense horizontal card.
-
-Below the fold: system status pills (API auth, engram memory count, MCP servers, agents/skills/commands counts), a clickable "Recent runs" list, a collapsed raw session log in a mono <pre> block.
-
-Placeholder room (don't fully build, just leave visual space / ghost state): per-model success sparkline over last ~20 runs, a cost-tier donut toggle, a routing-disagreements drill-down, a time-range selector (today/7d/30d/all).
-
-Keep density high — power-user cockpit, not a marketing dashboard. One staggered fade/slide-up on load, no other motion.`;
-const ovPromptGet = () => { try { return localStorage.getItem(OVPROMPT_KEY) ?? DEFAULT_OVPROMPT; } catch { return DEFAULT_OVPROMPT; } };
-const ovPromptSet = v => { try { localStorage.setItem(OVPROMPT_KEY, v); } catch {} };
-let ovShowPrompt = false;
-function renderOvPrompt() {
-  const box = $('#ovPromptPanel'); if (!box) return;
-  if (!ovShowPrompt) { box.innerHTML = ''; return; }
-  box.innerHTML = `
-    <div class="card" style="margin-bottom:20px">
-      <div class="flex" style="justify-content:space-between;align-items:baseline;margin-bottom:8px">
-        <span class="l">⧉ Lovable redesign prompt — Overview tab
-          <span class="muted" style="font-weight:400;font-size:11.5px">paste into lovable.com · edits saved automatically</span></span>
-        <span class="flex" style="gap:8px">
-          <button id="ovpCopy" style="padding:5px 13px;font-size:11.5px">Copy</button>
-          <button id="ovpReset" class="ghost" style="padding:5px 11px;font-size:11px">Reset to default</button>
-        </span>
-      </div>
-      <textarea id="ovpText" spellcheck="false" style="width:100%;min-height:220px;background:var(--panel2);color:var(--text);
-        border:1px solid var(--line);border-radius:var(--r);padding:10px;font-family:var(--font-mono);font-size:12px;resize:vertical">${esc(ovPromptGet())}</textarea>
-      <div id="ovpToast" class="muted" style="font-size:11.5px;min-height:16px;margin-top:4px"></div>
-    </div>`;
-  const ta = $('#ovpText'), toast = m => { const t = $('#ovpToast'); if (t) { t.textContent = m; setTimeout(() => { if (t.textContent === m) t.textContent = ''; }, 1600); } };
-  ta.oninput = () => ovPromptSet(ta.value);
-  $('#ovpCopy').onclick = async () => {
-    try { await navigator.clipboard.writeText(ta.value); toast('Copied ✓'); }
-    catch { ta.select(); try { document.execCommand('copy'); toast('Copied ✓'); } catch { toast('Select-all + Ctrl-C to copy'); } }
-  };
-  $('#ovpReset').onclick = () => { ovPromptSet(DEFAULT_OVPROMPT); ta.value = DEFAULT_OVPROMPT; toast('Reset to default'); };
+// tiny sparkline from a numeric series (any scale, normalized 0..1).
+function spark(vals, w, h) {
+  w = w || 100; h = h || 14;
+  if (!vals || vals.length < 2) return `<svg class="ovspark" viewBox="0 0 ${w} ${h}"></svg>`;
+  const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * w).toFixed(2)},${(h - ((v - min) / span) * h).toFixed(2)}`).join(' ');
+  return `<svg class="ovspark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(--muted)" stroke-width="1"/></svg>`;
 }
 
 renderers.overview = async function () {
-  const [d, runs, files, routing] = await Promise.all([
+  const [d, runs, routing, usage] = await Promise.all([
     api('/api/overview'),
     api('/api/runs').catch(() => []),
-    api('/api/files').catch(() => []),
     api('/api/routing').catch(() => null),
+    api('/api/usage').catch(() => null),
   ]);
   $('#projBadge').textContent = d.project;
   $('#nodeBadge').textContent = 'Node ' + d.nodeVersion;
+
   const today = new Date().toDateString();
   const tRuns = runs.filter(m => new Date(m.startedAt || m.queuedAt || 0).toDateString() === today);
   const finished = runs.filter(m => ['done', 'error', 'cancelled'].includes(m.status));
   const okRate = finished.length ? Math.round(100 * finished.filter(m => m.status === 'done').length / finished.length) : null;
   const active = runs.filter(m => m.status === 'running' || m.status === 'queued').length;
-  const apiPill = d.hasApiKey ? '<span class="pill ok">auth ready</span>' : '<span class="pill warn">no auth — runs can\'t execute</span>';
-  const memPill = d.engramCount ? `<span class="pill ok">engram: ${d.engramCount} memories</span>` : '<span class="pill warn">memory empty — runs auto-capture</span>';
+  const todayOk = tRuns.filter(m => ['done', 'error', 'cancelled'].includes(m.status));
+  const todayOkPct = todayOk.length ? Math.round(100 * todayOk.filter(m => m.status === 'done').length / todayOk.length) : null;
 
-  // ---- current chat = the latest run; token counts if the run reported them ----
+  // current chat = latest run
   const chat = runs[0] || null;
-  const win = chat ? ctxWindow(chat.model) : 200000;
+  const win = chat ? ctxWindow(chat.model) : CTX_WINDOW;
   const used = chat && chat.tokensIn != null ? chat.tokensIn + (chat.tokensOut || 0) : null;
-  const ctxPct = used != null ? Math.round(100 * used / win) : null;
-  // most recent run that actually reported tokens (fallback reference point)
-  const lastTokened = runs.find(m => m.tokensIn != null);
+  // clamp at 100 — cache-read tokens can push a raw count past the window, and a
+  // ">100%" context reading reads as a bug rather than the truth it is.
+  const ctxPct = used != null ? Math.min(100, Math.round(100 * used / win)) : null;
 
-  // ---- efficiency: routing accuracy + lean-model share + avg duration ----
+  // efficiency
   const routePct = routing && routing.total ? Math.round(100 * routing.ok / routing.total) : null;
   const tiers = { cheap: 0, mid: 0, heavy: 0 };
-  finished.forEach(m => { tiers[modelTier(m.model)]++; });
+  finished.forEach(m => tiers[modelTier(m.model)]++);
   const tierTotal = tiers.cheap + tiers.mid + tiers.heavy;
   const leanPct = tierTotal ? Math.round(100 * (tiers.cheap + tiers.mid) / tierTotal) : null;
   const durs = finished.map(m => m.durationMs).filter(x => x != null);
   const avgDur = durs.length ? durs.reduce((s, x) => s + x, 0) / durs.length : null;
 
-  // hero — context utilisation of the current chat
-  const heroNum = ctxPct != null ? ctxPct + '%' : shortK(win);
-  const heroLabel = ctxPct != null ? 'Context used · current chat' : 'Context window · current chat';
+  // sparkline series from the last ~16 finished runs (oldest→newest)
+  const recent = finished.slice(0, 16).reverse();
+  const sparkSucc = recent.map(m => m.status === 'done' ? 1 : 0);
+  const sparkLean = recent.map(m => modelTier(m.model) === 'heavy' ? 0 : 1);
+  const sparkDur = recent.map(m => m.durationMs || 0);
+  const autoRuns = recent.filter(m => m.routedReason);
+  const sparkRoute = autoRuns.map(m => m.status === 'done' ? 1 : 0);
+
+  // ---------- hero ----------
   const heroSub = ctxPct != null
-    ? `${shortK(used)} of ${shortK(win)} tokens · ${esc(chat.model || 'default')} · ${rel(chat.startedAt || chat.queuedAt)}`
-    : (chat ? `${shortK(win)}-token window · ${esc(chat.model || 'default')} · token usage not reported for this run` : 'no runs yet');
-
-  const usageHero = `
-    <div class="ovhero">
-      <div class="l">${heroLabel}</div>
-      <div class="ovheronum">${heroNum}</div>
-      <div class="muted" style="font-size:12.5px;margin-top:2px">${heroSub}</div>
-    </div>`;
-
-  // ---- per-model breakdown: share of runs + success rate, from real run history
-  // (plan-usage % bars were manual Config entries we can't verify against the API —
-  // this replaces them with numbers the hub actually measures).
-  function modelBreakdown(list) {
-    const by = {};
-    list.forEach(m => {
-      const k = m.model || 'default';
-      const e = (by[k] ||= { total: 0, ok: 0, durs: [], tok: 0, tokN: 0 });
-      e.total++; if (m.status === 'done') e.ok++;
-      if (m.durationMs != null) e.durs.push(m.durationMs);
-      if (m.tokensIn != null) { e.tok += m.tokensIn + (m.tokensOut || 0); e.tokN++; }
-    });
-    return Object.entries(by).map(([model, e]) => ({
-      model, count: e.total,
-      share: list.length ? Math.round(100 * e.total / list.length) : 0,
-      success: Math.round(100 * e.ok / e.total),
-      avgDur: e.durs.length ? e.durs.reduce((s, x) => s + x, 0) / e.durs.length : null,
-      avgTok: e.tokN ? Math.round(e.tok / e.tokN) : null,
-    })).sort((a, b) => b.count - a.count);
-  }
-  const modelRows = modelBreakdown(finished);
-  const modelBreakCard = modelRows.length ? `<div class="modelbreak">
-    <div class="modelbreak-h">Model distribution &amp; success rate — ${finished.length} finished runs</div>
-    ${modelRows.map(r => {
-      const tier = modelTier(r.model);
-      const tierColor = tier === 'cheap' ? 'var(--accent)' : tier === 'heavy' ? 'var(--red)' : 'var(--amber, #d9a441)';
-      const succCls = r.success >= 90 ? 'ok' : r.success >= 70 ? 'warn' : 'err';
-      return `<div class="modelrow">
-        <div class="modelrow-name mono" title="${esc(r.model)}">${esc(r.model)}</div>
-        <div class="modelrow-bar"><div style="width:${r.share}%;background:${tierColor}"></div></div>
-        <div class="modelrow-share mono">${r.share}% · ${r.count}</div>
-        <div class="modelrow-meta">
-          <span class="pill ${succCls}" style="min-width:48px;text-align:center">${r.success}% ok</span>
-          <span class="muted mono" style="font-size:11px">${shortDur(r.avgDur)}</span>
-          <span class="muted mono" style="font-size:11px">${r.avgTok != null ? shortK(r.avgTok) + ' tok' : '—'}</span>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>` : '';
-
-  // ---- current-chat analytics card ----
-  const chatCard = chat ? `<div class="card" style="display:flex;gap:16px;align-items:center;margin-bottom:20px">
-    ${ctxRing(ctxPct, 92, 'context')}
-    <div style="min-width:0;flex:1">
-      <div class="flex" style="justify-content:space-between;align-items:baseline">
-        <div class="l">Current chat · analytics</div>
-        <span class="pill ${chat.status === 'done' ? 'ok' : (chat.status === 'error' ? 'err' : 'warn')}">${esc(chat.status)}</span>
+    ? `${shortK(used)} of ${shortK(win)} · ${esc(chat.model || 'default')} · ${rel(chat.startedAt || chat.queuedAt)}`
+    : (chat ? `${shortK(win)} window · ${esc(chat.model || 'default')} · usage not reported` : 'no runs yet');
+  const hero = `<section class="ov-panel ovhero">
+    <div class="ovhero-l">
+      ${ovRing(ctxPct, 92)}
+      <div>
+        <div class="ovhero-big">${ctxPct != null ? ctxPct + '%' : '—'}</div>
+        <div class="ovhero-sub">${heroSub}</div>
       </div>
-      <div class="pex" style="margin:6px 0 10px">${esc(chat.promptExcerpt || '(no prompt captured)')}</div>
-      <div class="flex" style="gap:8px;flex-wrap:wrap">
-        <span class="pill neutral">◈ ${esc(chat.model || 'default')} · ${modelTier(chat.model)}</span>
-        <span class="pill neutral">▭ window ${shortK(win)}</span>
-        <span class="pill neutral">tokens ${used != null ? shortK(chat.tokensIn) + '→' + shortK(chat.tokensOut || 0) : 'not reported'}</span>
-        <span class="pill neutral">⧗ ${shortDur(chat.durationMs)}</span>
-        ${chat.recallCount ? `<span class="pill neutral">⟲ ${chat.recallCount} memories</span>` : ''}
-        ${chat.artifactCount ? `<span class="pill neutral">◫ ${chat.artifactCount} artifacts</span>` : ''}
-        ${chat.routedReason ? `<span class="pill neutral" title="auto-routing reason">⚖ ${esc(chat.routedReason)}</span>` : ''}
-      </div>
-      ${used == null && lastTokened ? `<div class="muted" style="font-size:11px;margin-top:8px">last measured context: ${shortK(lastTokened.tokensIn + (lastTokened.tokensOut || 0))} / ${shortK(ctxWindow(lastTokened.model))} on ${esc(lastTokened.model)} (${rel(lastTokened.startedAt || lastTokened.queuedAt)})</div>` : ''}
     </div>
-  </div>` : '';
+    <div class="ovhero-r">
+      <div class="ov-label">24h run pulse</div>
+      <div class="ovhero-pulse">today: ${tRuns.length} run${tRuns.length === 1 ? '' : 's'}${todayOkPct != null ? ' · ' + todayOkPct + '% ok' : ''}</div>
+    </div>
+  </section>`;
 
-  // ---- efficiency stat cards (no money) ----
-  const stat = (label, val, cls) => `<div class="card ovstat"><div class="l">${label}</div><div class="ovstatnum ${cls || ''}">${val}</div></div>`;
+  // ---------- stat cards ----------
+  const stat = (label, val, cls, sp) => `<div class="ov-panel ovstat">
+    <div class="ov-label">${label}</div>
+    <div class="ovstat-num ${cls || ''}">${val}</div>
+    ${spark(sp)}
+  </div>`;
+  const statCards = `<div class="ovstats">
+    ${stat('success rate', okRate == null ? '—' : okRate + '%', okRate != null && okRate < 70 ? 'warn' : 'accent', sparkSucc)}
+    ${stat('routing accuracy', routePct == null ? '—' : routePct + '%', routing && routing.suspects && routing.suspects.length ? 'warn' : '', sparkRoute)}
+    ${stat('lean-model share', leanPct == null ? '—' : leanPct + '%', leanPct != null && leanPct < 50 ? 'warn' : '', sparkLean)}
+    ${stat('avg run duration', shortDur(avgDur), '', sparkDur)}
+    ${stat('active runs', active, active ? 'accent' : '', [])}
+  </div>`;
+
+  // ---------- engine panels ----------
+  const claudeRuns = finished.filter(m => m.engine !== 'hermes');
+  const claudeOk = claudeRuns.length ? Math.round(100 * claudeRuns.filter(m => m.status === 'done').length / claudeRuns.length) : null;
+  const claudeTokRuns = claudeRuns.filter(m => m.tokensIn != null);
+  const claudeAvgTok = claudeTokRuns.length ? Math.round(claudeTokRuns.reduce((s, m) => s + m.tokensIn + (m.tokensOut || 0), 0) / claudeTokRuns.length) : 0;
+  const claudeDurs = claudeRuns.map(m => m.durationMs).filter(x => x != null);
+  const claudeAvgDur = claudeDurs.length ? claudeDurs.reduce((s, x) => s + x, 0) / claudeDurs.length : null;
+  const claudeTokMoved = claudeRuns.reduce((s, m) => s + (m.tokensIn || 0) + (m.tokensOut || 0), 0);
+  // per-model mix within claude
+  const mix = {};
+  claudeRuns.forEach(m => { const k = m.model || 'default'; const e = (mix[k] ||= { n: 0, tok: 0, tn: 0 }); e.n++; if (m.tokensIn != null) { e.tok += m.tokensIn + (m.tokensOut || 0); e.tn++; } });
+  const mixRows = Object.entries(mix).sort((a, b) => b[1].n - a[1].n).slice(0, 4).map(([model, e]) =>
+    `<div class="oveng-mixrow"><span class="m-name">${esc(model)} · ${modelTier(model)}</span><span class="m-val">${e.n} · ${e.tn ? shortK(Math.round(e.tok / e.tn)) : '—'}</span></div>`).join('');
+
+  const claudePanel = `<div class="ov-panel oveng">
+    <div class="oveng-strip" style="background:var(--accent)"></div>
+    <div class="oveng-head"><span class="oveng-name">claude</span><span class="oveng-ok">${claudeOk == null ? '—' : claudeOk + '% ok'}</span></div>
+    <div class="ov-label" style="font-size:9px;margin-top:2px">engine</div>
+    <div class="oveng-stats">
+      <div><div class="oveng-stat-k">runs</div><div class="oveng-stat-v">${claudeRuns.length}</div></div>
+      <div><div class="oveng-stat-k">avg tok/task</div><div class="oveng-stat-v">${shortK(claudeAvgTok)}</div></div>
+      <div><div class="oveng-stat-k">avg dur</div><div class="oveng-stat-v">${shortDur(claudeAvgDur)}</div></div>
+    </div>
+    <div class="oveng-mix ov-hair-t"><span class="ov-label">model mix</span>${mixRows || '<div class="oveng-foot">no runs yet</div>'}</div>
+    <div class="oveng-foot">tokens moved · ${shortK(claudeTokMoved)}</div>
+  </div>`;
+
+  // hermes — DORMANT. All zeros; never activated from here.
+  const hermesTiers = [['hermes-3-8b · draft · local', 0], ['hermes-3-70b · reason · local', 0], ['hermes-3-405b · escalate · local', 0]];
+  const hermesPanel = `<div class="ov-panel oveng">
+    <div class="oveng-strip" style="background:var(--cool)"></div>
+    <div class="oveng-head"><span class="oveng-name dim">hermes</span><span class="oveng-ok ov-dormant">0% ok</span></div>
+    <div class="ov-label" style="font-size:9px;margin-top:2px">engine · dormant</div>
+    <div class="oveng-stats">
+      <div><div class="oveng-stat-k">runs</div><div class="oveng-stat-v ov-dormant">0</div></div>
+      <div><div class="oveng-stat-k">avg tok/task</div><div class="oveng-stat-v ov-dormant">0</div></div>
+      <div><div class="oveng-stat-k">avg dur</div><div class="oveng-stat-v ov-dormant">0s</div></div>
+    </div>
+    <div class="oveng-mix ov-hair-t"><span class="ov-label">tier breakdown</span>
+      ${hermesTiers.map(([n]) => `<div class="oveng-mixrow"><span class="m-name ov-dormant">${esc(n)}</span><span class="m-val ov-dormant">0 · 0</span></div>`).join('')}
+    </div>
+    <div class="oveng-foot ov-dormant">dormant — not activated</div>
+  </div>`;
+
+  // tokens-per-task chart (claude live vs hermes dormant 0)
+  const maxTok = Math.max(claudeAvgTok, 1);
+  const bar = (label, val, color) => {
+    const pct = Math.round(100 * val / maxTok);
+    return `<div style="margin:6px 0"><div class="oveng-mixrow"><span class="m-name">${label}</span><span class="m-val">${shortK(val)}</span></div>
+      <div class="ovmd-bar" style="margin-top:3px"><div style="width:${pct}%;background:${color}"></div></div></div>`;
+  };
+  const chartPanel = `<div class="ov-panel oveng">
+    <div class="oveng-head"><span class="ov-label">tokens per task · per engine</span></div>
+    <div style="margin-top:10px">
+      ${bar('claude', claudeAvgTok, 'var(--accent)')}
+      ${bar('hermes', 0, 'var(--cool)')}
+    </div>
+    <div class="ovchart-caption">hermes dormant — offload candidates surface here once activated</div>
+  </div>`;
+
+  const enginePanels = `<div class="ovengines">${claudePanel}${hermesPanel}${chartPanel}</div>`;
+
+  // ---------- model distribution table ----------
+  const md = {};
+  finished.forEach(m => { const k = m.model || 'default'; const e = (md[k] ||= { n: 0, ok: 0, durs: [], tok: 0, tn: 0 }); e.n++; if (m.status === 'done') e.ok++; if (m.durationMs != null) e.durs.push(m.durationMs); if (m.tokensIn != null) { e.tok += m.tokensIn + (m.tokensOut || 0); e.tn++; } });
+  const mdRows = Object.entries(md).map(([model, e]) => ({
+    model, n: e.n, share: finished.length ? Math.round(100 * e.n / finished.length) : 0,
+    succ: Math.round(100 * e.ok / e.n),
+    dur: e.durs.length ? e.durs.reduce((s, x) => s + x, 0) / e.durs.length : null,
+    tok: e.tn ? Math.round(e.tok / e.tn) : null,
+  })).sort((a, b) => b.n - a.n);
+  const mdTable = `<section class="ov-panel ovmd">
+    <div class="ovmd-head ov-hair-b"><span class="ov-label">model distribution · success</span><span class="ov-label">${finished.length} finished</span></div>
+    <div class="ovmd-body">
+      <div class="ovmd-grid h"><div>model</div><div>count</div><div>weight</div><div>success</div><div>avg dur · tok</div></div>
+      ${mdRows.map(r => {
+        const tier = modelTier(r.model);
+        const col = tier === 'cheap' ? 'var(--accent)' : tier === 'heavy' ? 'var(--red)' : 'var(--amber)';
+        const sc = r.succ >= 90 ? 'ok' : r.succ >= 70 ? 'warn' : 'err';
+        return `<div class="ovmd-grid ovmd-row">
+          <div class="ovmd-model"><span class="n">${esc(r.model)}</span><span class="ovmd-tier">${tier.toUpperCase()}</span></div>
+          <div class="ovmd-count">${r.n}</div>
+          <div class="ovmd-weight"><div class="ovmd-bar"><div style="width:${r.share}%;background:${col}"></div></div><span class="ovmd-wpct">${r.share}%</span></div>
+          <div class="ovmd-succ ${sc}">${r.succ}%</div>
+          <div class="ovmd-dur">${shortDur(r.dur)} · ${r.tok != null ? shortK(r.tok) : '—'}</div>
+        </div>`;
+      }).join('') || '<div class="oveng-foot">no finished runs yet</div>'}
+    </div>
+  </section>`;
+
+  // ---------- current-chat strip ----------
+  const chatStrip = chat ? `<section class="ov-panel ovchat">
+    <span class="k">ctx</span> <span class="v accent">${ctxPct != null ? ctxPct + '%' : '—'}</span>
+    <span class="sep">·</span> <span class="k">${esc(chat.model || 'default')}</span>
+    <span class="sep">·</span> <span class="k">tokens</span> <span class="v">${chat.tokensIn != null ? shortK(chat.tokensIn) + ' → ' + shortK(chat.tokensOut || 0) : 'not reported'}</span>
+    <span class="sep">·</span> <span class="k">dur</span> <span class="v">${shortDur(chat.durationMs)}</span>
+    <span class="sep">·</span> <span class="k">recalled</span> <span class="v">${chat.recallCount || 0}</span>
+    <span class="sep">·</span> <span class="k">artifacts</span> <span class="v">${chat.artifactCount || 0}</span>
+    ${chat.routedReason ? `<span class="sep">·</span> <span class="k">route</span> <span class="v">${esc(chat.routedReason)}</span>` : ''}
+  </section>` : '';
+
+  // ---------- recent runs ----------
+  const recentRuns = `<section class="ov-panel">
+    <div class="ovsec-head ov-hair-b"><span class="ov-label">recent runs</span><button class="ovtail-btn" id="ovViewAll">view all →</button></div>
+    <div class="ovsec-body">${runs.slice(0, 6).map(m => `
+      <div class="ovrun" data-id="${esc(m.id)}">
+        <span class="st ${m.status}">${esc(m.status)}</span>
+        <span class="mono">${esc(m.model || '—')}</span>
+        <span class="mono">${m.tokensIn != null ? shortK(m.tokensIn + (m.tokensOut || 0)) : '—'}</span>
+        <span class="mono">${m.durationMs ? shortDur(m.durationMs) : '—'}</span>
+        <span class="mono">${m.artifactCount || 0}▢</span>
+        <span class="pex" title="${esc(m.promptExcerpt || '')}">${esc(m.promptExcerpt || '')}</span>
+      </div>`).join('') || '<div class="oveng-foot">No runs yet — open the Run tab.</div>'}</div>
+  </section>`;
+
+  // ---------- system status ----------
+  const sysStatus = `<section class="ov-panel">
+    <div class="ovsec-head ov-hair-b"><span class="ov-label">system status</span></div>
+    <div class="ovstatus">
+      <div class="ovstatus-row"><span class="k">api auth</span><span class="v" style="color:${d.hasApiKey ? 'var(--green)' : 'var(--red)'}">${d.hasApiKey ? 'ok' : 'no auth'}</span></div>
+      <div class="ovstatus-row"><span class="k">engram</span><span class="v">${d.engramCount || 0}</span></div>
+      <div class="ovstatus-row"><span class="k">mcp</span><span class="v">${(d.mcpServers || []).length}</span></div>
+      <div class="ovstatus-row"><span class="k">agents</span><span class="v">${d.counts.agents}</span></div>
+      <div class="ovstatus-row"><span class="k">skills</span><span class="v">${d.counts.skills}</span></div>
+      <div class="ovstatus-row"><span class="k">commands</span><span class="v">${d.counts.commands}</span></div>
+    </div>
+  </section>`;
+
+  // ---------- routing disagreements ----------
+  const downTier = { opus: 'sonnet', sonnet: 'haiku', haiku: 'haiku' };
+  const upTier = { haiku: 'sonnet', sonnet: 'opus', opus: 'opus' };
+  const suspects = (routing && routing.suspects) || [];
+  const disRows = suspects.slice(0, 5).map(s => {
+    const from = (s.model || '').toLowerCase();
+    const to = /over/.test(s.why || '') ? (downTier[from] || from) : (upTier[from] || from);
+    return `<div class="ovdis-row"><span class="p" title="${esc(s.why || '')}">${esc((s.prompt || '').slice(0, 40) || '(run)')}</span><span class="from">${esc(s.model || '?')}</span><span class="arr">→</span><span class="to">${esc(to)}</span></div>`;
+  }).join('');
+  const disagreements = `<section class="ov-panel">
+    <div class="ovsec-head ov-hair-b"><span class="ov-label">routing disagreements</span></div>
+    <div class="ovdis">${disRows || '<div class="oveng-foot">every auto-routed pick looks right</div>'}</div>
+  </section>`;
+
+  const bottom = `<div class="ovbottom">${recentRuns}<div class="ovbottom-r">${sysStatus}${disagreements}</div></div>`;
+
+  // ---------- tail ----------
+  const tail = `<section class="ov-panel ovtail">
+    <button class="ovtail-btn" id="ovTailBtn">▸ tail live server events</button>
+    <pre id="feed" class="hidden">Loading…</pre>
+    <span id="feedSession" class="hidden"></span>
+  </section>`;
 
   $('#overview').innerHTML = `
-    <div class="flex" style="justify-content:space-between;align-items:baseline">
-      <h2>Overview</h2>
-      <button id="ovPromptBtn" class="ghost" style="padding:5px 11px;font-size:11px" title="Copy the Lovable redesign prompt for this tab">⧉ Lovable prompt</button>
-    </div>
-    <div id="ovPromptPanel"></div>
-    ${usageHero}
-    ${chatCard}
-    <div class="cards ovstats">
-      ${stat('Success', okRate === null ? '—' : okRate + '%', okRate != null && okRate < 70 ? 'warn' : 'accent')}
-      ${stat('Routing', routePct == null ? '—' : routePct + '%', routing && routing.suspects && routing.suspects.length ? 'warn' : '')}
-      ${stat('Lean models', leanPct == null ? '—' : leanPct + '%', leanPct != null && leanPct < 50 ? 'warn' : '')}
-      ${stat('Avg run', shortDur(avgDur))}
-      ${stat('Active', active, active ? 'accent' : '')}
-    </div>
-    ${modelBreakCard}
-    <div class="flex" style="margin-bottom:22px">${memPill}${apiPill}
-      <span class="pill neutral">MCP: ${d.mcpServers.map(esc).join(', ') || 'none'}</span>
-      <span class="pill neutral">library: ${d.counts.agents} agents · ${d.counts.skills} skills · ${d.counts.commands} commands</span></div>
-    <h2>Recent runs <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— click to replay in the Run tab</span></h2>
-    <div id="ovRuns">${runs.slice(0, 5).map(m => `
-      <div class="row clickable ovrun" data-id="${esc(m.id)}">
-        <div class="flex" style="justify-content:space-between">
-          <span><span class="pill ${m.status === 'done' ? 'ok' : (m.status === 'error' ? 'err' : 'warn')}">${esc(m.status)}</span>
-            <span class="muted" style="font-size:11.5px">${rel(m.startedAt || m.queuedAt)}${m.model ? ' · ' + esc(m.model) : ''}${m.tokensIn != null ? ' · ' + shortK(m.tokensIn) + '→' + shortK(m.tokensOut || 0) + ' tok' : ''}${m.durationMs ? ' · ' + shortDur(m.durationMs) : ''}${m.artifactCount ? ' · ◫ ' + m.artifactCount : ''}</span></span>
-        </div>
-        <div class="pex">${esc(m.promptExcerpt || '')}</div>
-        ${m.errorExcerpt ? `<div class="pex" style="color:#f0908f">↳ ${esc(m.errorExcerpt)}</div>` : ''}
-      </div>`).join('') || '<div class="muted">No runs yet — open the Run tab and send a prompt.</div>'}</div>
-    <h2 style="margin-top:26px">Raw session feed <span class="mono" id="feedSession" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
-    <pre id="feed" style="max-height:180px">Loading…</pre>`;
-  $('#ovPromptBtn').onclick = () => { ovShowPrompt = !ovShowPrompt; renderOvPrompt(); };
-  if (ovShowPrompt) renderOvPrompt();
-  $('#overview').querySelectorAll('.card.clickable').forEach(c => c.onclick = () => goTab(c.dataset.goto));
+    <header class="jhead">
+      <div><div class="ov-label ov-eyebrow">command bridge · local runs only</div><h1 class="ov-h1">Overview</h1></div>
+    </header>
+    <div class="ov-wrap">
+      ${hero}
+      ${statCards}
+      ${enginePanels}
+      ${mdTable}
+      ${chatStrip}
+      ${bottom}
+      ${tail}
+    </div>`;
+
   $('#overview').querySelectorAll('.ovrun').forEach(r => r.onclick = () => { goTab('run'); ensureRunUI(); openRun(r.dataset.id); });
-  startFeed();
+  const va = $('#ovViewAll'); if (va) va.onclick = () => goTab('run');
+  const tb = $('#ovTailBtn');
+  if (tb) tb.onclick = () => {
+    const f = $('#feed'); if (!f) return;
+    const open = f.classList.toggle('hidden');
+    tb.textContent = open ? '▸ tail live server events' : '▾ live server events';
+    if (!open) startFeed();
+  };
 };

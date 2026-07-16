@@ -59,6 +59,7 @@ Check "GET /api/personas/get"  "$base/api/personas/get?id=jarvis"
 Check "GET /api/personas/get (bad id 404)" "$base/api/personas/get?id=..%2Fserver" 404
 Check "GET /assets/jarvistab.js" "$base/assets/jarvistab.js"
 Check "GET /assets/jarvis.css" "$base/assets/jarvis.css"
+Check "GET /assets/overview.css" "$base/assets/overview.css"
 Check "GET /assets/clientlog.js" "$base/assets/clientlog.js"
 Check "GET /api/clientlog"      "$base/api/clientlog"
 Check "GET /api/projects"      "$base/api/projects"
