@@ -29,6 +29,7 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 | # | Item | Where |
 |---|------|-------|
+| S-PC | **Persona CRUD backend + Jarvis distiller landed + handoff pipeline** — delete/rename/display-order endpoints (merge-written `data/personas.json`); `POST /api/jarvis/distill` Haiku prompt-shaper live; Run-tab history restored after the distiller session dropped it; `docs/handoffs/` work orders for Opus 4.8 hub runs; ~73 MB repo cleanup. **Jarvis-tab UI port is BLOCKED on the user's Lovable redesign — no speculative restyling** | `lib/personas.js`, `lib/distill.js`, `assets/run.js`, `docs/handoffs/` |
 | S-VH | **Voice hardening + latency (user-driven)** — barge-in fix (stopped interrupting the user mid-sentence — user confirms voice is now how they want it), self-healing Kokoro sidecar (boot warm-start + on-demand respawn), 'ok'-vs-'ready' status bug that muted mobile, streamed reply queue, ↻ Read-again button, `/api/spend/today` + cached artifact counts | `lib/voice.js`, `assets/voice.js`/`voicetts.js`, `lib/runs-query.js`, `assets/run.js` |
 | S-PJ | **Projects tab overhaul** — run stats + recent-runs + inbox import, inline UI (no popups), instruction presets, file manifest | `lib/projects.js`, `assets/projects.js`/`projects.css` |
 | S-PG | **claude-flow purge** — 166 dead commands + 28 dead skills removed (steps 1–3 of `docs/agent-skill-efficiency-report.md`; steps 4–6 = HANDOFF O2) | `.claude/commands/`, `.claude/skills/` |

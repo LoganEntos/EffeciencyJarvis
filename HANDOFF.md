@@ -41,6 +41,7 @@ lib/tasks.js schedules.js    hub-native task queue + cron → run engine (data/*
 lib/agentgraph.js liveness.js run stream → persona crew graph; orphan reaper + heartbeat
 lib/files.js             upload inbox (vanilla multipart) + zero-dep xlsx preview
 lib/voice.js             TTS proxy /api/voice/* (loopback-only; spawns CSM/Kokoro sidecar)
+lib/distill.js           Jarvis prompt distiller: POST /api/jarvis/distill (Haiku one-shot)
 lib/memory.js            Engram semantic memory (typed records, lexical recall, NO vectors)
 lib/sources.js sharepoint.js admin.js personas.js teams.js   Sources tab / SharePoint / Tools / personas / agent teams
 index.html               markup shell (token injected at serve time)
@@ -50,6 +51,7 @@ vendor/                  LOCAL asset library: fonts + 4 icon sprites (~9.8k) + c
 .claude/agents/          14 curated model-tiered local specialists (never a bulk library)
 data/                    runtime: runs/, inbox/, tasks.json, schedules.json, memory.json (gitignored)
 docs/roadmap.md          the plan · improvement-backlog.md the live find-fix list · jarvis-soul.md the persona
+docs/handoffs/           self-contained work orders for hub runs (one Opus 4.8 run each)
 ```
 Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Sources · Tools · Config (+ SharePoint).
 
@@ -74,6 +76,26 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
   dirs are gitignored (per-machine). The user drives push; don't push unprompted.
 
 ## Latest work shipped (2026-07-14 → 07-15)
+2026-07-15 evening (commits `4b0b0e3`, `1fb6cd4` — reconcile + orchestration session):
+- **Jarvis distiller landed** (`lib/distill.js`, `POST /api/jarvis/distill`):
+  Haiku one-shot rewrites >25-word "vibe" prompts; the refined prompt becomes
+  the visible turn. Probe: ~3–13 s, falls back to local cleanup on any miss.
+- **Run history RESTORED on the Run tab** — the distiller session's run.js
+  edit had dropped it (the user's "no previous threads" report). Verified:
+  200 rows + stats chips + filter render, zero client errors.
+- **Persona CRUD backend complete** (`lib/personas.js`): delete / rename /
+  display-order endpoints join save+active; `data/personas.json` is
+  merge-written ({active, handoff, order}). Full cycle verified live. UI
+  wiring deliberately deferred — **the user is redesigning the Jarvis tab on
+  Lovable; do NOT restyle it speculatively.**
+- **5757 hub restarted** via supervised `/api/restart` → distill + clientlog
+  beacon + persona CRUD routes are LIVE. Smoke extended to 84 checks, all green.
+- **Handoff pipeline created: `docs/handoffs/`** — self-contained work orders
+  (jarvis-ui-port · persona-manager-ui · jarvis-error-hunt) sized for one
+  Opus 4.8 hub run each, with the mandatory review pipeline in its README.
+- **Cleanup:** ECC-main.zip + ECC-main/ + `.claude-flow/` + `__pycache__`
+  deleted (~73 MB); `docs/jarvis-persona.yml` → `docs/personas/jarvis-voice.yml`.
+
 2026-07-15 late (commits `e844d02`→`5dc783b`, Opus 4.8 voice session):
 - **O1 diagnostics — client-error beacon (`e844d02`).** The Jarvis-tab error hunt
   was blocked: no console access from a voice/phone session, so no catalog. Added
@@ -118,22 +140,20 @@ P1/P2/P3 find-fix round closed; **N7 SharePoint Breakdown** shipped — see
 
 ## EXECUTE NEXT — Opus 4.8 finish list (ordered; handoff 2026-07-15)
 
-**O1. Jarvis tab error hunt (P1 — user report 2026-07-15). DIAGNOSTIC NOW IN
-PLACE — finish the fix.** The user reports "loads of errors" on the Jarvis tab.
-A full static pass this session (jarvistab.js / voice.js / personas.js / index
-wiring) found the code clean, so the errors are runtime/browser-specific. The
-`e844d02` client-error beacon is the catalog tool (works on the phone — no
-console needed). **Step 1: restart the 5757 hub** (button in the header, or the
-user's next logon autostart) so `assets/clientlog.js` + `/api/clientlog` go live.
-**Step 2: exercise the Jarvis tab** — load, persona switch, tap-to-talk,
-hold-for-call, soul-editor save — then read the captured errors: `GET
-/api/clientlog?tab=jarvis` or open `data/clientlog.json`. **Step 3: fix** the
-real errors precisely. User directive still stands: **don't patch blind — research
-open-source prior art** for the voice/persona loop (OpenPersona already adopted;
-open-jarvis/OpenJarvis queued in `lib/sources.json`, still unevaluated) and port
-the idea natively (zero-dep). Constraint: voice behavior (barge-in, Kokoro
-self-heal, reply queue) is exactly as the user wants — fix the tab without
-touching it.
+**O0. Work orders live in `docs/handoffs/` — read its README first.** Each is
+sized for one hub run and carries the mandatory review pipeline (verify →
+smoke → code-reviewer → commit).
+
+**O1. Jarvis tab error hunt** → `docs/handoffs/jarvis-error-hunt.md`. The
+beacon is LIVE (hub restarted 2026-07-15 evening; `/api/clientlog` answering).
+Exercise the tab, read the captured errors, fix precisely — never blind.
+Voice behavior (barge-in, Kokoro self-heal, reply queue) must not change.
+
+**O1.5. Jarvis tab UI port** → `docs/handoffs/jarvis-ui-port.md` +
+`docs/handoffs/persona-manager-ui.md`. **BLOCKED: the user is improving the
+design on Lovable — do NOT restyle the Jarvis tab until they deliver the
+final preview URL.** The persona-CRUD backend those UIs need is already live
+and verified.
 
 **O2. Finish the skills-layer cleanup** (`docs/agent-skill-efficiency-report.md`,
 steps 4–6; steps 1–3 shipped in `bd09b68` + the global CLAUDE.md is clean).
@@ -165,5 +185,5 @@ build last, if ever** (user call 2026-07-15).
 - **Mobile:** install Tailscale (PC + phone), `tailscale serve --bg 5757`, bookmark the URL.
 - **Autostart:** `powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1`.
 - **Q1 Playwright** (dev-only, no run tax): a quick "yes" and the E2E net gets built.
-- Housekeeping: `ECC-main.zip` + `ECC-main/` at the repo root are the gitignored raw
-  download (adopted copy is committed) — delete when convenient.
+- **Deliver the final Lovable Jarvis-tab design** (preview URL) — unblocks
+  `docs/handoffs/jarvis-ui-port.md` + `persona-manager-ui.md`.

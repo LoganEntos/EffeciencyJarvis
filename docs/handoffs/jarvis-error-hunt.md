@@ -1,0 +1,31 @@
+# Handoff: Jarvis tab error hunt (O1 — finish the fix)
+
+**Status: READY — the diagnostic is LIVE.** The 5757 hub was restarted
+2026-07-15 evening, so `assets/clientlog.js` + `/api/clientlog` are now
+serving (verified: `GET /api/clientlog?tab=jarvis` → `{count:0,records:[]}`).
+Model: Opus 4.8.
+
+## Background
+
+The user reported "loads of errors" on the Jarvis tab (2026-07-15). A full
+static pass over `jarvistab.js` / `voice.js` / `personas.js` / index wiring
+found the code clean — the errors are runtime/browser-specific, which is why
+the `e844d02` client-error beacon exists (it works from the phone; no
+devtools needed).
+
+## Steps
+
+1. Exercise the Jarvis tab in a real browser: load, switch persona,
+   tap-to-talk, hold-for-call, soul-editor save. If the user has been using
+   the hub, records may already be waiting — check first.
+2. `GET /api/clientlog?tab=jarvis` (or read `data/clientlog.json`) and fix
+   the **captured** errors precisely — don't patch blind.
+3. Research open-source prior art for anything structural in the
+   voice/persona loop (OpenPersona already adopted; OpenJarvis queued in
+   `lib/sources.json`, unevaluated) and port ideas natively, zero-dep.
+
+## Constraint
+
+Voice behavior (barge-in, Kokoro self-heal, reply queue, ok-vs-ready status)
+is **exactly as the user wants** — fix the tab without touching it. Review
+pipeline per `docs/handoffs/README.md`.
