@@ -1,5 +1,16 @@
 # Handoff: Jarvis tab error hunt (O1 — finish the fix)
 
+**Status: DONE (2026-07-16).** Beacon confirmed live and working — it caught the
+one real defect (the `run.js` `jarvisNote` crash, fixed in `6c09bd7`). At close,
+`data/clientlog.json` held exactly that one (now-stale) record and
+`GET /api/clientlog?tab=jarvis` returned `{count:0}` — **zero Jarvis-tab errors
+captured**. Static re-pass over `jarvistab.js` was clean: script order
+`clientlog→app→voice→jarvistab` is correct, every global it uses (`$`, `esc`,
+`api`, `renderers`) is defined before use, and `/api/personas` + `/api/personas/get`
+answer healthy. No blind patch was made (the handoff forbids it). Remaining
+interactive exercise (real-browser/phone load · persona switch · tap-talk ·
+hold-call · soul save) stays user-side — the beacon will catch anything new.
+
 **Status: READY — the diagnostic is LIVE.** The 5757 hub was restarted
 2026-07-15 evening, so `assets/clientlog.js` + `/api/clientlog` are now
 serving (verified: `GET /api/clientlog?tab=jarvis` → `{count:0,records:[]}`).
