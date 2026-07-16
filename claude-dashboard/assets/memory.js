@@ -133,7 +133,7 @@ function renderDetail() {
       <span class="muted" style="font-size:11px">${esc(m.type)}${m._score ? ' · score ' + m._score.toFixed(1) : ''} · ${rel(m.createdAt)}</span>
     </div>
     <div class="pex" style="white-space:pre-wrap;margin-top:10px">${esc(m.text || '')}</div>
-    ${m.fields && (m.fields.model || m.fields.costUsd != null) ? `<div class="muted" style="font-size:11px;margin-top:8px">model ${esc(m.fields.model || '—')}${m.fields.costUsd != null ? ' · $' + Number(m.fields.costUsd).toFixed(4) : ''}${m.fields.artifactCount ? ' · ' + m.fields.artifactCount + ' artifact(s)' : ''}</div>` : ''}
+    ${m.fields && (m.fields.model || m.fields.tokensOut != null) ? `<div class="muted" style="font-size:11px;margin-top:8px">model ${esc(m.fields.model || '—')}${m.fields.tokensOut != null ? ' · ' + fmtTok((m.fields.tokensIn || 0) + m.fields.tokensOut) + ' tok' : ''}${m.fields.artifactCount ? ' · ' + m.fields.artifactCount + ' artifact(s)' : ''}</div>` : ''}
     <div class="flex" style="margin-top:10px">
       ${tags.slice(0, 12).map(t => `<span class="pill neutral mem-tag" data-tag="${esc(t)}" style="cursor:pointer">${esc(t)}</span>`).join('')}
     </div>

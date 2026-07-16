@@ -48,7 +48,7 @@ Check "GET /api/sessions"      "$base/api/sessions"
 Check "GET /api/activity"      "$base/api/activity"
 Check "GET /api/graph/stats"   "$base/api/graph/stats"
 Check "GET /api/runs"          "$base/api/runs"
-Check "GET /api/spend/today"   "$base/api/spend/today"
+Check "GET /api/stats/today"   "$base/api/stats/today"
 Check "GET /api/files"         "$base/api/files"
 Check "GET /api/tasks"         "$base/api/tasks"
 Check "GET /api/schedules"     "$base/api/schedules"
@@ -103,7 +103,6 @@ CheckPost "POST /api/voice/tts w/o token (403)"   "$base/api/voice/tts"   '{"tex
 CheckPost "POST /api/voice/start w/o token (403)" "$base/api/voice/start" '{}' 403
 CheckPost "POST /api/voice/stop w/o token (403)"  "$base/api/voice/stop"  '{}' 403
 CheckPost "POST /api/autopilot/toggle w/o token (403)" "$base/api/autopilot/toggle" '{}' 403
-CheckPost "POST /api/usage/config w/o token (403)" "$base/api/usage/config" '{"dailyBudgetUsd":5}' 403
 CheckPost "POST /api/sharepoint/pull w/o token (403)" "$base/api/sharepoint/pull" '{"drive":"x","item":"y"}' 403
 CheckPost "POST /api/sharepoint/auth/start w/o token (403)" "$base/api/sharepoint/auth/start" '{}' 403
 CheckPost "POST /api/personas/active w/o token (403)" "$base/api/personas/active" '{"id":"jarvis"}' 403

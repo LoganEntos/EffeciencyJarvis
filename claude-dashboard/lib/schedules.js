@@ -107,7 +107,8 @@ function enrich(list) {
     return Object.assign({}, s, {
       cadence: describe(s),
       lastRunStatus: m ? m.status : null,
-      lastRunCost: m ? m.costUsd : null,
+      lastRunTokensIn: m ? m.tokensIn : null,
+      lastRunTokensOut: m ? m.tokensOut : null,
       lastRunModel: m ? m.model : null,
     });
   });

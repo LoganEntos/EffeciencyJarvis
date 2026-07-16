@@ -88,13 +88,11 @@ function launchOneshot(st, { HERMES_EXE, PROJECT_DIR, pushLine, finalize }) {
     liveness.stopHermesTail(st);
     st.meta.exitCode = code;
     const u = U.safeJson(path.join(st.dir, 'usage.json')) || {};
-    const cost = [u.estimated_cost_usd, u.estimated_cost, u.cost_usd, u.cost].find(v => typeof v === 'number');
-    if (cost !== undefined) st.meta.costUsd = cost;
     if (u.model) st.meta.model = String(u.model);
     st.meta.status = st.cancelled ? 'cancelled' : (code === 0 ? 'done' : 'error');
     pushLine(st, JSON.stringify({
       type: 'hub_status',
-      text: `hermes done · ${st.meta.model || 'config default'}${st.meta.costUsd != null ? ' · ~$' + st.meta.costUsd.toFixed(4) : ''}`,
+      text: `hermes done · ${st.meta.model || 'config default'}`,
     }));
     finalize(st);
   });

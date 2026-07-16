@@ -285,11 +285,10 @@ function renderLine(o) {
   }
   if (o.type === 'result') {
     const secs = o.duration_ms ? (o.duration_ms / 1000).toFixed(1) + 's' : '';
-    const cost = o.total_cost_usd != null ? '$' + o.total_cost_usd.toFixed(4) : '';
     const turns = o.num_turns ? o.num_turns + ' turns' : '';
     const tok = o.usage ? `${(o.usage.input_tokens || 0) + (o.usage.cache_read_input_tokens || 0) + (o.usage.cache_creation_input_tokens || 0)}→${o.usage.output_tokens || 0} tok` : '';
     const ok = o.subtype === 'success';
-    addMsg(`${ok ? '✓ done' : '✗ ' + (o.subtype || 'error')} ${[secs, turns, tok, cost].filter(Boolean).join(' · ')}`, ok ? 'result' : 'errmsg');
+    addMsg(`${ok ? '✓ done' : '✗ ' + (o.subtype || 'error')} ${[secs, turns, tok].filter(Boolean).join(' · ')}`, ok ? 'result' : 'errmsg');
     if (!ok && o.result) addEl(errBlock(o.result), 'errblk');
     return o;
   }

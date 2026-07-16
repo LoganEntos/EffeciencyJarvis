@@ -57,7 +57,7 @@ function buildEpisodicRecord(meta, promptText) {
     tags, importance,
     createdAt: meta.startedAt || meta.queuedAt || new Date().toISOString(),
     sourceRunId: meta.id,
-    fields: { status: meta.status, model: meta.model, costUsd: meta.costUsd, artifactCount: meta.artifactCount || 0, error: meta.errorExcerpt || null, projectSlug: meta.projectSlug || null },
+    fields: { status: meta.status, model: meta.model, tokensIn: meta.tokensIn, tokensOut: meta.tokensOut, artifactCount: meta.artifactCount || 0, error: meta.errorExcerpt || null, projectSlug: meta.projectSlug || null },
   };
 }
 

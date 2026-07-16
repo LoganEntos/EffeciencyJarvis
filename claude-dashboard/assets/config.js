@@ -112,27 +112,10 @@ async function renderUsageConfig() {
   if (!el) return;
   let u;
   try { u = await api('/api/usage'); } catch { el.innerHTML = '<div class="note">Usage status unavailable.</div>'; return; }
+  const row = (label, w) => `<span class="pill neutral">${label}: ${fmtTok(w.tokensTotal)} tok · ${w.completionPct != null ? w.completionPct + '% done' : '— done'} · ${w.runs} run${w.runs === 1 ? '' : 's'}</span>`;
   el.innerHTML = `
-    <h2 style="font-size:12px">Usage limits <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— drives the Overview hero gauges (today &amp; this week). This is a $-spend proxy against a budget YOU set; wiring the real plan-quota API is a separate task.</span></h2>
-    <div class="flex" style="margin-bottom:14px">
-      <label class="mono" style="font-size:12px;color:var(--muted)">Daily budget $
-        <input id="dailyBudget" type="number" min="0" step="0.5" value="${u.today.budget != null ? u.today.budget : ''}" style="width:110px;margin:4px 0 0;padding:8px 10px" placeholder="unset"></label>
-      <label class="mono" style="font-size:12px;color:var(--muted)">Weekly budget $
-        <input id="weeklyBudget" type="number" min="0" step="1" value="${u.week.budget != null ? u.week.budget : ''}" style="width:110px;margin:4px 0 0;padding:8px 10px" placeholder="unset"></label>
-      <button class="ghost" id="saveBudgets" style="padding:9px 16px;font-size:12px;align-self:flex-end">Save</button>
-    </div>`;
-  $('#saveBudgets').onclick = async () => {
-    const dv = $('#dailyBudget').value.trim();
-    const wv = $('#weeklyBudget').value.trim();
-    try {
-      await api('/api/usage/config', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyBudgetUsd: dv === '' ? null : Number(dv), weeklyBudgetUsd: wv === '' ? null : Number(wv) }),
-      });
-    } catch {}
-    renderUsageConfig();
-    if (currentTab === 'overview') load('overview', true);
-  };
+    <h2 style="font-size:12px">Usage <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— token volume + completion rate, today and this week. No dollar tracking in this app; wiring the real plan-quota API is a separate task (docs/roadmap.md R0).</span></h2>
+    <div class="flex" style="margin-bottom:14px">${row('Today', u.today)}${row('This week', u.week)}</div>`;
 }
 
 async function renderAutopilot() {

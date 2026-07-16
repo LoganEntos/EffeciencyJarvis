@@ -331,18 +331,18 @@ function wireDelete(p) {
 }
 
 function runsTable(runs) {
-  return `<table class="pruns"><thead><tr><th>When</th><th>Model</th><th>Duration</th><th>Cost</th><th>Status</th><th>Prompt</th></tr></thead>
+  return `<table class="pruns"><thead><tr><th>When</th><th>Model</th><th>Duration</th><th>Tokens</th><th>Status</th><th>Prompt</th></tr></thead>
     <tbody>${runs.map(runRow).join('')}</tbody></table>`;
 }
 function runRow(r) {
-  const cost = r.costUsd ? '$' + r.costUsd.toFixed(2) : '—';
+  const tok = (r.tokensIn || r.tokensOut) ? fmtTok((r.tokensIn || 0) + (r.tokensOut || 0)) : '—';
   const dur = r.durationMs ? (r.durationMs >= 1000 ? Math.round(r.durationMs / 1000) + 's' : r.durationMs + 'ms') : '—';
   const stCls = r.status === 'done' ? 'ok' : (r.status === 'error' ? 'err' : (r.status === 'running' ? 'neutral' : 'warn'));
   return `<tr class="prun" data-id="${esc(r.id)}">
     <td class="mono muted">${r.startedAt ? rel(r.startedAt) : '—'}</td>
     <td><span class="pill neutral">${esc(r.model)}</span></td>
     <td class="mono muted">${dur}</td>
-    <td class="mono muted">${cost}</td>
+    <td class="mono muted">${tok}</td>
     <td><span class="pill ${stCls}">${esc(r.status)}</span></td>
     <td class="mono ptrunc" title="${esc(r.prompt || '')}">${esc((r.prompt || '').slice(0, 90)) || '—'}</td>
   </tr>`;

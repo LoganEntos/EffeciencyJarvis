@@ -108,7 +108,7 @@ async function refreshSchedules() {
     const pill = st === 'done' ? 'ok' : (st === 'error' ? 'err' : 'warn');
     const meta = [s.cadence, s.enabled ? 'next ' + relFuture(s.nextDue) : 'paused',
       s.runCount ? s.runCount + ' fired' : 'never fired',
-      s.lastRunCost != null ? '$' + s.lastRunCost.toFixed(3) : ''].filter(Boolean).join(' · ');
+      s.lastRunTokensOut != null ? fmtTok((s.lastRunTokensIn || 0) + s.lastRunTokensOut) + ' tok' : ''].filter(Boolean).join(' · ');
     return `<div class="row" style="${s.enabled ? '' : 'opacity:.55'}">
       <div class="flex" style="justify-content:space-between">
         <span class="name">◷ ${esc(s.title)}</span>
@@ -185,7 +185,7 @@ async function refreshTasks() {
   $('#taskCount').textContent = `${list.length} total · ${queued} queued · ${running} running`;
   el.innerHTML = list.length ? list.map(t => {
     const s = taskState(t);
-    const meta = [t.model, t.costUsd != null ? '$' + t.costUsd.toFixed(3) : '', t.artifactCount ? '◫ ' + t.artifactCount : '', t.startedAt ? rel(t.startedAt) : ''].filter(Boolean).join(' · ');
+    const meta = [t.model, t.tokensOut != null ? fmtTok((t.tokensIn || 0) + t.tokensOut) + ' tok' : '', t.artifactCount ? '◫ ' + t.artifactCount : '', t.startedAt ? rel(t.startedAt) : ''].filter(Boolean).join(' · ');
     return `<div class="row">
       <div class="flex" style="justify-content:space-between">
         <span class="name">${esc(t.title || t.prompt.slice(0, 60))}</span>

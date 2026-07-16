@@ -104,7 +104,7 @@ function runningCount() {
 // Read-side queries (list/routingStats/transcript/getRunMeta) live in
 // runs-query.js to keep this file under the 500-line rule; they share the
 // live `active` Map so in-flight runs read back the same as finished ones.
-const { listRuns, routingStats, transcript, getRunMeta, spendToday } = createQueries({ RUNS_DIR, active, okId });
+const { listRuns, routingStats, transcript, getRunMeta, statsToday } = createQueries({ RUNS_DIR, active, okId });
 
 // Every line event carries `id:` = its index in the run, so EventSource
 // auto-reconnects (which send Last-Event-ID) never duplicate rendered lines.
@@ -513,7 +513,7 @@ async function handle(req, res, url) {
   }
   if (p === '/api/run/stream') { streamRun(req, res, url.searchParams.get('id') || ''); return true; }
   if (p === '/api/runs') { U.sendJson(res, listRuns()); return true; }
-  if (p === '/api/spend/today') { U.sendJson(res, spendToday()); return true; }
+  if (p === '/api/stats/today') { U.sendJson(res, statsToday()); return true; }
   if (p === '/api/routing') { U.sendJson(res, routingStats()); return true; }
   if (p === '/api/run/transcript') {
     const t = transcript(url.searchParams.get('id') || '');

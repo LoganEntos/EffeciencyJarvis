@@ -4,6 +4,16 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = s => (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// Compact token-count formatter shared by the header badge, run history,
+// the usage gauge, and anywhere else a token total is shown (85 -> "85",
+// 12400 -> "12.4k", 1250000 -> "1.3M"). No $ anywhere in this app — tokens
+// + completion/routing percentages are the efficiency signal instead.
+const fmtTok = n => {
+  n = n || 0;
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(n);
+};
 const HUB_TOKEN = (document.querySelector('meta[name="hub-token"]') || {}).content || '';
 const renderers = {}; // tab -> async render fn; other scripts register into this
 
@@ -37,16 +47,18 @@ async function api(p, opts = {}) {
   } catch (e) { markServer(false); throw e; }
   finally { clearTimeout(t); }
 }
-// Compact on phones — "today" was the part getting clipped by the 120px
-// mobile max-width (screenshot bug: "$58.11 to..."). Number alone always fits.
-// Dedicated /api/spend/today endpoint (one number, no artifact walk) — this
-// polls every 60s always-on, so it must not pull the whole runs array.
+// Compact on phones — the 120px mobile max-width clips long strings, so the
+// token count alone is what fits there. Dedicated /api/stats/today endpoint
+// (small numbers, no artifact walk) — this polls every 60s always-on, so it
+// must not pull the whole runs array.
 async function updateSpendBadge() {
   const el = $('#spendBadge');
   if (!el) return;
   try {
-    const spend = (await api('/api/spend/today')).spendUsd || 0;
-    el.textContent = window.innerWidth <= 760 ? `$${spend.toFixed(2)}` : `$${spend.toFixed(2)} today`;
+    const s = await api('/api/stats/today');
+    const tok = fmtTok(s.tokensTotal || 0) + ' tok';
+    el.textContent = window.innerWidth <= 760 ? tok
+      : `${s.runs || 0} runs · ${tok}` + (s.completionPct != null ? ` · ${s.completionPct}% done` : '');
   } catch {}
 }
 let serverOk = true, reconnectTimer = null;

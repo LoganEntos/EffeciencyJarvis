@@ -31,7 +31,8 @@ function enrich(list) {
     return Object.assign({}, t, {
       runStatus: m ? m.status : 'gone',
       model: m ? m.model : t.model,
-      costUsd: m ? m.costUsd : null,
+      tokensIn: m ? m.tokensIn : null,
+      tokensOut: m ? m.tokensOut : null,
       artifactCount: m ? m.artifactCount : 0,
       team: m ? m.team : null,
       errorExcerpt: m ? m.errorExcerpt : null,

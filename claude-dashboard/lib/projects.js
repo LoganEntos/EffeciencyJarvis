@@ -90,7 +90,8 @@ function runsForSlug(slug, limit = 8) {
   let runs = [];
   try { runs = require('./runs').listRuns(); } catch {}
   return runs.filter(r => r.projectSlug === slug).slice(0, limit).map(r => ({
-    id: r.id, model: r.model || '?', status: r.status || '?', costUsd: r.costUsd || 0,
+    id: r.id, model: r.model || '?', status: r.status || '?',
+    tokensIn: r.tokensIn || 0, tokensOut: r.tokensOut || 0,
     durationMs: r.durationMs || 0, startedAt: r.startedAt || r.queuedAt || null,
     prompt: r.promptExcerpt || r.prompt || '' }));
 }

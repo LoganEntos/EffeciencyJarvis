@@ -66,7 +66,7 @@ async function fetchAgentGraph() {
   const running = g.run.status === 'running' || g.run.status === 'queued';
   const st = $('#avStatus');
   if (st) st.innerHTML = `<span class="pill ${g.run.status === 'done' ? 'ok' : running ? 'warn' : 'err'}">${esc(g.run.status)}</span>`
-    + (g.run.costUsd != null ? `<span class="pill neutral">$${g.run.costUsd.toFixed(3)}</span>` : '');
+    + (g.run.tokensOut != null ? `<span class="pill neutral">${fmtTok((g.run.tokensIn || 0) + g.run.tokensOut)} tok</span>` : '');
   renderAgentDetail(aviz.sel);
   if (aviz.kick) aviz.kick(); // redraw / resume the loop for the fresh graph
 }
