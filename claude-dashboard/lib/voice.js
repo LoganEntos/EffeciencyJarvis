@@ -188,6 +188,19 @@ async function handle(req, res, url) {
     U.sendJson(res, stopSidecar(engine));
     return true;
   }
+  // Open the selected engine's voice folder in Windows Explorer. The path is
+  // built only from our own ENGINES table (engineKey clamps to kokoro|csm), so
+  // no user string ever reaches the shell — fixed argv, no traversal.
+  if (url.pathname === '/api/voice/open-folder' && req.method === 'POST') {
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 4 * 1024) || '{}'); } catch {}
+    const engine = engineKey(b.engine || url.searchParams.get('engine'));
+    const dir = path.join(PROJECT_DIR, ENGINES[engine].dir);
+    if (!fs.existsSync(dir)) { U.sendJson(res, { error: ENGINES[engine].dir + ' folder not found — install the engine first (Config → Voice → Start engine)' }, 404); return true; }
+    try { execFile('explorer', [dir], { windowsHide: true }, () => {}); } catch {}
+    U.sendJson(res, { ok: true, dir });
+    return true;
+  }
   if (url.pathname !== '/api/voice/tts' || req.method !== 'POST') return false;
 
   let b = {};

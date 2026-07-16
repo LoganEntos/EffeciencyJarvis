@@ -30,6 +30,7 @@ const personas = require('./lib/personas');
 const projects = require('./lib/projects');
 const sharepoint = require('./lib/sharepoint');
 const clientlog = require('./lib/clientlog');
+const distill = require('./lib/distill');
 
 const PORT = parseInt(process.argv[2] || process.env.PORT || '5757', 10);
 const HOST = '127.0.0.1';
@@ -159,6 +160,7 @@ const server = http.createServer(async (req, res) => {
     if (await teams.handle(req, res, url)) return;
     if (await sources.handle(req, res, url)) return;
     if (await personas.handle(req, res, url)) return;
+    if (await distill.handle(req, res, url)) return;
     if (await clientlog.handle(req, res, url)) return;
     if (await projects.handle(req, res, url)) return;
     if (await sharepoint.handle(req, res, url)) return;

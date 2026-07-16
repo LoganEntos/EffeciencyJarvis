@@ -55,6 +55,7 @@
           <button class="ghost hidden" id="vCsmStart" style="padding:6px 12px;font-size:11.5px">⚡ Start engine</button>
           <button class="danger hidden" id="vCsmStop" style="padding:6px 12px;font-size:11.5px">⏻ Stop engine</button>
           <button class="ghost" id="vCsmTest" style="padding:6px 12px;font-size:11.5px">▶ Test voice</button>
+          <button class="ghost" id="vVoiceFolder" style="padding:6px 12px;font-size:11.5px" title="open the folder holding this engine's model + voice files in Explorer">📁 Voice files…</button>
           <span id="vCsmStat" class="pill neutral" style="font-size:11px;display:none"></span>
         </div>
         <div class="note" style="margin:6px 0 2px"><b>Kokoro-82M</b> is the fast local neural voice (runs in <span class="mono">.kokoro/</span> via <span class="mono">scripts/kokoro-server.py</span> on onnxruntime — ~0.1–0.3 s per sentence on the GPU, first run downloads ~340 MB). <b>CSM-1B</b> (<span class="mono">.csm/</span>) is more natural but slow (~6 s to first word) — see <span class="mono">docs/voice-csm.md</span>. Pick an engine above, hit <b>Start engine</b>, then <b>Test voice</b>; if a neural engine fails the hub falls back to the browser voice. Voice/rate sliders apply to the browser engine only; Speaker applies to the neural engines.</div>
@@ -139,6 +140,16 @@
           return playBlob(blob, () => { if (V.state === 'speaking') setState('idle'); });
         })
         .catch(err => { cs.className = 'pill err'; cs.textContent = 'unreachable: ' + String((err && err.message) || err).slice(0, 90); });
+    };
+
+    // Open the selected engine's voice folder (model + voice embeddings) in Explorer.
+    container.querySelector('#vVoiceFolder').onclick = async () => {
+      const cs = container.querySelector('#vCsmStat');
+      const nm = neuralEngine();
+      try {
+        const r = await api('/api/voice/open-folder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ engine: nm }) });
+        if (r && r.error) { cs.style.display = ''; cs.className = 'pill err'; cs.textContent = r.error.slice(0, 90); }
+      } catch (e) { cs.style.display = ''; cs.className = 'pill err'; cs.textContent = 'could not open folder'; }
     };
 
     // ---- live microphone diagnostics ----

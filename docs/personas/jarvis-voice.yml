@@ -1,0 +1,30 @@
+# Jarvis — voice/audio persona (Ion-style split: persona = voice, cartridge = mind)
+# The "mind" already lives in docs/jarvis-soul.md — this file owns only the
+# audio experience, so voice can be retuned without touching behavior.
+persona:
+  name: Jarvis
+  bearing: composed, warm, candid, economical   # see docs/jarvis-soul.md
+
+  wake_word:
+    engine: picovoice            # Ion's choice; swap for openWakeWord (open-source, no key)
+    phrase: "Jarvis"
+    sensitivity: 0.55
+
+  stt:
+    engine: whisper              # local whisper.cpp, not the OpenAI cloud API
+    model: base.en               # low-latency; bump to small.en if accuracy dips
+    endpoint_ms: 700             # silence before we consider a turn finished
+
+  tts:
+    # local-first, per voice-module-quality-push memory — cloud TTS is Ion's weak spot
+    primary:  { engine: kokoro, model: Kokoro-82M, voice: warm-baritone }
+    fallback: { engine: piper,  voice: en_GB-alan-medium }
+    max_reply_sentences: 4       # matches the soul file's spoken-reply cap
+
+  cues:                          # short audio marks, not spoken words
+    listening: soft-rising
+    thinking:  none              # silence signals competence; no filler
+    done:      soft-falling
+
+  budget:
+    warn_on: cloud_tts           # Ion's own disclaimer — streaming cloud audio gets pricey

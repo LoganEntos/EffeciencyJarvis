@@ -418,7 +418,7 @@ function renderAttachStrip() {
 async function sendPrompt() {
   const ta = $('#promptIn');
   let prompt = ta.value.trim();
-  if (chat.running) return;
+  if (chat.running || chat.sending) return; // sending = mid-distill (async gap below)
   // Attachments: block while any is still uploading; allow an attachment-only
   // send by supplying a default instruction.
   if (chat.pendingFiles.some(c => c.pending)) { addMsg('Still uploading an attachment — try again in a moment.', 'sys'); return; }
@@ -437,20 +437,33 @@ async function sendPrompt() {
   // with the exact distilled prompt Jarvis actually sent. That note is a 'sys'
   // line — the ONE Jarvis-authored output that is shown but never spoken (the
   // voice queue only ever reads assistant text + the final reply, never 'sys').
-  let displayPrompt = prompt, jarvisNote = null;
+  // Jarvis mode. QoL: the refined prompt BECOMES the visible turn (white text) —
+  // no separate raw-words bubble + yellow note. And a word-count gate decides how
+  // hard to work: long vibe-dumps go through the real Haiku distiller; short ones
+  // get only the instant local cleanup (nothing to engineer, no point paying the
+  // latency). The distilled/cleaned text is exactly what runs, so what you see is
+  // what fires.
+  let displayPrompt = prompt;
   const jarvisToggle = $('#jarvisToggle');
   if (jarvisToggle && jarvisToggle.checked && engine === 'claude') {
-    const transform = jarvisTransform(prompt);
-    if (transform) {
-      displayPrompt = transform.original; // bubble shows what you said…
-      prompt = transform.buffered;        // …while the cleaned version is what runs
-      // If user hasn't pinned a model, use Jarvis's pick
-      const userModel = $('#runModel').value;
-      if (userModel === 'auto' || userModel === '') {
-        $('#runModel').value = transform.complexity;
-      }
-      jarvisNote = `✦ Jarvis distilled that → ${transform.buffered}  ·  model: ${transform.complexity}`;
+    const wordCount = prompt.split(/\s+/).filter(Boolean).length;
+    if (wordCount > DISTILL_MIN_WORDS) {
+      // Haiku pre-pass takes a couple seconds — show a status + block re-sends.
+      const btn = $('#sendBtn'), label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = '✦ Shaping…'; }
+      chat.sending = true;
+      const refined = await jarvisDistill(prompt);
+      chat.sending = false;
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+      if (chat.running) return; // a run slipped in while we were distilling
+      if (refined) { displayPrompt = prompt = refined; }
+      else { const tr = jarvisTransform(prompt); if (tr) displayPrompt = prompt = tr.buffered; } // distill miss → local cleanup
+    } else {
+      const tr = jarvisTransform(prompt); if (tr) displayPrompt = prompt = tr.buffered;
     }
+    // If the user hasn't pinned a model, route on the (now refined) prompt.
+    const userModel = $('#runModel').value;
+    if (userModel === 'auto' || userModel === '') $('#runModel').value = analyzePromptComplexity(prompt);
   }
 
   let r;

@@ -84,3 +84,23 @@ function jarvisTransform(prompt) {
     complexity: analyzePromptComplexity(prompt),
   };
 }
+
+// Word-count gate: short prompts have nothing to engineer, so they skip the
+// Haiku pre-pass (which costs ~a couple seconds + a fraction of a cent) and get
+// only the instant local cleanup. Above the gate, a real vibe-dump goes through
+// jarvisDistill. Tune this number as it's felt in use.
+const DISTILL_MIN_WORDS = 25;
+
+// The REAL distiller: a Haiku one-shot on the server (POST /api/jarvis/distill)
+// rewrites a long, spoken request into one clear, self-contained prompt. Returns
+// '' on ANY failure so the caller falls back to local cleanup and the run is
+// never blocked by a distill miss.
+async function jarvisDistill(text) {
+  try {
+    const r = await api('/api/jarvis/distill', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    return (r && r.prompt) ? r.prompt.trim() : '';
+  } catch { return ''; }
+}
