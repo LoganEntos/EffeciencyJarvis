@@ -481,7 +481,6 @@ async function sendPrompt() {
     if (docs.length) addMsg('📎 ' + docs.map(c => c.name).join(', '), 'sys');
     chat.pendingFiles = []; renderAttachStrip();
   }
-  if (jarvisNote) addMsg(jarvisNote, 'sys jarvisnote'); // shown, never spoken
   chat.hermesEl = null; chat.hermesText = ''; // fresh bubble per hermes reply
   attachLiveRun(r.id, { startedAtMs: Date.now(), queued: r.queued });
   if (window.HubVoice) HubVoice.onRunStart();
