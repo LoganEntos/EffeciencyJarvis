@@ -1,7 +1,16 @@
 # Handoff: Skills-layer cleanup, steps 4–6 (O2)
 
-**Status: READY.** Model: Opus 4.8. Finishes
-`docs/agent-skill-efficiency-report.md` (steps 1–3 shipped in `bd09b68`).
+**Status: DONE (2026-07-15, committed `573212a`).** Design suite consolidated
+6→2 (`ui-ux-pro-max` + `slides`; reusable methodology folded into
+`ui-ux-pro-max/references/`); borderline three (`autonomous-loops`,
+`team-agent-orchestration`, `verification-loop`) deleted after a
+zero-references check; `prompt-optimizer` re-pointed to `verify`. Logistics
+skills untouched — **still an open user question** whether they move to a
+separate work profile. Original brief below for the record.
+
+---
+
+Finishes `docs/agent-skill-efficiency-report.md` (steps 1–3 shipped in `bd09b68`).
 
 ## Before touching anything
 

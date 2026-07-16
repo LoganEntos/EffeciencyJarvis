@@ -38,7 +38,8 @@ as the source of truth over this list.
 - `POST /api/personas/save|delete|rename|order|active` — full CRUD (see `lib/personas.js` header)
 - `POST /api/jarvis/distill {text}` → `{prompt}` — Haiku prompt-shaper (~3–13 s; '' on failure)
 - `GET  /api/clientlog?tab=jarvis` — client-error beacon (live)
-- `GET /api/spend/today`, `GET /api/routing` — header chips
+- `GET /api/stats/today` (runs · tokens · completion%), `GET /api/routing` — header chips.
+  ⚠ **No dollar figures anywhere** (user directive 2026-07-15): tokens + % rates only.
 - Voice: existing `HubVoice` API + `/api/voice/*` (status/start/stop/tts, open-folder)
 
 ## Hard constraints

@@ -29,12 +29,17 @@ Commit at each working, browser-verified stage.
 
 | # | file | status | model |
 | --- | --- | --- | --- |
-| 1 | `jarvis-error-hunt.md` | READY — beacon LIVE; first catch already fixed (`6c09bd7`) | Opus 4.8 |
-| 2 | `skills-cleanup.md` | READY — O2, steps 4–6 of the efficiency report | Opus 4.8 |
-| 3 | `schedules-verify.md` | READY — O3 headless part (R5 never proven) | Opus 4.8 |
-| 4 | `distill-latency.md` | OPTIONAL — only after 1–3 | Opus 4.8 |
+| ✅ | `jarvis-error-hunt.md` | DONE 07-16 (`d212169`) — beacon works; only catch was the already-fixed `6c09bd7` crash | — |
+| ✅ | `skills-cleanup.md` | DONE 07-15 (`573212a`) — design suite 6→2, borderline three deleted | — |
+| 1 | `schedules-verify.md` | READY — O3 headless part (R5 never proven) | Opus 4.8 |
+| 2 | `distill-latency.md` | OPTIONAL — only after schedules-verify | Opus 4.8 |
 | — | `jarvis-ui-port.md` | **BLOCKED — user is finishing the Lovable design** | Opus 4.8 |
 | — | `persona-manager-ui.md` | backend DONE; UI blocked on the same design | Opus 4.8 |
+
+⚠ Since 2026-07-15 the hub shows **no dollar figures anywhere** — tokens +
+completion/routing % are the metrics (`39e6ed6`). Any handoff that touches UI
+or run metadata must respect this; `/api/spend/today` is gone
+(→ `/api/stats/today`), and `meta.costUsd` is recorded but never displayed.
 
 ⚠ When pasting a work-order prompt into the Run tab, **turn the ✦ Jarvis
 toggle OFF** — otherwise the >25-word paste goes through the Haiku distiller

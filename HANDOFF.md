@@ -76,6 +76,31 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
   dirs are gitignored (per-machine). The user drives push; don't push unprompted.
 
 ## Latest work shipped (2026-07-14 → 07-15)
+2026-07-15 night (commits `045ee51`→`39e6ed6` — reconcile of the background
+handoff run + the no-dollars directive):
+- **NO DOLLAR FIGURES ANYWHERE, EVER (user directive).** `39e6ed6` swept every
+  `$` out of the app: header badge, run result lines, history chips/rows, the
+  Run-tab gauge (now a completion-% ring), Config (budget inputs deleted),
+  Tasks/Schedules/Projects/Memory/Agents. Metrics are **tokens** (`fmtTok`:
+  85 / 12.4k / 1.3M) **+ completion/routing %**. `/api/spend/today` →
+  `/api/stats/today`; `/api/usage` returns token windows + completionPct (the
+  whole $-budget concept incl. `POST /api/usage/config` is deleted).
+  `meta.costUsd` is still recorded in run history, just never displayed.
+- **Jarvis tab → operator console** (`045ee51`, from the background handoff
+  run, reviewed + bug-fixed): persona cards row, LIVE CONVERSATION pane (orb +
+  session-transcript tail) + PROMPT WORKSPACE pane (distiller surfaced with
+  refine chips, copy, run-this). Review caught a real crash: `pollTranscript`
+  called an undefined `fmtEvent` — added the missing formatter, verified live.
+- **Overview: plan-usage bars deleted** (they were manual Config numbers the
+  hub couldn't verify) → model-distribution + success-rate panel computed from
+  real run history; in-app editable "Lovable prompt" panel
+  (`docs/lovable-prompts/overview-tab.md`).
+- **O2 skills cleanup DONE** (`573212a`): design suite 6→2 (`ui-ux-pro-max` +
+  `slides`), borderline three deleted after a zero-refs check. Logistics
+  skills untouched (open user question).
+- **O1 error hunt DONE** (`d212169`, background run): beacon works; zero
+  Jarvis-tab errors captured beyond the already-fixed `6c09bd7` crash.
+
 2026-07-15 evening (commits `4b0b0e3`, `1fb6cd4` — reconcile + orchestration session):
 - **Jarvis distiller landed** (`lib/distill.js`, `POST /api/jarvis/distill`):
   Haiku one-shot rewrites >25-word "vibe" prompts; the refined prompt becomes
@@ -144,20 +169,20 @@ P1/P2/P3 find-fix round closed; **N7 SharePoint Breakdown** shipped — see
 sized for one hub run and carries the mandatory review pipeline (verify →
 smoke → code-reviewer → commit).
 
-**O1. Jarvis tab error hunt** → `docs/handoffs/jarvis-error-hunt.md`. The
-beacon is LIVE (hub restarted 2026-07-15 evening; `/api/clientlog` answering).
-Exercise the tab, read the captured errors, fix precisely — never blind.
-Voice behavior (barge-in, Kokoro self-heal, reply queue) must not change.
+**O1. ✅ DONE — Jarvis tab error hunt** (`d212169`; see
+`docs/handoffs/jarvis-error-hunt.md`). Beacon stays live — keep reading
+`/api/clientlog` after UI changes. Voice behavior still must not change.
 
 **O1.5. Jarvis tab UI port** → `docs/handoffs/jarvis-ui-port.md` +
 `docs/handoffs/persona-manager-ui.md`. **BLOCKED: the user is improving the
 design on Lovable — do NOT restyle the Jarvis tab until they deliver the
-final preview URL.** The persona-CRUD backend those UIs need is already live
-and verified.
+final preview URL.** (An interim operator-console layout shipped in `045ee51`;
+the Lovable port supersedes it when the design lands.) The persona-CRUD
+backend is live and verified. ⚠ No `$` in any new UI — tokens + % only.
 
-**O2. Finish the skills-layer cleanup** → `docs/handoffs/skills-cleanup.md`
-(consolidate design suite ~6→2, decide the borderline three, reconcile the
-07-15 background Fable 5 "ECC skills" run first, logistics skills untouched).
+**O2. ✅ DONE — skills-layer cleanup** (`573212a`; see
+`docs/handoffs/skills-cleanup.md`). Open user question: do the 5 logistics
+skills move to a separate work profile?
 
 **O3. Verify the unverified.** Headless part →
 `docs/handoffs/schedules-verify.md` (R5 schedules have never been proven to
