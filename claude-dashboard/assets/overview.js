@@ -47,12 +47,66 @@ function ctxRing(pct, size, label) {
     </div></div>`;
 }
 
+// Lovable redesign prompt for this tab — editable, persisted, one-click copy
+// (same pattern as the Projects SharePoint transfer-prompt panel).
+const OVPROMPT_KEY = 'hub.overview.lovablePrompt';
+const DEFAULT_OVPROMPT = `Design a dark operator-cockpit "Overview" dashboard screen for a personal AI agent hub. This is the landing tab — it should read as command-center status, not a generic admin panel.
+
+Design tokens (reuse exactly, this must match the rest of the app):
+- Background #0c0b0a, panel #17140f, panel-2 #141210, hairline #ffffff12 (stronger #ffffff24), text #f2ece0, muted #a79e8c
+- Accent amber #e8a33d (soft fill #e8a33d1a, dim #e8a33d40), success green #4bc47a, error red #e05252
+- Fonts: Bricolage Grotesque for display/headings (800 weight for h1, 600 for h2), JetBrains Mono for every number/metric/label/control, Instrument Serif reserved for exactly one large hero number
+- Shapes: 4px radius cards, 3px radius controls, pill badges at 20px radius, subtle inset top-highlight line on panels. No drop shadows, no glassmorphism, no purple gradients.
+
+Critical framing: there is NO API that exposes Claude subscription plan usage. Kill any "plan usage %" bars entirely — every metric must be something the hub can actually measure from real run history.
+
+Hero (top, full-width): one big Instrument Serif number = current chat's context-window utilization (e.g. "34%"), subtext in mono: "68K of 200K tokens · claude-sonnet-5 · 2m ago". Small conic-gradient ring next to it (amber under 70%, warm-amber warn 70-90%, red 90%+).
+
+Row of 5 compact stat cards (mono numerals, Bricolage label above): Success rate, Routing accuracy, Lean-model share, Avg run duration, Active runs.
+
+Model distribution & success-rate panel (centerpiece): one row per model seen in run history — name, a share bar sized to % of finished runs (colored by cost tier: cheap=amber, mid=warm amber, heavy=red), share % and count, a success-rate pill (green >=90%, amber 70-89%, red <70%), avg duration and avg tokens in dim mono. Sort by run count descending.
+
+Current-chat analytics card: context ring + model/tier badges + token in/out + duration + memory-recall count + artifact count + routing reason. One dense horizontal card.
+
+Below the fold: system status pills (API auth, engram memory count, MCP servers, agents/skills/commands counts), a clickable "Recent runs" list, a collapsed raw session log in a mono <pre> block.
+
+Placeholder room (don't fully build, just leave visual space / ghost state): per-model success sparkline over last ~20 runs, a cost-tier donut toggle, a routing-disagreements drill-down, a time-range selector (today/7d/30d/all).
+
+Keep density high — power-user cockpit, not a marketing dashboard. One staggered fade/slide-up on load, no other motion.`;
+const ovPromptGet = () => { try { return localStorage.getItem(OVPROMPT_KEY) ?? DEFAULT_OVPROMPT; } catch { return DEFAULT_OVPROMPT; } };
+const ovPromptSet = v => { try { localStorage.setItem(OVPROMPT_KEY, v); } catch {} };
+let ovShowPrompt = false;
+function renderOvPrompt() {
+  const box = $('#ovPromptPanel'); if (!box) return;
+  if (!ovShowPrompt) { box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="flex" style="justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <span class="l">⧉ Lovable redesign prompt — Overview tab
+          <span class="muted" style="font-weight:400;font-size:11.5px">paste into lovable.com · edits saved automatically</span></span>
+        <span class="flex" style="gap:8px">
+          <button id="ovpCopy" style="padding:5px 13px;font-size:11.5px">Copy</button>
+          <button id="ovpReset" class="ghost" style="padding:5px 11px;font-size:11px">Reset to default</button>
+        </span>
+      </div>
+      <textarea id="ovpText" spellcheck="false" style="width:100%;min-height:220px;background:var(--panel2);color:var(--text);
+        border:1px solid var(--line);border-radius:var(--r);padding:10px;font-family:var(--font-mono);font-size:12px;resize:vertical">${esc(ovPromptGet())}</textarea>
+      <div id="ovpToast" class="muted" style="font-size:11.5px;min-height:16px;margin-top:4px"></div>
+    </div>`;
+  const ta = $('#ovpText'), toast = m => { const t = $('#ovpToast'); if (t) { t.textContent = m; setTimeout(() => { if (t.textContent === m) t.textContent = ''; }, 1600); } };
+  ta.oninput = () => ovPromptSet(ta.value);
+  $('#ovpCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(ta.value); toast('Copied ✓'); }
+    catch { ta.select(); try { document.execCommand('copy'); toast('Copied ✓'); } catch { toast('Select-all + Ctrl-C to copy'); } }
+  };
+  $('#ovpReset').onclick = () => { ovPromptSet(DEFAULT_OVPROMPT); ta.value = DEFAULT_OVPROMPT; toast('Reset to default'); };
+}
+
 renderers.overview = async function () {
-  const [d, runs, files, cfg, routing] = await Promise.all([
+  const [d, runs, files, routing] = await Promise.all([
     api('/api/overview'),
     api('/api/runs').catch(() => []),
     api('/api/files').catch(() => []),
-    api('/api/settings').catch(() => ({})),
     api('/api/routing').catch(() => null),
   ]);
   $('#projBadge').textContent = d.project;
@@ -89,28 +143,52 @@ renderers.overview = async function () {
     ? `${shortK(used)} of ${shortK(win)} tokens · ${esc(chat.model || 'default')} · ${rel(chat.startedAt || chat.queuedAt)}`
     : (chat ? `${shortK(win)}-token window · ${esc(chat.model || 'default')} · token usage not reported for this run` : 'no runs yet');
 
-  // plan usage bars (kept — %-based; the credits line shows % only, no $)
-  const plan = cfg.plan || {};
-  const planBar = (text, pct, cls) => `<div style="margin:0 0 11px">
-    <div class="mono" style="font-size:11.5px;color:var(--muted);margin-bottom:5px">${esc(text)}</div>
-    <div class="planbar"><div class="planbar-fill ${cls}" style="width:${Math.min(100, Math.max(0, pct || 0))}%"></div></div></div>`;
-  const planCard = plan.sessionPct != null ? `<div class="card" style="margin:16px 0 20px">
-    <div class="flex" style="justify-content:space-between;margin-bottom:12px">
-      <div class="l">Plan usage — ${esc(plan.label || '')}</div>
-      <span class="muted" style="font-size:10.5px">${plan.updatedAt ? 'updated ' + rel(plan.updatedAt) : 'not set'} · <span id="ovPlanRefresh" style="cursor:pointer" title="refresh from saved values">↻</span> · edit in Config ⚙</span></div>
-    ${planBar(`Current session — ${plan.sessionPct}% used · resets in ${esc(plan.sessionResets || '')}`, plan.sessionPct, '')}
-    ${planBar(`Weekly · All models — ${plan.weeklyAll}% used · resets ${esc(plan.weeklyResets || '')}`, plan.weeklyAll, '')}
-    ${planBar(`Weekly · Fable — ${plan.weeklyFable}% used · resets ${esc(plan.weeklyResets || '')}`, plan.weeklyFable, plan.weeklyFable >= 80 ? 'warn' : '')}
-    ${planBar(`Usage credits — ${plan.creditsPct}% used · resets ${esc(plan.creditsResets || '')}`, plan.creditsPct, plan.creditsPct >= 90 ? 'danger' : 'warn')}
-  </div>` : '';
-
   const usageHero = `
     <div class="ovhero">
       <div class="l">${heroLabel}</div>
       <div class="ovheronum">${heroNum}</div>
       <div class="muted" style="font-size:12.5px;margin-top:2px">${heroSub}</div>
-    </div>
-    ${planCard}`;
+    </div>`;
+
+  // ---- per-model breakdown: share of runs + success rate, from real run history
+  // (plan-usage % bars were manual Config entries we can't verify against the API —
+  // this replaces them with numbers the hub actually measures).
+  function modelBreakdown(list) {
+    const by = {};
+    list.forEach(m => {
+      const k = m.model || 'default';
+      const e = (by[k] ||= { total: 0, ok: 0, durs: [], tok: 0, tokN: 0 });
+      e.total++; if (m.status === 'done') e.ok++;
+      if (m.durationMs != null) e.durs.push(m.durationMs);
+      if (m.tokensIn != null) { e.tok += m.tokensIn + (m.tokensOut || 0); e.tokN++; }
+    });
+    return Object.entries(by).map(([model, e]) => ({
+      model, count: e.total,
+      share: list.length ? Math.round(100 * e.total / list.length) : 0,
+      success: Math.round(100 * e.ok / e.total),
+      avgDur: e.durs.length ? e.durs.reduce((s, x) => s + x, 0) / e.durs.length : null,
+      avgTok: e.tokN ? Math.round(e.tok / e.tokN) : null,
+    })).sort((a, b) => b.count - a.count);
+  }
+  const modelRows = modelBreakdown(finished);
+  const modelBreakCard = modelRows.length ? `<div class="modelbreak">
+    <div class="modelbreak-h">Model distribution &amp; success rate — ${finished.length} finished runs</div>
+    ${modelRows.map(r => {
+      const tier = modelTier(r.model);
+      const tierColor = tier === 'cheap' ? 'var(--accent)' : tier === 'heavy' ? 'var(--red)' : 'var(--amber, #d9a441)';
+      const succCls = r.success >= 90 ? 'ok' : r.success >= 70 ? 'warn' : 'err';
+      return `<div class="modelrow">
+        <div class="modelrow-name mono" title="${esc(r.model)}">${esc(r.model)}</div>
+        <div class="modelrow-bar"><div style="width:${r.share}%;background:${tierColor}"></div></div>
+        <div class="modelrow-share mono">${r.share}% · ${r.count}</div>
+        <div class="modelrow-meta">
+          <span class="pill ${succCls}" style="min-width:48px;text-align:center">${r.success}% ok</span>
+          <span class="muted mono" style="font-size:11px">${shortDur(r.avgDur)}</span>
+          <span class="muted mono" style="font-size:11px">${r.avgTok != null ? shortK(r.avgTok) + ' tok' : '—'}</span>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>` : '';
 
   // ---- current-chat analytics card ----
   const chatCard = chat ? `<div class="card" style="display:flex;gap:16px;align-items:center;margin-bottom:20px">
@@ -137,24 +215,12 @@ renderers.overview = async function () {
   // ---- efficiency stat cards (no money) ----
   const stat = (label, val, cls) => `<div class="card ovstat"><div class="l">${label}</div><div class="ovstatnum ${cls || ''}">${val}</div></div>`;
 
-  // model-mix bar (efficiency: how work spreads across cheap/mid/heavy tiers)
-  const seg = (n, cls, title) => tierTotal ? `<div title="${title}" style="width:${100 * n / tierTotal}%;background:${cls}"></div>` : '';
-  const mixBar = tierTotal ? `<div style="padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:22px">
-    <div style="color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Model mix — ${finished.length} finished runs (lean = cheaper tiers doing the work)</div>
-    <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;gap:1px">
-      ${seg(tiers.cheap, 'var(--accent)', 'cheap (haiku/fable): ' + tiers.cheap)}
-      ${seg(tiers.mid, 'var(--amber, #d9a441)', 'mid (sonnet): ' + tiers.mid)}
-      ${seg(tiers.heavy, 'var(--red)', 'heavy (opus): ' + tiers.heavy)}
-    </div>
-    <div class="flex" style="gap:14px;flex-wrap:wrap;margin-top:9px">
-      <span class="pill neutral" style="font-size:11px">● cheap ${tiers.cheap}</span>
-      <span class="pill neutral" style="font-size:11px">● mid ${tiers.mid}</span>
-      <span class="pill neutral" style="font-size:11px">● heavy ${tiers.heavy}</span>
-    </div>
-  </div>` : '';
-
   $('#overview').innerHTML = `
-    <h2>Overview</h2>
+    <div class="flex" style="justify-content:space-between;align-items:baseline">
+      <h2>Overview</h2>
+      <button id="ovPromptBtn" class="ghost" style="padding:5px 11px;font-size:11px" title="Copy the Lovable redesign prompt for this tab">⧉ Lovable prompt</button>
+    </div>
+    <div id="ovPromptPanel"></div>
     ${usageHero}
     ${chatCard}
     <div class="cards ovstats">
@@ -164,7 +230,7 @@ renderers.overview = async function () {
       ${stat('Avg run', shortDur(avgDur))}
       ${stat('Active', active, active ? 'accent' : '')}
     </div>
-    ${mixBar}
+    ${modelBreakCard}
     <div class="flex" style="margin-bottom:22px">${memPill}${apiPill}
       <span class="pill neutral">MCP: ${d.mcpServers.map(esc).join(', ') || 'none'}</span>
       <span class="pill neutral">library: ${d.counts.agents} agents · ${d.counts.skills} skills · ${d.counts.commands} commands</span></div>
@@ -180,8 +246,9 @@ renderers.overview = async function () {
       </div>`).join('') || '<div class="muted">No runs yet — open the Run tab and send a prompt.</div>'}</div>
     <h2 style="margin-top:26px">Raw session feed <span class="mono" id="feedSession" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
     <pre id="feed" style="max-height:180px">Loading…</pre>`;
+  $('#ovPromptBtn').onclick = () => { ovShowPrompt = !ovShowPrompt; renderOvPrompt(); };
+  if (ovShowPrompt) renderOvPrompt();
   $('#overview').querySelectorAll('.card.clickable').forEach(c => c.onclick = () => goTab(c.dataset.goto));
   $('#overview').querySelectorAll('.ovrun').forEach(r => r.onclick = () => { goTab('run'); ensureRunUI(); openRun(r.dataset.id); });
-  if ($('#ovPlanRefresh')) $('#ovPlanRefresh').onclick = () => load('overview', true); // re-fetch latest plan numbers
   startFeed();
 };
