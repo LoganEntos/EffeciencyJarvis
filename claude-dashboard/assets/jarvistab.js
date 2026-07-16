@@ -1,17 +1,14 @@
-/* Jarvis tab — the hub's operator console. A voice-first face laid out as a
-   console: an eyebrow + serif nameplate header, a scroll-row of persona cards
-   (one-tap switch, active card "has the conn"), then a two-pane deck — LIVE
-   CONVERSATION on the left (the state-driven orb + voice controls + a live tail
-   of the newest Claude Code transcript) and PROMPT WORKSPACE on the right (the
-   Haiku distiller made visible: type a loose vibe-dump, shape it, refine it,
-   then copy or fire it into the Run tab).
-
-   The orb is the SAME voice engine as the small header orb — tap to talk once
-   (or hush a reply), hold for a hands-free call. Interactions delegate to
-   assets/voice.js so there is exactly one voice code path. Animation only runs
-   while this tab is visible; reduced-motion users get a static per-state frame.
-   Mobile-first: the header stacks, cards scroll horizontally, the deck goes
-   single-column, and the orb scales to the viewport. All colors are theme vars. */
+/* Jarvis tab — ported 1:1 from the amber-agent-orb Lovable build (project
+   7ce003de) into the hub's zero-dep vanilla JS. Layout: eyebrow + mono
+   nameplate, a scroll-row of persona cards, then a two-pane deck — LIVE
+   CONVERSATION (state orb + voice controls + transcript tail) and PROMPT IN
+   PROGRESS (the Haiku distiller) + HOLDING IN CONTEXT (live derived anchors +
+   a thread timeline). The orb is the SAME voice engine as the header orb — tap
+   to talk, hold for a call — delegating to assets/voice.js (one voice path).
+   Animation runs only while the tab is visible; reduced-motion users get a
+   static per-state frame. Personas/distiller/transcript are wired to real
+   endpoints; HOLDING IN CONTEXT is derived from live state (no fabricated
+   data). Styling in assets/jarvis.css. */
 'use strict';
 (function () {
   const J = { ctx: null, size: 300, dpr: 1, raf: null, watch: null, txTimer: null,
@@ -22,8 +19,11 @@
   const inCall = () => !!(window.HubVoice && !HubVoice._disabled && HubVoice._call());
   const visible = () => { const s = $('#jarvis'); return s && !s.classList.contains('hidden') && !document.hidden; };
   const toneWords = t => (t || '').split(/[·,]/).map(s => s.trim()).filter(Boolean);
+  // a small glyph per persona (Lovable used one per card); falls back to ◉.
+  const GLYPH = { jarvis: '◉', 'jarvis-wit': '⌁', dispatch: '⚑', sage: '❋', athena: '❋', vulcan: '⚒', hermes: '⌁' };
+  const glyphFor = id => GLYPH[id] || '◉';
 
-  // ---- orb ------------------------------------------------------------------
+  // ---- orb (unchanged draw path) --------------------------------------------
   function draw() {
     const ctx = J.ctx; if (!ctx) return;
     const S = J.size, c = S / 2, t = (performance.now() - J.t0) / 1000;
@@ -35,19 +35,16 @@
     if (st === 'listening') { color = listen; pulse = S * 0.02 * (0.5 + 0.5 * Math.sin(t * 7)); }
     else if (st === 'thinking') { pulse = S * 0.014 * (0.5 + 0.5 * Math.sin(t * 4)); }
     else if (st === 'speaking') { pulse = S * 0.03 * Math.abs(Math.sin(t * 9)) + S * 0.012 * Math.abs(Math.sin(t * 23)); }
-    else { pulse = S * 0.008 * Math.sin(t * 1.3); } // idle: slow breath
-    // aura — the atmosphere behind the core
+    else { pulse = S * 0.008 * Math.sin(t * 1.3); }
     const aura = ctx.createRadialGradient(c, c, core * 0.3, c, c, S * 0.48);
     aura.addColorStop(0, color + (st === 'idle' ? '2e' : '55'));
     aura.addColorStop(1, color + '00');
     ctx.fillStyle = aura;
     ctx.beginPath(); ctx.arc(c, c, S * 0.48, 0, 6.2832); ctx.fill();
-    // a faint tick-ring for the console vibe — dashes around the aura edge
     ctx.save();
     ctx.strokeStyle = color; ctx.globalAlpha = st === 'idle' ? 0.14 : 0.22; ctx.lineWidth = 1;
     ctx.setLineDash([1.5, 7]); ctx.beginPath(); ctx.arc(c, c, S * 0.44, 0, 6.2832); ctx.stroke();
     ctx.restore();
-    // listening: sonar ripples expanding from the core
     if (st === 'listening') {
       for (let k = 0; k < 2; k++) {
         const ph = (t * 0.55 + k * 0.5) % 1;
@@ -56,24 +53,20 @@
       }
       ctx.globalAlpha = 1;
     }
-    // thinking: a single orbiting arc — deliberation, not alarm
     if (st === 'thinking') {
       const a = t * 2.2;
       ctx.beginPath(); ctx.arc(c, c, core + S * 0.055, a, a + 1.35);
       ctx.strokeStyle = accent; ctx.globalAlpha = 0.8; ctx.lineWidth = 2.2;
       ctx.lineCap = 'round'; ctx.stroke(); ctx.globalAlpha = 1;
     }
-    // core
     const g = ctx.createRadialGradient(c - core * 0.3, c - core * 0.35, core * 0.15, c, c, core + pulse);
     g.addColorStop(0, '#ffe9c4'); g.addColorStop(0.35, color); g.addColorStop(1, color);
     ctx.beginPath(); ctx.arc(c, c, core + pulse, 0, 6.2832);
     ctx.fillStyle = g; ctx.shadowColor = color; ctx.shadowBlur = st === 'idle' ? 14 : 30;
     ctx.fill(); ctx.shadowBlur = 0;
-    // outer ring
     ctx.beginPath(); ctx.arc(c, c, core + pulse + S * 0.035, 0, 6.2832);
     ctx.strokeStyle = color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.4; ctx.stroke();
     ctx.globalAlpha = 1;
-    // hands-free call: a slowly rotating dashed halo — "the line is open"
     if (call) {
       ctx.beginPath(); ctx.arc(c, c, S * 0.43, 0, 6.2832);
       ctx.strokeStyle = listen; ctx.globalAlpha = 0.55 + 0.25 * Math.sin(t * 3);
@@ -85,12 +78,9 @@
   function loop() {
     if (!visible()) { J.raf = null; return; }
     draw();
-    if (reducedMotion()) { J.raf = null; return; } // static frame per state
+    if (reducedMotion()) { J.raf = null; return; }
     J.raf = requestAnimationFrame(loop);
   }
-  // Watcher: (re)starts the loop when the tab becomes visible, and repaints on
-  // state changes for reduced-motion users. 400ms poll only — never a 60fps
-  // loop while the tab is hidden.
   function startWatch() {
     if (J.watch) return;
     J.watch = setInterval(() => {
@@ -102,51 +92,48 @@
     document.addEventListener('visibilitychange', () => { if (visible() && J.raf == null) J.raf = requestAnimationFrame(loop); });
   }
 
-  const STATE_LINE = {
-    idle: 'tap to talk · hold for a call',
-    listening: 'listening…',
-    thinking: 'thinking…',
-    speaking: 'speaking — tap to hush',
-  };
-  const STATE_BADGE = { idle: 'idle', listening: 'listening', thinking: 'thinking', speaking: 'speaking' };
+  const STATE_LINE = { idle: 'idle', listening: 'listening…', thinking: 'thinking…', speaking: 'speaking — tap to hush' };
+  const STATE_BADGE = { idle: '◌ idle', listening: '◉ listening', thinking: '◐ thinking', speaking: '◉ speaking' };
   function updateStateLine(st, call) {
     const el = $('#jstate');
     if (el) {
-      const txt = call && st === 'idle' ? 'call open — waiting for you' : (STATE_LINE[st] || st);
+      const txt = call && st === 'idle' ? 'on call' : (STATE_LINE[st] || st);
       if (el.textContent !== txt) el.textContent = txt;
       el.classList.toggle('on', st !== 'idle' || call);
     }
     const b = $('#jconvState');
     if (b) {
       const on = st !== 'idle' || call;
-      b.textContent = call && st === 'idle' ? 'on call' : (STATE_BADGE[st] || st);
+      b.textContent = call && st === 'idle' ? '☎ on call' : (STATE_BADGE[st] || st);
       b.classList.toggle('on', on);
     }
     const cb = $('#jCallBtn');
-    if (cb) { const on = inCall(); cb.classList.toggle('active', on); cb.querySelector('.jcb-t').textContent = on ? 'Hang up' : 'Open call'; }
+    if (cb) { const on = inCall(); const t = cb.querySelector('.jcb-t'); if (t) t.textContent = on ? 'hang up' : 'open call'; cb.classList.toggle('on', on); }
   }
 
   // ---- personas --------------------------------------------------------------
   async function loadPersonas() {
     const d = await api('/api/personas');
     J.personas = d.personas || []; J.active = d.active;
-    renderCards(); renderNameplate();
+    renderCards(); renderNameplate(); renderHolding();
     const sel = $('#jpSel'); if (sel) fillEditorSelect(sel.value);
   }
   function renderNameplate() {
     const p = J.personas.find(x => x.id === J.active);
-    const nm = $('#jname'); if (nm) nm.textContent = p ? p.name : 'Plain Claude';
-    const tg = $('#jtag'); if (tg) tg.textContent = p ? p.tagline : 'no persona — plain Claude';
+    const nm = $('#jname'); if (nm) nm.textContent = p ? p.name : 'Jarvis';
+    const tg = $('#jtag'); if (tg) tg.textContent = p ? ' — ' + (p.tagline || p.tone || 'active') : ' — plain Claude';
   }
   function card(p, on) {
-    const tones = toneWords(p ? p.tone : '').slice(0, 3).map(w => `<span>${esc(w)}</span>`).join('');
+    const id = p ? p.id : 'none';
     const name = p ? p.name : 'Off';
+    const glyph = on ? (p ? glyphFor(id) : '○') : (p ? glyphFor(id) : '○');
     const tag = p ? esc(p.tagline || '') : 'plain Claude — no persona';
-    return `<button class="jcard${on ? ' active' : ''}" data-id="${esc(p ? p.id : 'none')}">
-      <div class="jc-top"><span class="jc-name">${esc(name)}</span><span class="jc-mark">${on ? '◉' : '○'}</span></div>
+    const tone = p ? toneWords(p.tone).join(' · ') : 'neutral · unstyled';
+    return `<button class="jcard${on ? ' active' : ''}" data-id="${esc(id)}">
+      <div class="jc-top"><span class="jc-name">${esc(name)}</span><span class="jc-mark">${on ? '◉' : glyph}</span></div>
       <div class="jc-tag">${tag}</div>
-      <div class="jc-tone">${tones}</div>
-      ${on ? '<span class="jc-conn">◈ has the conn</span>' : ''}
+      <div class="jc-tone">${esc(tone)}</div>
+      ${on ? '<div class="jp-pill live jc-conn">◉ has the conn</div>' : ''}
     </button>`;
   }
   function renderCards() {
@@ -157,7 +144,7 @@
   async function switchPersona(id) {
     const r = await api('/api/personas/active', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id === 'none' ? null : id }) });
     if (r.error) { flash('✗ ' + r.error, true); return; }
-    J.active = r.active; renderCards(); renderNameplate();
+    J.active = r.active; renderCards(); renderNameplate(); renderHolding(); wsMeta();
     const p = J.personas.find(x => x.id === r.active);
     flash(r.active ? '✓ ' + (p ? p.name : r.active) + ' has the conn' + (r.handoff ? ' — handoff briefed' : '') : '✓ persona off — plain Claude');
     try { if (p && window.HubVoice && !HubVoice._disabled && voiceState() === 'idle' && !inCall()) HubVoice.speak(p.name + ' here.'); } catch {}
@@ -168,23 +155,23 @@
     clearTimeout(J.flashT); J.flashT = setTimeout(() => { el.textContent = ''; }, 4000);
   }
 
-  // ---- memory-recall pill (mirrors the Run tab's recall toggle) --------------
+  // ---- memory-recall pill (mirrors the Run tab toggle) -----------------------
   function recallOn() { try { return localStorage.getItem('hub.recall') === '1'; } catch { return false; } }
   function renderRecall() {
     const b = $('#jrecall'); if (!b) return;
     const on = recallOn();
     b.classList.toggle('on', on);
-    b.innerHTML = `◇ memory recall · <b>${on ? 'on' : 'off'}</b>`;
+    b.innerHTML = `memory recall · <b>${on ? 'on' : 'off'}</b>`;
   }
   function toggleRecall() {
     const next = !recallOn();
     try { localStorage.setItem('hub.recall', next ? '1' : '0'); } catch {}
-    const rc = $('#runRecall'); if (rc) rc.checked = next; // keep the Run tab in sync if it's built
-    renderRecall();
+    const rc = $('#runRecall'); if (rc) rc.checked = next;
+    renderRecall(); renderHolding();
     flash(next ? '✓ memory recall on' : '✓ memory recall off');
   }
 
-  // ---- prompt workspace (the distiller, surfaced) ----------------------------
+  // ---- prompt in progress (distiller, surfaced) ------------------------------
   const REFINERS = [
     { k: 'shorter', mod: 'Make it shorter and denser.' },
     { k: 'more technical', mod: 'Make it more technical and precise.' },
@@ -195,24 +182,22 @@
   function wsMeta() {
     const src = ($('#jwsIn') && $('#jwsIn').value || '').trim();
     const words = src ? src.split(/\s+/).length : 0;
-    const model = src ? (typeof analyzePromptComplexity === 'function' ? analyzePromptComplexity(src) : 'auto') : '—';
-    const p = J.personas.find(x => x.id === J.active);
+    const model = src ? (typeof analyzePromptComplexity === 'function' ? analyzePromptComplexity(src) : 'auto') : 'auto';
     const m = $('#jwsMeta');
-    if (m) m.innerHTML = `<span class="jbadge">intent · ${words > 25 ? 'distill' : 'clean'}</span>`
-      + `<span class="jbadge accent">${esc(model)}</span>`
-      + `<span class="jbadge">${words} words</span>`
-      + `<span class="jbadge">persona · ${esc(p ? p.name.toLowerCase() : 'off')}</span>`;
+    if (m) m.innerHTML = `<span>intent · ${words > 25 ? 'distill' : 'clean'}</span>`
+      + `<span class="accent">${esc(model)}</span>`
+      + `<span>${words} word${words === 1 ? '' : 's'}</span>`;
   }
   async function shape(mod) {
     const ta = $('#jwsIn'); if (!ta) return;
     let src = ta.value.trim();
     if (!src) { flash('nothing to shape yet — type a loose ask first', true); return; }
     if (mod) src += `\n\n(Refine: ${mod})`;
-    const btn = $('#jwsShape'), label = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.textContent = '✦ Shaping…'; }
+    const btn = $('#jwsShape'), label = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.textContent = '✦ shaping…'; }
     let out = '';
     try { out = await jarvisDistill(src); } catch {}
-    if (btn) { btn.disabled = false; btn.textContent = label; }
+    if (btn) { btn.disabled = false; btn.innerHTML = label; }
     if (!out) { flash('✗ distiller returned nothing — try again', true); return; }
     J.shaped = out;
     const box = $('#jwsOut'), wrap = $('#jwsOutWrap');
@@ -235,17 +220,60 @@
     try { navigator.clipboard.writeText(t); flash('✓ copied'); } catch { flash('✗ clipboard blocked', true); }
   }
 
+  // ---- holding in context (derived from live state — no fabricated data) -----
+  function renderHolding() {
+    const grid = $('#jholdGrid'); if (!grid) return;
+    const p = J.personas.find(x => x.id === J.active);
+    const model = ($('#runModel') && $('#runModel').value) || 'auto';
+    const tier = model === 'auto' || model === '' ? 'auto-routed'
+      : /opus/.test(model) ? 'heavy' : /haiku|fable/.test(model) ? 'cheap' : 'mid';
+    const sess = (typeof chat === 'object' && chat && chat.sessionId) ? chat.sessionId.slice(0, 12) : '—';
+    const anchors = [
+      ['persona', p ? p.name : 'plain Claude'],
+      ['bearing', p ? (toneWords(p.tone).join(' · ') || '—') : 'neutral'],
+      ['engine', 'claude'],
+      ['model', model === '' ? 'CLI default' : model],
+      ['tier', tier],
+      ['recall', recallOn() ? 'on' : 'off'],
+      ['session', sess],
+    ];
+    grid.innerHTML = anchors.map(([k, v]) =>
+      `<div class="janchor"><div class="janchor-k">${esc(k)}</div><div class="janchor-v" title="${esc(v)}">${esc(v)}</div></div>`).join('')
+      + `<button class="jp-pill jpin" id="jpin">＋ pin moment</button>`;
+    const cnt = $('#jholdCount'); if (cnt) cnt.textContent = anchors.length + ' anchors';
+    const pin = $('#jpin'); if (pin) pin.onclick = () => flash('context pinning is on the roadmap — anchors are live-derived for now');
+  }
+
   // ---- live transcript tail (newest Claude Code session) ---------------------
+  function timeOf(iso) { try { return new Date(iso).toLocaleTimeString(undefined, { hour12: false }); } catch { return ''; } }
   function fmtEvent(e) {
-    const tag = e.kind === 'user' ? '›' : (e.kind === 'tool' ? '⚒' : '·');
-    const color = e.kind === 'user' ? 'var(--txt)' : (e.kind === 'tool' ? 'var(--accent)' : 'var(--muted)');
-    return `<div style="color:${color}">${tag} ${esc(e.text || '')}</div>`;
+    const who = e.kind === 'user' ? 'you' : (e.kind === 'tool' ? 'tool' : 'jarvis');
+    const av = e.kind === 'user' ? `<div class="java user">you</div>`
+      : e.kind === 'tool' ? `<div class="java assistant">⚒</div>`
+      : `<div class="java assistant">◉</div>`;
+    return `<div class="jmsg ${e.kind === 'user' ? 'user' : e.kind === 'tool' ? 'tool' : 'assistant'}">
+      ${av}
+      <div class="jmsg-body">
+        <div class="jmsg-meta">${who} · ${timeOf(e.time)}</div>
+        <div class="jmsg-text">${esc(e.text || '')}</div>
+      </div></div>`;
+  }
+  function renderTimeline(n) {
+    const track = $('#jtlTrack'); if (!track) return;
+    const count = Math.min(8, Math.max(1, n || 1));
+    let dots = '<div class="jtl-line"></div>';
+    for (let i = 0; i < count; i++) {
+      const pct = count === 1 ? 0 : (i / (count - 1)) * 92;
+      dots += `<button class="jtl-dot${i === count - 1 ? ' active' : ''}" style="left:${pct}%" title="turn ${i + 1}"></button>`;
+    }
+    dots += '<div class="jtl-end">→</div>';
+    track.innerHTML = dots;
   }
   async function pollTranscript(force) {
     const feed = $('#jconv'); if (!feed || !visible()) return;
     let list;
     try { const d = await api('/api/sessions'); list = Array.isArray(d) ? d : (d.list || []); } catch { return; }
-    if (!list || !list.length) { feed.innerHTML = '<span class="muted">no session transcript yet — talk to the orb or fire a run</span>'; return; }
+    if (!list || !list.length) { feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">no session transcript yet — talk to the orb or fire a run</div>'; return; }
     const sid = list[0].id;
     let events;
     try { events = await api(`/api/session-tail?id=${encodeURIComponent(sid)}&n=40`); } catch { return; }
@@ -254,7 +282,8 @@
     if (!force && sig === J.txSig) return;
     J.txSig = sig;
     const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 60;
-    feed.innerHTML = events.length ? events.map(fmtEvent).join('\n') : '<span class="muted">(no conversation events yet)</span>';
+    feed.innerHTML = events.length ? events.map(fmtEvent).join('') : '<div class="jmsg-meta" style="padding:4px">(no conversation events yet)</div>';
+    renderTimeline(events.length);
     if (force || atBottom) feed.scrollTop = feed.scrollHeight;
   }
 
@@ -300,51 +329,66 @@
     const disabled = !window.HubVoice || HubVoice._disabled;
     $('#jarvis').innerHTML = `
       <div class="jhead">
-        <div class="jhead-l">
-          <div class="jeyebrow">Console · voice + text</div>
-          <h2 class="jtitle"><span class="jname" id="jname">…</span><span class="jdash"> — </span><span class="jtag" id="jtag"></span></h2>
+        <div>
+          <div class="jp-label jeyebrow">console · voice + text</div>
+          <h1 class="jtitle"><span class="jname" id="jname">Jarvis</span><span class="jtag" id="jtag"> — the quiet operator</span></h1>
         </div>
         <div class="jhead-r">
-          <button class="jpill" id="jrecall" title="Toggle memory recall for hub runs">◇ memory recall</button>
-          <button class="jpill" id="jcustBtn">✎ customize</button>
+          <button class="jp-pill" id="jrecall" title="Toggle memory recall for hub runs">memory recall</button>
+          <button class="jp-ghost" id="jcustBtn">✎ customize</button>
         </div>
       </div>
 
-      <div class="jcards" id="jcards" role="listbox" aria-label="Persona"></div>
+      <div class="jcards"><div class="jcards-row" id="jcards" role="listbox" aria-label="Persona"></div></div>
 
       <div class="jdeck">
-        <section class="jpanel jconv-panel">
-          <header class="jpanel-h"><span>Live conversation</span><span class="jstate-badge" id="jconvState">idle</span></header>
+        <section class="jp-panel jconv-panel">
+          <header class="jpanel-h jhair-b"><span class="jp-label">live conversation</span><span class="jp-pill" id="jconvState">◌ idle</span></header>
           <div class="jstage">
             <canvas id="jorb" role="button" tabindex="0" aria-label="Voice orb — tap to talk, hold for a hands-free call"></canvas>
-            <div class="jstate" id="jstate">${disabled ? 'voice module unavailable in this browser' : ''}</div>
-            <div class="jctrls">
-              <button class="jctrl" id="jTalkBtn">◉ <span>Tap to talk</span></button>
-              <button class="jctrl" id="jCallBtn">☎ <span class="jcb-t">Open call</span></button>
-            </div>
+            <div class="jstate" id="jstate">${disabled ? 'voice unavailable' : 'idle'}</div>
+            <div class="jrtt" id="jrtt">rtt —</div>
           </div>
-          <pre class="jconv" id="jconv"><span class="muted">loading transcript…</span></pre>
+          <div class="jctrls jhair-t">
+            <button class="jp-ghost" id="jTalkBtn">⏵ hold to talk</button>
+            <button class="jp-btn" id="jCallBtn">☎ <span class="jcb-t">open call</span></button>
+            <button class="jp-ghost" id="jThinkBtn">◐ think</button>
+            <button class="jp-ghost" id="jBargeBtn">⤾ barge in</button>
+          </div>
+          <div class="jconv jhair-t" id="jconv"><div class="jmsg-meta" style="padding:4px">loading transcript…</div></div>
         </section>
 
-        <section class="jpanel jws-panel">
-          <header class="jpanel-h"><span>Prompt workspace</span><span class="jbadge subtle">Haiku distiller</span></header>
-          <textarea id="jwsIn" placeholder="Dump the loose, spoken version of what you want — Jarvis shapes it into one clean, self-contained prompt with the right model."></textarea>
-          <div class="jws-meta" id="jwsMeta"></div>
-          <div class="jrefine"><span class="jrefine-l">refine</span><span id="jrefineChips"></span></div>
-          <div class="jws-actions">
-            <button class="jctrl" id="jwsShape">✦ Shape</button>
-            <button class="ghost jctrl" id="jwsCopy">⧉ copy</button>
-            <button class="jctrl primary" id="jwsRun">▷ run this</button>
-          </div>
-          <div class="jws-out hidden" id="jwsOutWrap">
-            <div class="jws-out-h">shaped prompt — what fires</div>
-            <pre id="jwsOut"></pre>
-          </div>
-        </section>
+        <div class="jdeck-r">
+          <section class="jp-panel">
+            <header class="jpanel-h jhair-b"><span class="jp-label">prompt in progress</span><span class="jpip-meta" id="jwsMeta"></span></header>
+            <textarea id="jwsIn" placeholder="Dump the loose, spoken version of what you want — Jarvis shapes it into one clean, self-contained prompt with the right model."></textarea>
+            <div class="jpip-foot jhair-t">
+              <div class="jrefine"><span class="jp-label">refine:</span><span id="jrefineChips"></span></div>
+              <div class="jpip-actions">
+                <button class="jp-ghost" id="jwsCopy">⧉ copy</button>
+                <button class="jp-btn" id="jwsShape">✦ shape</button>
+                <button class="jp-btn" id="jwsRun">▷ run this</button>
+              </div>
+            </div>
+            <div class="jws-out hidden" id="jwsOutWrap">
+              <div class="jws-out-h">shaped prompt — what fires</div>
+              <pre id="jwsOut"></pre>
+            </div>
+          </section>
+
+          <section class="jp-panel">
+            <header class="jpanel-h jhair-b"><span class="jp-label">holding in context</span><span class="jp-label" id="jholdCount" style="letter-spacing:.04em">—</span></header>
+            <div class="jhold-grid" id="jholdGrid"></div>
+            <div class="jtimeline jhair-t">
+              <div class="jtimeline-h">thread timeline</div>
+              <div class="jtl-track" id="jtlTrack"></div>
+            </div>
+          </section>
+        </div>
       </div>
 
       <div class="jcustom">
-        <span class="jmsg" id="jmsg"></span>
+        <span class="jmsg-flash" id="jmsg"></span>
         <div id="jcustPanel" class="hidden">
           <div class="jfields">
             <div class="wide"><label for="jpSel">Persona</label><select id="jpSel"></select></div>
@@ -359,15 +403,17 @@
         </div>
       </div>`;
 
-    // orb canvas: sized to the panel, DPR-aware, one draw context for life
+    // orb canvas: sized to the 4:3 stage, DPR-aware, one draw context for life
     const cv = $('#jorb');
-    J.size = Math.max(200, Math.min(300, Math.floor(Math.min(window.innerWidth * 0.7, 300))));
+    const stage = cv.parentElement;
+    const stageW = Math.max(220, Math.min(520, stage.clientWidth || 480));
+    J.size = Math.round(Math.min(stageW, (stageW * 3) / 4));
     J.dpr = window.devicePixelRatio || 1;
     cv.width = J.size * J.dpr; cv.height = J.size * J.dpr;
-    cv.style.width = cv.style.height = J.size + 'px';
+    cv.style.width = '100%'; cv.style.height = '100%';
     J.ctx = cv.getContext('2d'); J.ctx.scale(J.dpr, J.dpr);
-    // interactions mirror the header orb — tap delegates to its click handler
-    // (one code path for one-shot / hush / hang-up), hold starts a call.
+    // orb interaction — same code path as the header orb (tap once / hush /
+    // hang-up), hold to start a call.
     let pressT = null, longPressed = false;
     const tap = e => { const hdr = $('#voiceOrb'); if (hdr && hdr.onclick) hdr.onclick(e); };
     cv.onpointerdown = e => {
@@ -382,18 +428,20 @@
     // control cluster
     $('#jTalkBtn').onclick = tap;
     $('#jCallBtn').onclick = () => { if (!window.HubVoice) return; inCall() ? HubVoice.endCall() : HubVoice.beginCall(); };
+    $('#jThinkBtn').onclick = () => flash('think mode follows the run — the orb shows it live');
+    $('#jBargeBtn').onclick = () => { try { if (window.HubVoice && HubVoice.bargeIn) HubVoice.bargeIn(); else if (window.HubVoice && HubVoice.stop) HubVoice.stop(); } catch {} };
 
     // header pills
     $('#jrecall').onclick = toggleRecall;
     $('#jcustBtn').onclick = () => {
       const p = $('#jcustPanel'); p.classList.toggle('hidden');
-      if (!p.classList.contains('hidden')) { fillEditorSelect(); loadEditor($('#jpSel').value); $('#jcustPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+      if (!p.classList.contains('hidden')) { fillEditorSelect(); loadEditor($('#jpSel').value); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
     };
     renderRecall();
 
-    // workspace
-    $('#jrefineChips').innerHTML = REFINERS.map(r => `<button class="jchip-r" data-mod="${esc(r.mod)}">${esc(r.k)}</button>`).join('');
-    $('#jrefineChips').querySelectorAll('.jchip-r').forEach(b => b.onclick = () => shape(b.dataset.mod));
+    // prompt-in-progress (distiller)
+    $('#jrefineChips').innerHTML = REFINERS.map(r => `<button class="jp-pill" data-mod="${esc(r.mod)}">◦ ${esc(r.k)}</button>`).join('');
+    $('#jrefineChips').querySelectorAll('.jp-pill').forEach(b => b.onclick = () => shape(b.dataset.mod));
     $('#jwsIn').oninput = wsMeta;
     $('#jwsShape').onclick = () => shape('');
     $('#jwsCopy').onclick = copyShaped;
@@ -404,6 +452,10 @@
     $('#jpSel') && ($('#jpSel').onchange = e => loadEditor(e.target.value));
     $('#jpSave').onclick = saveEditor;
 
+    // rtt readout (mirrors the header orb's round-trip if voice exposes it)
+    const rtt = $('#jrtt');
+    if (rtt && window.HubVoice && HubVoice._rtt) { const v = HubVoice._rtt(); if (v) rtt.textContent = 'rtt ' + v; }
+
     await loadPersonas();
     wsMeta();
     draw(); startWatch();
@@ -411,5 +463,5 @@
     if (!J.txTimer) J.txTimer = setInterval(() => pollTranscript(false), 2500);
     if (!reducedMotion()) { if (J.raf == null) J.raf = requestAnimationFrame(loop); }
   };
-  renderers.jarvis.noSkeleton = true; // the stage renders instantly — no skeleton flash
+  renderers.jarvis.noSkeleton = true;
 })();
