@@ -155,21 +155,15 @@ design on Lovable — do NOT restyle the Jarvis tab until they deliver the
 final preview URL.** The persona-CRUD backend those UIs need is already live
 and verified.
 
-**O2. Finish the skills-layer cleanup** (`docs/agent-skill-efficiency-report.md`,
-steps 4–6; steps 1–3 shipped in `bd09b68` + the global CLAUDE.md is clean).
-Remaining: consolidate the design suite ~6→2 (keep `ui-ux-pro-max` as reference
-DB + `slides`; fold/drop `banner-design`, `brand`, `design`, `design-system`),
-decide the borderline three (`autonomous-loops`, `team-agent-orchestration`,
-`verification-loop` — keep only if actually invoked), check `data/teams.json`
-for references before deleting, then smoke + one hub run + optional
-`context-budget` before/after. ⚠ A background Fable 5 run was tasked with "ECC
-skills" on 07-15 — `git log` first and reconcile; don't duplicate its work.
-Ask the user whether the 5 logistics skills move to a separate work profile.
+**O2. Finish the skills-layer cleanup** → `docs/handoffs/skills-cleanup.md`
+(consolidate design suite ~6→2, decide the borderline three, reconcile the
+07-15 background Fable 5 "ECC skills" run first, logistics skills untouched).
 
-**O3. Verify the unverified.** (a) Wake-word "Suzy" gate — needs a real-mic
-test with the user. (b) R5: schedules have never been stress-tested — create a
-near-future schedule, assert it fires into run history, tear down. (c) Projects
-tab — browser-verify at 375px.
+**O3. Verify the unverified.** Headless part →
+`docs/handoffs/schedules-verify.md` (R5 schedules have never been proven to
+fire). Interactive part stays with the user: (a) wake-word "Suzy" real-mic
+test, (b) Projects tab at 375px. Optional after all READY handoffs:
+`docs/handoffs/distill-latency.md` (~12.6 s cold Shaping… wait).
 
 **O4. Then the roadmap queue** (`docs/roadmap.md`): N2 mobile ergonomic pass,
 R3 auto session summaries (cheap-model, cached), R4 image thumbnails + day

@@ -25,13 +25,20 @@ Commit at each working, browser-verified stage.
    `HANDOFF.md` + `docs/roadmap.md` when the handoff closes; mark the handoff
    file DONE at the top rather than deleting it.
 
-## Current handoffs
+## Current handoffs (execute READY ones top-to-bottom)
 
-| file | status | model |
-| --- | --- | --- |
-| `jarvis-ui-port.md` | **BLOCKED — waiting on the user's Lovable design** | Opus 4.8 |
-| `persona-manager-ui.md` | ready (backend live; UI blocked on same design) | Opus 4.8 |
-| `jarvis-error-hunt.md` | ready — beacon is LIVE as of 2026-07-15 restart | Opus 4.8 |
+| # | file | status | model |
+| --- | --- | --- | --- |
+| 1 | `jarvis-error-hunt.md` | READY — beacon LIVE; first catch already fixed (`6c09bd7`) | Opus 4.8 |
+| 2 | `skills-cleanup.md` | READY — O2, steps 4–6 of the efficiency report | Opus 4.8 |
+| 3 | `schedules-verify.md` | READY — O3 headless part (R5 never proven) | Opus 4.8 |
+| 4 | `distill-latency.md` | OPTIONAL — only after 1–3 | Opus 4.8 |
+| — | `jarvis-ui-port.md` | **BLOCKED — user is finishing the Lovable design** | Opus 4.8 |
+| — | `persona-manager-ui.md` | backend DONE; UI blocked on the same design | Opus 4.8 |
+
+⚠ When pasting a work-order prompt into the Run tab, **turn the ✦ Jarvis
+toggle OFF** — otherwise the >25-word paste goes through the Haiku distiller
+and gets rewritten before it runs.
 
 Ground rules that override everything here: `HANDOFF.md` + `CLAUDE.md`
 (zero-dep, localhost-only, <500-line files, security invariants, no HTML
