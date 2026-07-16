@@ -13,6 +13,14 @@ found the code clean — the errors are runtime/browser-specific, which is why
 the `e844d02` client-error beacon exists (it works from the phone; no
 devtools needed).
 
+## First catch (2026-07-15, already FIXED — commit `6c09bd7`)
+
+The beacon's first record was tab **run**, not jarvis: a leftover
+`jarvisNote` reference crashed every Jarvis-mode send after the POST but
+before `attachLiveRun` (the user's "code stuck"). Fixed and verified with a
+live run. The Jarvis-tab errors the user originally reported are still
+uncataloged — proceed below.
+
 ## Steps
 
 1. Exercise the Jarvis tab in a real browser: load, switch persona,
