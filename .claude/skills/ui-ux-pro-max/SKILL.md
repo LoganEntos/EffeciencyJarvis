@@ -7,6 +7,20 @@ description: "UI/UX design intelligence for web and mobile. Searchable local dat
 
 Comprehensive design guide for web and mobile applications. Contains 50+ styles, 161 color palettes, 57 font pairings, 161 product types with reasoning rules, 99 UX guidelines, and 25 chart types across 10 technology stacks. Searchable database with priority-based recommendations.
 
+## Bundled reference libraries (`references/`)
+
+Folded in from the retired `design-system` / `brand` / `banner-design` skills —
+read these when a task needs the deeper methodology behind a recommendation:
+
+- `references/tokens/` — design-token architecture: the primitive → semantic →
+  component layering, component specs, and interaction states/variants. Use when
+  building or auditing a token system rather than picking one-off values.
+- `references/brand/` — brand identity frameworks: voice, messaging, visual
+  identity, logo-usage rules, typography specs. Use for brand-consistent copy
+  and identity decisions.
+- `references/banner-sizes-and-styles.md` — per-platform banner/ad/hero
+  dimensions and style directions (social, display, print, web hero).
+
 ## When to Apply
 
 This Skill should be used when the task involves **UI structure, visual design decisions, interaction patterns, or user experience quality control**.
