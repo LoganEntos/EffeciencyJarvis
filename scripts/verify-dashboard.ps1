@@ -108,6 +108,11 @@ CheckPost "POST /api/sharepoint/pull w/o token (403)" "$base/api/sharepoint/pull
 CheckPost "POST /api/sharepoint/auth/start w/o token (403)" "$base/api/sharepoint/auth/start" '{}' 403
 CheckPost "POST /api/personas/active w/o token (403)" "$base/api/personas/active" '{"id":"jarvis"}' 403
 CheckPost "POST /api/personas/save w/o token (403)" "$base/api/personas/save" '{"id":"x","body":"y"}' 403
+CheckPost "POST /api/personas/delete w/o token (403)" "$base/api/personas/delete" '{"id":"x"}' 403
+CheckPost "POST /api/personas/rename w/o token (403)" "$base/api/personas/rename" '{"id":"x","newId":"y"}' 403
+CheckPost "POST /api/personas/order w/o token (403)" "$base/api/personas/order" '{"ids":[]}' 403
+CheckPost "POST /api/jarvis/distill w/o token (403)" "$base/api/jarvis/distill" '{"text":"x"}' 403
+CheckPost "POST /api/voice/open-folder w/o token (403)" "$base/api/voice/open-folder" '{"engine":"kokoro"}' 403
 
 if ($fails -eq 0) { Write-Host "`nAll checks passed." -ForegroundColor Green; exit 0 }
 Write-Host "`n$fails check(s) failed." -ForegroundColor Red

@@ -12,6 +12,11 @@
  *
  *   GET  /api/personas            -> { personas: [{id,name,tagline,tone,bytes}], active }
  *   POST /api/personas/active     { id }  -> { ok, active }   (id null/"none" = off)
+ *   GET  /api/personas/get?id=    -> full persona incl. body (for the editor)
+ *   POST /api/personas/save       { id, name, tagline, tone, body } (create/overwrite)
+ *   POST /api/personas/delete     { id }
+ *   POST /api/personas/rename     { id, newId }
+ *   POST /api/personas/order      { ids: [] }  (display order; unlisted ids sort last)
  *
  * Zero dependencies; local files only. Injection stays token-neutral when off.
  */
@@ -27,6 +32,15 @@ const STATE_FILE = path.join(DASH_DIR, 'data', 'personas.json');
 // A persona id is the filename without .md; validated so it can never escape
 // the personas dir (no traversal, no absolute paths).
 const okId = id => typeof id === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(id);
+
+// State file holds { active, handoff, order } — always merge-write so one
+// feature's save never drops another's field.
+function readState() { return U.safeJson(STATE_FILE) || {}; }
+function writeState(patch) {
+  const s = Object.assign(readState(), patch);
+  fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+  fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2));
+}
 
 // Parse the tiny frontmatter head (--- ... ---). Returns { meta, body }.
 function parse(raw) {
@@ -67,12 +81,17 @@ function list() {
     const p = load(e.name.replace(/\.md$/i, ''));
     if (p) out.push({ id: p.id, name: p.name, tagline: p.tagline, tone: p.tone, bytes: p.bytes });
   }
-  out.sort((a, b) => a.name.localeCompare(b.name));
+  // Saved display order first (drag-organize in the UI); anything unlisted
+  // falls to the end alphabetically, so a fresh file is still visible.
+  const ord = Array.isArray(readState().order) ? readState().order : [];
+  const key = id => { const i = ord.indexOf(id); return i === -1 ? Infinity : i; };
+  out.sort((a, b) => (key(a.id) - key(b.id)) || a.name.localeCompare(b.name));
   return out;
 }
 
 function getActiveId() {
   const s = U.safeJson(STATE_FILE);
+  if (s && !('active' in s)) return fs.existsSync(path.join(PERSONAS_DIR, 'jarvis.md')) ? 'jarvis' : null;
   // Never configured yet → default to Jarvis (the hub's primary persona). Once
   // the user sets a choice — including turning personas OFF ({active:null}) —
   // that saved choice is honored verbatim.
@@ -105,10 +124,8 @@ function setActiveId(id) {
       };
     }
   }
-  try {
-    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ active, handoff }, null, 2));
-  } catch (e) { return { error: 'could not save: ' + e.message }; }
+  try { writeState({ active, handoff }); }
+  catch (e) { return { error: 'could not save: ' + e.message }; }
   return { ok: true, active, handoff: !!handoff };
 }
 
@@ -119,7 +136,7 @@ function takeHandoff(id) {
   const s = U.safeJson(STATE_FILE);
   const h = s && s.handoff;
   if (!h || h.forId !== id) return '';
-  try { fs.writeFileSync(STATE_FILE, JSON.stringify({ active: s.active, handoff: null }, null, 2)); } catch {}
+  try { writeState({ handoff: null }); } catch {}
   const pending = (h.pending && h.pending.length)
     ? '\nOpen queue left behind:\n' + h.pending.map(p => '- ' + p).join('\n') : '';
   return `<persona-handoff from="${h.from.name}" at="${h.at}">\n`
@@ -147,6 +164,52 @@ function save(b) {
   } catch (e) { return { error: 'could not save: ' + e.message }; }
   const p = load(id);
   return { ok: true, persona: { id: p.id, name: p.name, tagline: p.tagline, tone: p.tone, bytes: p.bytes } };
+}
+
+// Delete a persona file. If it was active, personas switch OFF (plain Claude)
+// rather than silently falling back to another persona; any pending handoff
+// touching it is dropped; it leaves the saved display order.
+function remove(id) {
+  if (!okId(id)) return { error: 'bad persona id' };
+  const file = path.join(PERSONAS_DIR, id + '.md');
+  if (!file.startsWith(PERSONAS_DIR + path.sep)) return { error: 'bad persona id' };
+  if (!fs.existsSync(file)) return { error: 'unknown persona' };
+  try { fs.unlinkSync(file); } catch (e) { return { error: 'could not delete: ' + e.message }; }
+  const s = readState();
+  const patch = {};
+  if (s.active === id) patch.active = null;
+  if (s.handoff && (s.handoff.forId === id || (s.handoff.from && s.handoff.from.id === id))) patch.handoff = null;
+  if (Array.isArray(s.order)) patch.order = s.order.filter(x => x !== id);
+  try { writeState(patch); } catch (e) { return { error: 'deleted, but could not update state: ' + e.message }; }
+  return { ok: true, active: getActiveId() };
+}
+
+// Rename a persona's id (its filename). Display name lives in frontmatter and
+// is edited via save(); this moves the file and re-points active/order/handoff.
+function rename(id, newId) {
+  if (!okId(id) || !okId(newId)) return { error: 'bad persona id (lowercase letters/digits/-/_ only)' };
+  if (id === newId) return { ok: true, id };
+  const from = path.join(PERSONAS_DIR, id + '.md');
+  const to = path.join(PERSONAS_DIR, newId + '.md');
+  if (!from.startsWith(PERSONAS_DIR + path.sep) || !to.startsWith(PERSONAS_DIR + path.sep)) return { error: 'bad persona id' };
+  if (!fs.existsSync(from)) return { error: 'unknown persona' };
+  if (fs.existsSync(to)) return { error: `a persona "${newId}" already exists` };
+  try { fs.renameSync(from, to); } catch (e) { return { error: 'could not rename: ' + e.message }; }
+  const s = readState();
+  const patch = {};
+  if (s.active === id) patch.active = newId;
+  if (Array.isArray(s.order)) patch.order = s.order.map(x => (x === id ? newId : x));
+  if (s.handoff && s.handoff.forId === id) patch.handoff = Object.assign({}, s.handoff, { forId: newId });
+  try { writeState(patch); } catch (e) { return { error: 'renamed, but could not update state: ' + e.message }; }
+  return { ok: true, id: newId };
+}
+
+// Persist display order (array of ids, UI drag-organize). Ids are validated but
+// not required to exist — a stale id is harmless and ignored by list().
+function setOrder(ids) {
+  if (!Array.isArray(ids) || ids.length > 200 || !ids.every(okId)) return { error: 'order must be an array of persona ids' };
+  try { writeState({ order: ids }); } catch (e) { return { error: 'could not save: ' + e.message }; }
+  return { ok: true, order: ids };
 }
 
 // Injectable block for lib/runs.js — the active persona's body as a system
@@ -188,6 +251,27 @@ async function handle(req, res, url) {
     let b = {};
     try { b = JSON.parse(await U.readBody(req, 64 * 1024) || '{}'); } catch {}
     const r = save(b);
+    U.sendJson(res, r, r.error ? 400 : 200);
+    return true;
+  }
+  if (url.pathname === '/api/personas/delete' && req.method === 'POST') {
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 4 * 1024) || '{}'); } catch {}
+    const r = remove(b.id);
+    U.sendJson(res, r, r.error ? 400 : 200);
+    return true;
+  }
+  if (url.pathname === '/api/personas/rename' && req.method === 'POST') {
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 4 * 1024) || '{}'); } catch {}
+    const r = rename(b.id, b.newId);
+    U.sendJson(res, r, r.error ? 400 : 200);
+    return true;
+  }
+  if (url.pathname === '/api/personas/order' && req.method === 'POST') {
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 16 * 1024) || '{}'); } catch {}
+    const r = setOrder(b.ids);
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;
   }
