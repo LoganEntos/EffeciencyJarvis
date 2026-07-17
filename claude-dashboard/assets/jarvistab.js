@@ -229,7 +229,7 @@
     const isNew = id === '__new';
     $('#jpId').disabled = !isNew;
     if (isNew) {
-      $('#jpId').value = ''; $('#jpName').value = ''; $('#jpTagline').value = ''; $('#jpTone').value = '';
+      $('#jpId').value = ''; $('#jpName').value = ''; $('#jpTagline').value = ''; $('#jpTone').value = ''; $('#jpAck').value = '';
       $('#jpBody').value = 'You are <Name>, one of the hub\'s communication personas. Hold this bearing on every reply:\n\n- ';
       $('#jpId').focus();
       return;
@@ -238,14 +238,14 @@
       const p = await api('/api/personas/get?id=' + encodeURIComponent(id));
       if (p.error) { flash('✗ ' + p.error, true); return; }
       $('#jpId').value = p.id; $('#jpName').value = p.name;
-      $('#jpTagline').value = p.tagline; $('#jpTone').value = p.tone; $('#jpBody').value = p.body;
+      $('#jpTagline').value = p.tagline; $('#jpTone').value = p.tone; $('#jpAck').value = p.ack || ''; $('#jpBody').value = p.body;
     } catch (e) { flash('✗ ' + (e.message || 'load failed'), true); }
   }
   async function saveEditor() {
     const body = {
       id: ($('#jpId').value || '').trim().toLowerCase(),
       name: $('#jpName').value, tagline: $('#jpTagline').value,
-      tone: $('#jpTone').value, body: $('#jpBody').value,
+      tone: $('#jpTone').value, ack: $('#jpAck').value, body: $('#jpBody').value,
     };
     const r = await api('/api/personas/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.error) { flash('✗ ' + r.error, true); return; }
@@ -333,6 +333,7 @@
             <div><label for="jpName">Name</label><input id="jpName" placeholder="Display name"></div>
             <div><label for="jpTagline">Tagline</label><input id="jpTagline" placeholder="One-line character sketch"></div>
             <div><label for="jpTone">Tone</label><input id="jpTone" placeholder="e.g. composed · warm · candid"></div>
+            <div><label for="jpAck">Wake ack <span style="text-transform:none;letter-spacing:0">(spoken when you say the wake word)</span></label><input id="jpAck" placeholder="Yes?" maxlength="60"></div>
             <div class="wide"><label for="jpBody">Soul — the directive injected ahead of every run</label><textarea id="jpBody" spellcheck="false"></textarea></div>
           </div>
           <button id="jpSave" style="padding:8px 18px">Save persona</button>

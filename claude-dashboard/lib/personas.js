@@ -68,6 +68,7 @@ function load(id) {
     name: meta.name || id,
     tagline: meta.tagline || '',
     tone: meta.tone || '',
+    ack: meta.ack || '', // spoken wake acknowledgment ("Yes?") — voice conversation engine
     body,
     bytes: Buffer.byteLength(raw),
   };
@@ -79,7 +80,7 @@ function list() {
     if (e.isFile && !e.isFile()) continue;
     if (!/\.md$/i.test(e.name)) continue;
     const p = load(e.name.replace(/\.md$/i, ''));
-    if (p) out.push({ id: p.id, name: p.name, tagline: p.tagline, tone: p.tone, bytes: p.bytes });
+    if (p) out.push({ id: p.id, name: p.name, tagline: p.tagline, tone: p.tone, ack: p.ack, bytes: p.bytes });
   }
   // Saved display order first (drag-organize in the UI); anything unlisted
   // falls to the end alphabetically, so a fresh file is still visible.
@@ -157,13 +158,13 @@ function save(b) {
   if (body.length > 24 * 1024) return { error: 'persona body too large (24 KB max)' };
   const file = path.join(PERSONAS_DIR, id + '.md');
   if (!file.startsWith(PERSONAS_DIR + path.sep)) return { error: 'bad persona id' };
-  const md = `---\nname: ${one(b.name) || id}\ntagline: ${one(b.tagline)}\ntone: ${one(b.tone)}\n---\n\n${body}\n`;
+  const md = `---\nname: ${one(b.name) || id}\ntagline: ${one(b.tagline)}\ntone: ${one(b.tone)}\nack: ${one(b.ack) || 'Yes?'}\n---\n\n${body}\n`;
   try {
     fs.mkdirSync(PERSONAS_DIR, { recursive: true });
     fs.writeFileSync(file, md);
   } catch (e) { return { error: 'could not save: ' + e.message }; }
   const p = load(id);
-  return { ok: true, persona: { id: p.id, name: p.name, tagline: p.tagline, tone: p.tone, bytes: p.bytes } };
+  return { ok: true, persona: { id: p.id, name: p.name, tagline: p.tagline, tone: p.tone, ack: p.ack, bytes: p.bytes } };
 }
 
 // Delete a persona file. If it was active, personas switch OFF (plain Claude)

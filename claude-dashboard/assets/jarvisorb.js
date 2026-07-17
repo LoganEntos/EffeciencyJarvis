@@ -11,10 +11,19 @@
   // Hue table lives in jarvis.js (jarvisHueOf) — shared with jarvistab.js.
   const hueOf = id => jarvisHueOf(id);
   const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
-  const voiceState = () => (window.HubVoice && !HubVoice._disabled) ? HubVoice._state()
-    : (window.jarvisChat && window.jarvisChat.isRunning() ? 'thinking' : 'idle');
+  // Rich conversation phase (idle/passive/open/capturing/thinking/speaking)
+  // from the conversation engine (voiceconvo.js); legacy HubVoice fallback.
+  const convoPhase = () => { try { return window.HubVoiceConvo ? HubVoiceConvo.state() : null; } catch { return null; } };
+  const voiceState = () => {
+    const p = convoPhase();
+    if (p === 'capturing' || p === 'open') return 'listening';
+    if (p === 'thinking' || p === 'speaking') return p;
+    return (window.HubVoice && !HubVoice._disabled) ? HubVoice._state()
+      : (window.jarvisChat && window.jarvisChat.isRunning() ? 'thinking' : 'idle');
+  };
   const inCall = () => !!(window.HubVoice && !HubVoice._disabled && HubVoice._call());
-  const STATE_LINE = { idle: 'idle', listening: 'listening…', thinking: 'thinking…', speaking: 'speaking — tap to hush' };
+  const STATE_LINE = { idle: 'idle', listening: 'listening — go ahead', thinking: 'thinking…',
+    speaking: 'speaking — say my name to cut in' };
   const STATE_BADGE = { idle: '◌ idle', listening: '◉ listening', thinking: '◐ thinking', speaking: '◉ speaking' };
   const decay = (v, target, k) => v + (target - v) * k;
 
@@ -38,20 +47,23 @@
     O.env.hi = decay(O.env.hi, hi / (n - 40), 0.22);
   }
   function updateStateLine(st, call) {
+    const passive = convoPhase() === 'passive'; // hot mic, wake-word only
     const el = $('#jstate');
     if (el) {
-      const txt = call && st === 'idle' ? 'on call' : (STATE_LINE[st] || st);
+      const txt = call && st === 'idle' ? 'conversation open'
+        : (st === 'idle' && passive ? `say "${((window.HubVoice && HubVoice._cfg && HubVoice._cfg.store.wake) || 'Jarvis').toLowerCase()}"` : (STATE_LINE[st] || st));
       if (el.textContent !== txt) el.textContent = txt;
       el.classList.toggle('on', st !== 'idle' || call);
     }
     const b = $('#jconvState');
     if (b) {
       const on = st !== 'idle' || call;
-      b.textContent = call && st === 'idle' ? '☎ on call' : (STATE_BADGE[st] || st);
+      b.textContent = call && st === 'idle' ? '◉ open'
+        : (st === 'idle' && passive ? '◉ wake listening' : (STATE_BADGE[st] || st));
       b.classList.toggle('on', on);
     }
     const cb = $('#jCallBtn');
-    if (cb) { const on = inCall(); const t = cb.querySelector('.jcb-t'); if (t) t.textContent = on ? 'hang up' : 'open call'; cb.classList.toggle('on', on); }
+    if (cb) { const on = inCall(); const t = cb.querySelector('.jcb-t'); if (t) t.textContent = on ? 'close' : 'open conversation'; cb.classList.toggle('on', on); }
   }
   function draw() {
     const ctx = O.ctx; if (!ctx) return;

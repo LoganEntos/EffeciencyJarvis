@@ -47,6 +47,8 @@
         if (b.type === 'text' && b.text) {
           S.buf = (S.buf ? S.buf + '\n\n' : '') + b.text.trim();
           setBubble(S.buf, true);
+          // speak each block as it streams — same voice path as the Run tab
+          try { if (window.HubVoice && HubVoice.onAssistantText) HubVoice.onAssistantText(b.text.trim()); } catch {}
         } else if (b.type === 'tool_use') {
           const summ = (b.input && b.input.title) ? b.input.title : (b.name || 'tool');
           jconvAppend(jmsgHtml('tool', `⚒ ${esc(b.name || 'tool')} · <span class="dim">${esc(summ)}</span>`), 'jmsg tool');
@@ -61,14 +63,14 @@
       jconvAppend(`<div class="jmsg-meta">${ok ? '✓ done' : '✗ ' + esc(o.subtype || 'error')} ${esc(secs)}</div>`, 'jmsg result');
     }
   }
-  async function send() {
-    const ta = $('#jchatIn'); if (!ta) return;
-    const prompt = ta.value.trim();
+  async function send(textArg) {
+    const ta = $('#jchatIn');
+    const prompt = (typeof textArg === 'string' && textArg.trim()) || (ta ? ta.value.trim() : '');
     if (!prompt || S.running) return;
     if (window.jarvisHooks && window.jarvisHooks.pauseTranscript) window.jarvisHooks.pauseTranscript();
     const feed = $('#jconv');
     if (feed && feed.querySelector('.jmsg-meta[style]')) feed.innerHTML = '';
-    ta.value = ''; ta.style.height = 'auto'; S.buf = '';
+    if (ta) { ta.value = ''; ta.style.height = 'auto'; } S.buf = '';
     jconvAppend(jmsgHtml('user', esc(prompt)), 'jmsg user');
     S.bubble = jconvAppend(jmsgHtml('assistant', '<span class="jshimmer">thinking…</span>'), 'jmsg assistant');
     const model = ($('#runModel') && $('#runModel').value) || 'auto';
@@ -83,6 +85,7 @@
     S.running = true; S.runId = r.id; S.seen = -1;
     const btn = $('#jchatSend'); if (btn) btn.disabled = true;
     setBubble('', true);
+    try { if (window.HubVoice && HubVoice.onRunStart) HubVoice.onRunStart(); } catch {}
     const es = new EventSource(`/api/run/stream?id=${encodeURIComponent(r.id)}`);
     S.es = es;
     es.addEventListener('line', ev => {
@@ -96,6 +99,7 @@
       let meta = {}; try { meta = JSON.parse(ev.data); } catch {}
       if (meta.sessionId) S.sessionId = meta.sessionId;
       setBubble(S.buf || '(no reply)', false);
+      try { if (window.HubVoice && HubVoice.onRunDone) HubVoice.onRunDone(S.buf); } catch {}
       const b2 = $('#jchatSend'); if (b2) b2.disabled = false;
       if (window.jarvisHooks && window.jarvisHooks.renderHolding) window.jarvisHooks.renderHolding();
       // Turn is over — let the transcript tail refresh again (paused on send).
@@ -133,5 +137,8 @@
     const sb = $('#jchatSend'); if (sb) sb.onclick = send;
     const nb = $('#jchatNew'); if (nb) nb.onclick = newChat;
   }
-  window.jarvisChat = { wire, send, newChat, isRunning: () => S.running, sessionId: () => S.sessionId };
+  // sendText = programmatic entry for the voice conversation engine
+  // (assets/voiceconvo.js): spoken turns render in-tab like typed ones.
+  window.jarvisChat = { wire, send, sendText: t => send(t), newChat,
+    isRunning: () => S.running, sessionId: () => S.sessionId };
 })();

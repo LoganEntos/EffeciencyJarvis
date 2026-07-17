@@ -4,12 +4,13 @@
    in the header for state. No server cost: speech never leaves the browser
    except through the vendor's own speech service.
 
-   Two ways to talk:
-     • One-shot  — click the orb (or press V): speak once, it sends & replies.
-     • Call mode — a hands-free loop: after Claude finishes speaking, the mic
-       re-opens automatically so you can go back and forth without the keyboard.
-       Start with Shift+click / long-press the orb (or when "hands-free" is on in
-       Config, a normal click starts it). End with Esc, a click, or two silences.
+   Talking is a CONVERSATION (state machine in assets/voiceconvo.js):
+     • Say "Jarvis" on the Jarvis tab (passive wake listening) or tap the orb /
+       press V — the conversation opens (persona-flavored ack on a bare wake).
+     • While open, no wake word is needed; each utterance auto-sends when you
+       stop speaking, and the conversation closes itself after N seconds of
+       held silence (Config → conversation window). Esc/click closes any time.
+     • While a reply is speaking, saying the name barges in (self-echo filtered).
 
    Public surface (window.HubVoice):
      init()                    - inject the orb + wire hotkeys (called from boot)
@@ -57,8 +58,13 @@
     // wake-word gate on/off (default ON — user asked: don't interrupt unless named)
     get wakeGate() { try { const v = localStorage.getItem('hub.voice.wakegate'); return v === null ? true : v === '1'; } catch { return true; } },
     set wakeGate(v) { try { localStorage.setItem('hub.voice.wakegate', v ? '1' : '0'); } catch {} },
+    // conversation window — seconds of held silence before an open conversation closes
+    get window() { try { const v = parseFloat(localStorage.getItem('hub.voice.window')); return isNaN(v) ? 5 : Math.max(2, Math.min(15, v)); } catch { return 5; } },
+    set window(v) { try { localStorage.setItem('hub.voice.window', String(v)); } catch {} },
+    // hot mic — passively listen for the wake word while the Jarvis tab is visible
+    get hotmic() { try { const v = localStorage.getItem('hub.voice.hotmic'); return v === null ? true : v === '1'; } catch { return true; } },
+    set hotmic(v) { try { localStorage.setItem('hub.voice.hotmic', v ? '1' : '0'); } catch {} },
   };
-  const silenceMs = () => Math.round(store.pause * 1000);
 
   // Wake-word gate. In a hands-free call the mic re-opens between turns, so room
   // noise or my own talk-back bleeding back through the speakers used to get
@@ -80,10 +86,11 @@
       .replace(/\s+/g, ' ').replace(/^[\s,.:;!?—-]+/, '').trim();
   }
 
-  // V.call = hands-free loop active; V.silence = consecutive empty listens;
-  // V.reTimer = pending re-open timer; V.press = long-press timer on the orb.
-  const V = { state: 'idle', rec: null, listening: false, call: false, silence: 0,
-    reTimer: null, press: null, raf: null, canvas: null, ctx: null, t0: performance.now(),
+  // V.call = a conversation is open (voiceconvo.js drives it); V.voiceTurn =
+  // the in-flight run was voice-initiated (its reply always speaks);
+  // V.press = long-press timer on the orb.
+  const V = { state: 'idle', rec: null, listening: false, call: false, voiceTurn: false,
+    press: null, raf: null, canvas: null, ctx: null, t0: performance.now(),
     // CSM audio: csmGen invalidates in-flight fetches on barge-in
     audioEl: null, audioUrl: null, csmGen: 0, csmPending: false };
 
@@ -144,7 +151,8 @@
     const ref = $('#refreshTab');
     ref.parentNode.insertBefore(btn, ref);
     V.canvas = cv; V.ctx = cv.getContext('2d'); V.ctx.scale(DPR, DPR);
-    // Long-press (400ms) starts a hands-free call; a plain tap is one-shot.
+    // A tap opens (or closes) a conversation; while a reply is speaking, a tap
+    // just hushes it (you stay in the conversation). Long-press also opens.
     btn.onpointerdown = (e) => {
       if (e.button && e.button !== 0) return;
       V.longPressed = false;
@@ -155,21 +163,19 @@
     btn.onclick = (e) => {
       clearTimeout(V.press);
       if (V.longPressed) { V.longPressed = false; return; } // long-press already acted
-      if (V.call) { endCall(); return; }                    // click hangs up a call
-      if (queueBusy()) { stopSpeak(); return; }             // click hushes a reply (incl. mid-queue)
+      if (queueBusy()) { stopSpeak(); if (convo) convo.onReplyDone(); return; } // hush, stay in the conversation
+      if (V.call) { endCall(); return; }                    // click closes the conversation
       const blocked = micBlockReason();
       if (blocked) { say(blocked, 'errmsg'); return; }        // tell the user why, don't sit silent
-      if (e.shiftKey) { beginCall(); return; }               // Shift+click = start call
-      if (V.listening) { stopListen(); return; }
-      store.conv ? beginCall() : startListen();              // hands-free pref → call
+      beginCall();                                           // open a conversation
     };
     loop();
   }
 
   function orbTitle() {
     if (!SR) return 'Voice input needs Chrome or Edge (desktop) · talk-back works everywhere';
-    if (V.call) return 'In a call — click or press Esc to hang up';
-    return 'Voice — tap to talk once · Shift+click or long-press for a hands-free call (V)';
+    if (V.call) return 'Conversation open — click or press Esc to close it';
+    return `Voice — tap to talk (closes after ${store.window}s of silence) · V`;
   }
   function setState(s) { V.state = s; const b = $('#voiceOrb'); if (b) b.title = orbTitle(); kickVoice(); }
 
@@ -212,122 +218,34 @@
   }
   function kickVoice() { if (V.raf == null && V.ctx) V.raf = requestAnimationFrame(loop); }
 
-  // ---- speech-to-text ------------------------------------------------------
-  function startListen() {
-    const blocked = micBlockReason();
-    if (blocked) { say(blocked, 'errmsg'); if (V.call) endCall(); return; }
-    if (queueBusy()) stopSpeak();
-    const rec = new SR();
-    // continuous=true so a pause mid-thought doesn't end the turn; we decide when
-    // you're done ourselves via a silence timer, so you never get cut off.
-    rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
-    V.rec = rec; V.listening = true; V.sentByTimer = false; setState('listening');
-    // The Jarvis tab is its own voice stage — opening the mic there must not
-    // yank the user to Run (the V-key/orb "takes me to the Run tab" bug).
-    if (typeof currentTab === 'undefined' || currentTab !== 'jarvis') goTab('run');
-    ensureRunUI();
-    const ta = $('#promptIn'); const pre = ta ? ta.value : '';
-    rec.onresult = (e) => {
-      // rebuild the whole transcript each event (results accumulate with continuous)
-      let full = '';
-      for (let i = 0; i < e.results.length; i++) full += e.results[i][0].transcript;
-      full = full.replace(/\s+/g, ' ').trim();
-      if (ta) ta.value = (pre ? pre + ' ' : '') + full;
-      V.finalText = full;
-      // restart the "you've stopped talking" countdown on every bit of speech
-      clearTimeout(V.silTimer);
-      if (full) V.silTimer = setTimeout(() => { V.sentByTimer = true; try { V.rec && V.rec.stop(); } catch {} }, silenceMs());
-    };
-    rec.onerror = (e) => {
-      V.listening = false;
-      const reason = ({
-        'not-allowed': 'Microphone permission denied. Click the 🔒/mic icon in the address bar → Allow, and check Windows Settings → Privacy → Microphone (both "apps" and "desktop apps" toggles on).',
-        'service-not-allowed': 'Speech service blocked — usually an insecure origin or a Windows mic-privacy setting.',
-        'audio-capture': 'No microphone found. Plug one in / enable it in Windows Sound settings, then try again.',
-        'no-speech': "Didn't catch anything — speak a moment after the blip.",
-        'network': 'Speech-recognition network error (Chrome/Edge send audio to their speech service — needs internet).',
-        'aborted': '',
-      })[e && e.error] || ('Voice input error: ' + ((e && e.error) || 'unknown'));
-      // don't spam "didn't catch anything" every quiet turn of a call
-      if (reason && !(V.call && e && e.error === 'no-speech')) say(reason, 'errmsg');
-      // a real failure (not just silence) should end a call rather than loop on the error
-      if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture')) { endCall(); return; }
-      if (V.call) reListenSoon(600); else if (V.state === 'listening') setState('idle');
-    };
-    rec.onend = () => {
-      V.listening = false;
-      clearTimeout(V.silTimer);
-      const heard = V.finalText;
-      V.finalText = '';
-      let send = heard;
-      // Wake-word gate (call mode only): unless the utterance names me, treat it
-      // as noise — don't send, don't cut off my reply. Say "Jarvis …" to talk.
-      if (heard && V.call && store.wakeGate) {
-        send = wakeRe().test(heard) ? stripWake(heard) : '';
-      }
-      // keep the composer in sync with what will actually be sent (noise → clear)
-      if (ta) ta.value = send ? ((pre ? pre + ' ' : '') + send) : pre;
-      // sendPrompt() reads #promptIn and self-guards on an already-running chat
-      if (send && typeof sendPrompt === 'function') {
-        V.silence = 0; setState('thinking'); sendPrompt();
-      } else if (V.call) {
-        // nothing for me this turn (silence, or noise without the wake word).
-        // When gated, be slower to hang up — she's clearly around, just not
-        // addressing me; keep the line open longer before giving up.
-        if (++V.silence >= (store.wakeGate ? 6 : 2)) endCall(true);
-        else reListenSoon(400);
-      } else setState('idle');
-    };
-    try { rec.start(); } catch { if (V.call) reListenSoon(600); else stopListen(); }
-  }
-  function stopListen() {
-    V.listening = false;
-    clearTimeout(V.silTimer);
-    try { V.rec && V.rec.stop(); } catch {}
-    if (V.state === 'listening') setState('idle');
-  }
-
-  // ---- hands-free call loop ------------------------------------------------
-  // A call is: listen → send → speak reply → (re-open mic) → repeat, until the
-  // user hangs up (Esc/click) or two turns of silence. Talk-back is implied.
-  function reListenSoon(ms) {
-    clearTimeout(V.reTimer);
-    if (!V.call) return;
-    V.reTimer = setTimeout(() => {
-      if (!V.call || (typeof chat === 'object' && chat.running)) return;
-      earOpen();
-      startListen();
-    }, ms);
-  }
-  function beginCall() {
-    if (V.call) return;
-    const blocked = micBlockReason();
-    if (blocked) { say(blocked, 'errmsg'); return; }
-    V.call = true; V.silence = 0; kickVoice();
-    earOpen();
-    startListen();
-  }
-  function endCall(fromSilence) {
-    if (!V.call) return;
-    V.call = false; V.silence = 0;
-    clearTimeout(V.reTimer);
-    stopListen();
-    earClose();
-    setState('idle');
-  }
+  // ---- conversation engine (assets/voiceconvo.js) ---------------------------
+  // The mic, wake word, attention window, endpointing, echo filter, and turn
+  // routing all live in the HubVoiceConvo state machine. voice.js keeps the
+  // orb, earcons, TTS glue, and hotkeys, and delegates the old call API to it.
+  let convo = null; // assigned below, after the TTS factory provides speak/stopSpeak
 
   // ---- text-to-speech (engines live in assets/voicetts.js) -----------------
   // The browser + neural TTS engines, the ChunkPipeline, and the single
   // stopSpeak() barge-in path were lifted into voicetts.js to keep this file
-  // under the 500-line rule. We hand that factory the shared state it needs and
-  // pull the resulting functions back into this closure so every call site
-  // below is unchanged. (voicetts.js loads before voice.js in index.html.)
-  const _tts = window.HubVoiceTTS({ SS, store, V, setState, reListenSoon, say, isMobileDevice });
+  // under the 500-line rule. reListenSoon (the after-reply hook) now hands the
+  // turn back to the conversation engine instead of blindly re-opening the mic.
+  const _tts = window.HubVoiceTTS({ SS, store, V, setState, say, isMobileDevice,
+    reListenSoon: () => { if (convo) convo.onReplyDone(); else setState('idle'); } });
   // The reply speech queue + run-reply hooks (replyStart/Text/Done) live in
-  // voicetts.js alongside the engines they drive; voice.js keeps the mic, orb,
-  // call loop, and hotkeys. stopSpeak here is the queue-aware barge-in.
+  // voicetts.js alongside the engines they drive; voice.js keeps the orb and
+  // hotkeys. stopSpeak here is the queue-aware barge-in.
   const { speak, speakBrowser, stopSpeak, speakingNow, queueBusy, csmFetch, playBlob,
           replyStart, replyText, replyDone } = _tts;
+
+  // Build the conversation engine now that speak/stopSpeak/queueBusy exist.
+  convo = window.HubVoiceConvo = window.HubVoiceConvoFactory({
+    SR, store, V, setState, say, micBlockReason, earOpen, earClose,
+    wakeRe, stripWake, speak, stopSpeak, queueBusy,
+  });
+  // Legacy call API — every existing call site (orb, jarvistab, hotkeys) keeps
+  // working; a "call" is now an open conversation with the silence window.
+  function beginCall() { convo.open(); }
+  function endCall() { convo.close(); }
 
   // ---- gesture unlock (mobile autoplay) ------------------------------------
   // Mobile browsers (iOS Safari especially, Android Chrome too) only let
@@ -397,8 +315,16 @@
   // it streams (progress narration + the answer) so long CLI wind-down doesn't
   // read as lag; onRunDone closes the queue so the mic/orb transitions once.
   function onRunStart() { if (!VOICE_DISABLED) replyStart(); }
-  function onAssistantText(text) { if (!VOICE_DISABLED) replyText(text); }
-  function onRunDone(text) { if (!VOICE_DISABLED) replyDone(text); }
+  function onAssistantText(text) {
+    if (VOICE_DISABLED) return;
+    if (convo) convo.noteReply(text); // feed the self-echo filter BEFORE audio plays
+    replyText(text);
+  }
+  function onRunDone(text) {
+    if (VOICE_DISABLED) return;
+    if (convo && text) convo.noteReply(text);
+    replyDone(text);
+  }
 
   function init() {
     if (VOICE_DISABLED) return; // see kill switch note at top of file
@@ -436,8 +362,7 @@
       }).catch(() => {});
     }
     // The moment you start texting me, I go quiet — stop the reply mid-sentence.
-    // (Barge-in rule; the spoken-input half arrives when we keep the mic open
-    //  during talk-back — see startListen's SS.cancel for the manual version.)
+    // (Spoken barge-in is the conversation engine's name-based interrupt.)
     document.addEventListener('input', e => {
       const t = e.target;
       if (t && t.id === 'promptIn' && queueBusy()) stopSpeak();
@@ -453,9 +378,7 @@
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (!store.mic || !SR) return;
       e.preventDefault();
-      if (V.call) { endCall(); return; }
-      if (e.shiftKey) { beginCall(); return; }
-      V.listening ? stopListen() : (store.conv ? beginCall() : startListen());
+      convo ? convo.toggle() : beginCall();
     });
   }
 
@@ -465,7 +388,7 @@
     _disabled: VOICE_DISABLED,
     // closure internals for the Config settings panel (assets/voicecfg.js,
     // loaded right after this file — it attaches HubVoice.renderSettings)
-    _cfg: { SS, SR, store, speakBrowser, csmFetch, playBlob, stopSpeak, setState, V, micBlockReason },
+    _cfg: { SS, SR, store, speakBrowser, csmFetch, playBlob, stopSpeak, setState, V, micBlockReason, wakeRe, stripWake },
     renderSettings: (container) => {
       if (VOICE_DISABLED && container) {
         container.innerHTML = `<h2 style="font-size:12px;margin-top:22px">Voice</h2>

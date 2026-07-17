@@ -14,13 +14,17 @@
         ${SR ? '' : '<div class="note" style="margin-bottom:10px">Mic input needs Chrome or Edge on desktop. Talk-back works everywhere.</div>'}
         <label class="chk" title="show the mic orb and allow click/V-key to talk"><input type="checkbox" id="vMic"${store.mic ? ' checked' : ''}> Mic orb in header ${SR ? '' : '(input unavailable in this browser)'}</label>
         <label class="chk" style="margin-top:8px"><input type="checkbox" id="vTalk"${store.talk ? ' checked' : ''}> Speak Claude's replies out loud</label>
-        <label class="chk" style="margin-top:8px" title="after each reply, re-open the mic for a natural back-and-forth"><input type="checkbox" id="vConv"${store.conv ? ' checked' : ''}> Hands-free call — a plain orb tap starts the loop ${SR ? '' : '(needs Chrome or Edge)'}</label>
-        <div class="note" style="margin:8px 0 2px">Call mode keeps the mic open between turns (talk-back is always on during a call). A soft blip means it's your turn. Hang up with <b>Esc</b>, a click, or two quiet turns. Shift+click / long-press the orb starts a call any time.</div>
-        <label class="chk" style="margin-top:8px" title="in a call, ignore anything you say that doesn't include the wake word — stops room noise or my own voice from triggering a turn"><input type="checkbox" id="vWakeGate"${store.wakeGate ? ' checked' : ''}> Only act when you say my name (wake-word gate)</label>
+        <label class="chk" style="margin-top:8px" title="while the Jarvis tab is visible, the mic listens passively for the wake word — everything else is discarded unheard"><input type="checkbox" id="vHotmic"${store.hotmic ? ' checked' : ''}> Wake listening on the Jarvis tab — say “${esc(store.wake)}” to start a conversation ${SR ? '' : '(needs Chrome or Edge)'}</label>
+        <div class="note" style="margin:8px 0 2px">A conversation stays open — no wake word needed between turns — and closes itself after the silence window below. Saying just “<b>${esc(store.wake)}</b>” gets a spoken acknowledgment (each persona has its own, editable in the Jarvis tab's soul editor). While a reply is playing, saying the name cuts it off. Close any time with <b>Esc</b> or an orb click.</div>
         <div class="flex" style="margin-top:8px;align-items:center">
           <span class="muted" style="font-size:12px">Wake word</span>
           <input type="text" id="vWake" value="${esc(store.wake)}" maxlength="24" style="width:130px" placeholder="Jarvis">
-          <span class="muted" style="font-size:11.5px">During a call, say e.g. “<b>${esc(store.wake)}</b>, what's on the schedule” — the name is stripped from the prompt. Off = every turn is heard.</span>
+          <span class="muted" style="font-size:11.5px">Say “<b>${esc(store.wake)}</b>” alone to wake, or “<b>${esc(store.wake)}</b>, what's on the schedule” to wake + ask — the name is stripped from the prompt.</span>
+        </div>
+        <div class="flex" style="margin-top:12px;align-items:center" title="seconds of held silence before an open conversation closes itself">
+          <span class="muted" style="font-size:12px">Conversation window</span>
+          <input type="range" id="vWindow" min="2" max="15" step="1" value="${store.window}" style="width:150px">
+          <span class="muted mono" id="vWindowVal" style="font-size:11.5px">${store.window}s</span>
         </div>
         <div class="flex" style="margin-top:12px;align-items:center;gap:10px">
           <span class="muted" style="font-size:12px">Mic status</span>
@@ -63,9 +67,9 @@
     const orb = $('#voiceOrb');
     container.querySelector('#vMic').onchange = e => { store.mic = e.target.checked; if (orb) orb.style.display = e.target.checked ? '' : 'none'; };
     container.querySelector('#vTalk').onchange = e => { store.talk = e.target.checked; };
-    container.querySelector('#vConv').onchange = e => { store.conv = e.target.checked; if (e.target.checked && !store.mic) { store.mic = true; if (orb) orb.style.display = ''; const m = container.querySelector('#vMic'); if (m) m.checked = true; } };
-    container.querySelector('#vWakeGate').onchange = e => { store.wakeGate = e.target.checked; };
+    container.querySelector('#vHotmic').onchange = e => { store.hotmic = e.target.checked; if (e.target.checked && !store.mic) { store.mic = true; if (orb) orb.style.display = ''; const m = container.querySelector('#vMic'); if (m) m.checked = true; } };
     container.querySelector('#vWake').onchange = e => { store.wake = e.target.value; e.target.value = store.wake; };
+    container.querySelector('#vWindow').oninput = e => { store.window = parseFloat(e.target.value); const wv = container.querySelector('#vWindowVal'); if (wv) wv.textContent = store.window + 's'; };
     container.querySelector('#vVoice').onchange = e => { store.voiceURI = e.target.value; };
     container.querySelector('#vRate').onchange = e => { store.rate = parseFloat(e.target.value); };
     container.querySelector('#vPause').oninput = e => { store.pause = parseFloat(e.target.value); const pv = container.querySelector('#vPauseVal'); if (pv) pv.textContent = parseFloat(e.target.value).toFixed(1) + 's'; };

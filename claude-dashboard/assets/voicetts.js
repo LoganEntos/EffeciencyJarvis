@@ -224,18 +224,21 @@ window.HubVoiceTTS = function (ctx) {
     if (!synth(Q.items.shift(), drainSpeak)) drainSpeak(); // nothing audible → skip to next
   }
   function afterReply() {
-    if (V.call) reListenSoon(200);             // your turn again
-    else if (V.state === 'speaking' || V.state === 'thinking') setState('idle');
+    // Hand the turn to the conversation engine (voice.js wires reListenSoon to
+    // HubVoiceConvo.onReplyDone) — it re-opens the window or idles the orb.
+    reListenSoon(0);
+    if (!V.call && (V.state === 'speaking' || V.state === 'thinking')) setState('idle');
   }
   // Queue-clearing barge-in: every caller in voice.js (typing, Esc, orb click,
   // run start) funnels here, so a new prompt never leaks the prior reply's
   // remaining blocks.
   function stopSpeak() { Q.items.length = 0; Q.active = false; Q.last = ''; Q.streaming = false; haltAudio(); }
   const queueBusy = () => speakingNow() || Q.active;
-  // Read replies aloud right now? The Jarvis tab is a voice-first surface, so it
-  // always speaks; elsewhere follow the call / talk-back toggle / mobile rules.
+  // Read replies aloud right now? Voice in → voice out, always (V.voiceTurn);
+  // the Jarvis tab is a voice-first surface, so it always speaks; elsewhere
+  // follow the conversation / talk-back toggle / mobile rules.
   function wantSpeak() {
-    return V.call || store.talk || isMobileDevice()
+    return V.call || V.voiceTurn || store.talk || isMobileDevice()
       || (typeof currentTab !== 'undefined' && currentTab === 'jarvis');
   }
 
