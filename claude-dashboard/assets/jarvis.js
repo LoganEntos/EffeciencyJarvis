@@ -91,6 +91,12 @@ function jarvisTransform(prompt) {
 // jarvisDistill. Tune this number as it's felt in use.
 const DISTILL_MIN_WORDS = 25;
 
+// Per-persona orb hue, clamped 28..44 so every persona stays amber-adjacent.
+// Shared by jarvistab.js (accent light) and jarvisorb.js (sphere render) — the
+// single source of truth so the two never drift.
+const JARVIS_HUE = { jarvis: 36, 'jarvis-wit': 32, hermes: 38, athena: 30, vulcan: 40, sage: 34, dispatch: 36 };
+const jarvisHueOf = id => Math.max(28, Math.min(44, JARVIS_HUE[id] || 36));
+
 // The REAL distiller: a Haiku one-shot on the server (POST /api/jarvis/distill)
 // rewrites a long, spoken request into one clear, self-contained prompt. Returns
 // '' on ANY failure so the caller falls back to local cleanup and the run is

@@ -144,6 +144,16 @@ handoff run + the no-dollars directive):
 - **OpenJarvis** already tracked in `lib/sources.json` (queued, Apache-2.0); user's
   link carried an `mcp_token` credential — stripped, not stored.
 
+2026-07-16: **Jarvis-tab overhaul finalized** — the main tab split into three
+modules (`jarvistab.js` 404 L + `jarvisorb.js` 186 L + `jarvischat.js` 130 L)
+while `jarvis.js` (112 L) remains the cross-tab helper (initJarvis,
+analyzePromptComplexity, jarvisDistill, DISTILL_MIN_WORDS, JARVIS_HUE table,
+jarvisHueOf). Four defects fixed: transcript poller resumes after chat send,
+send button re-enables on error, holding-in-context panel anchors correctly,
+duplicate HUE/hueOf hoisted. Smoke extended to 88 checks, all green. **If
+jarvistab.js grows past ~450 L, next splits:** soul editor → jarvissoul.js
+(~60 L) or persona-card render → jarvispersonas.js (~50 L).
+
 2026-07-14: **C1–C13 code-health** + **U1–U13 UI/a11y** rounds done; the 15-item
 P1/P2/P3 find-fix round closed; **N7 SharePoint Breakdown** shipped — see
 `docs/improvement-backlog.md` (all ✅) and `docs/roadmap.md`.

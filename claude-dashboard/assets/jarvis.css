@@ -76,10 +76,10 @@ button.jp-pill:hover { color: var(--txt); border-color: var(--line-strong); }
 .jpanel-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
 
 /* live conversation */
-.jconv-panel { overflow: hidden; }
-.jstage { position: relative; width: 100%; aspect-ratio: 4 / 3; }
-#jorb { width: 100%; height: 100%; display: block; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-#jorb:focus-visible { outline: 2px solid var(--accent); outline-offset: -6px; }
+.jconv-panel { overflow: hidden; position: relative; }
+.jstage { position: relative; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; }
+#jorb { display: block; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+#jorb:focus-visible { outline: 2px solid var(--accent-live, var(--accent)); outline-offset: -6px; }
 .jrtt { position: absolute; bottom: 12px; right: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--dim); }
 .jstate { position: absolute; bottom: 12px; left: 12px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .jstate.on { color: var(--amber); }
@@ -140,6 +140,75 @@ button.jp-pill:hover { color: var(--txt); border-color: var(--line-strong); }
 }
 .jcustom textarea { font-family: var(--font-mono); font-size: 12px; min-height: 220px; resize: vertical; }
 .jcustom label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 4px; }
+
+/* ---- in-tab chat composer (inside .jconv-panel) ---- */
+.jchat-row { display: flex; align-items: flex-end; gap: 8px; padding: 10px 14px; background: color-mix(in srgb, var(--panel) 90%, var(--accent-live, var(--accent)) 6%); }
+.jchat-caret { font-family: var(--font-mono); color: var(--accent-live, var(--accent)); font-size: 15px; padding-bottom: 8px; user-select: none; }
+#jchatIn {
+  flex: 1; min-width: 0; box-sizing: border-box; margin: 0; resize: none; overflow: hidden;
+  background: var(--bg-2, var(--panel)); color: var(--txt); border: 1px solid var(--line);
+  border-radius: 3px; padding: 8px 10px;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.5; min-height: 34px; max-height: 120px;
+  transition: border-color .15s;
+}
+#jchatIn:focus { outline: none; border-color: color-mix(in srgb, var(--accent-live, var(--accent)) 55%, transparent); }
+.jchat-row .jp-ghost, .jchat-row .jp-btn { padding: 7px 12px; }
+.jmsg.tool { opacity: .85; }
+.jmsg.result { justify-content: center; }
+.jmsg.result .jmsg-meta { color: var(--dim); font-family: var(--font-mono); font-size: 10px; }
+.jmsg-text .dim { color: var(--dim); }
+.jmsg-text pre { background: color-mix(in srgb, var(--bg) 88%, var(--accent-live, var(--accent)) 6%); border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; margin: 6px 0; font-family: var(--font-mono); font-size: 11.5px; overflow-x: auto; white-space: pre; }
+.jmsg-text code { background: color-mix(in srgb, var(--bg) 88%, var(--accent-live, var(--accent)) 6%); border-radius: 2px; padding: 1px 4px; font-family: var(--font-mono); font-size: 12px; }
+.jmsg-text a.link { color: var(--accent-live, var(--accent)); text-decoration: none; border-bottom: 1px dashed color-mix(in srgb, var(--accent-live, var(--accent)) 55%, transparent); }
+.jcaret { display: inline-block; width: 8px; margin-left: 2px; color: var(--accent-live, var(--accent)); animation: jcaret 1s step-end infinite; }
+.jshimmer {
+  background: linear-gradient(90deg, var(--muted) 0%, var(--txt) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; animation: jshimmer 1.8s linear infinite;
+  font-family: var(--font-mono); font-size: 12px;
+}
+
+/* ---- ambient light (per-persona hue via --accent-live) ---- */
+#jarvis { position: relative; }
+#jarvis::before {
+  content: ''; position: absolute; inset: -40px -40px auto -40px; height: 520px;
+  background: radial-gradient(700px 380px at 22% 8%, color-mix(in srgb, var(--accent-live, var(--accent)) 22%, transparent), transparent 68%);
+  pointer-events: none; z-index: 0; opacity: .85;
+  transition: opacity .3s ease-out;
+}
+#jarvis > * { position: relative; z-index: 1; }
+
+/* ---- state badge on the state pill ---- */
+.jp-pill.on { color: var(--accent-live, var(--accent)); border-color: color-mix(in srgb, var(--accent-live, var(--accent)) 55%, transparent); animation: jlivePulse 1.8s var(--ease-out, cubic-bezier(.2,.7,.2,1)) infinite; }
+.jctrls .jp-btn.on { background: var(--accent-live, var(--accent)); border-color: var(--accent-live, var(--accent)); }
+
+/* ---- keyframes ---- */
+@keyframes jreveal { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
+@keyframes jcaret { 0%, 60% { opacity: 1; } 61%, 100% { opacity: 0; } }
+@keyframes jshimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes jlivePulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-live, var(--accent)) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent-live, var(--accent)) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-live, var(--accent)) 0%, transparent); }
+}
+@keyframes jorbPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-live, var(--accent)) 40%, transparent), 0 0 28px 0 color-mix(in srgb, var(--accent-live, var(--accent)) 14%, transparent); }
+  50%      { box-shadow: 0 0 0 12px transparent, 0 0 32px 4px color-mix(in srgb, var(--accent-live, var(--accent)) 35%, transparent); }
+}
+
+/* ---- staggered page-load reveal ---- */
+.stagger > * { opacity: 0; animation: jreveal .45s cubic-bezier(.2,.7,.2,1) forwards; }
+.stagger > *:nth-child(1) { animation-delay: 40ms; }
+.stagger > *:nth-child(2) { animation-delay: 100ms; }
+.stagger > *:nth-child(3) { animation-delay: 160ms; }
+.stagger > *:nth-child(4) { animation-delay: 220ms; }
+.stagger > *:nth-child(5) { animation-delay: 280ms; }
+.stagger > *:nth-child(6) { animation-delay: 340ms; }
+@media (prefers-reduced-motion: reduce) {
+  .stagger > * { opacity: 1; animation: none; }
+  .jcaret, .jshimmer, .jp-pill.on { animation: none; }
+}
 
 /* ---- mobile ---- */
 @media (max-width: 900px) { .jdeck { grid-template-columns: 1fr; } }

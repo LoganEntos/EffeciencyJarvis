@@ -49,3 +49,29 @@ as the source of truth over this list.
 - Zero dependencies; every file < 500 lines (split modules); vendored assets
   only; X-Hub-Token on all non-GET (use the existing `api()` helper).
 - Run the review pipeline in `docs/handoffs/README.md` before each commit.
+
+## Postscript: Module split finalized (2026-07-16)
+
+The Jarvis tab overhaul completed with a three-way split to maintain the 500-line
+ceiling:
+- **`jarvistab.js`** (404 L) — main tab: persona-cards row, live-conversation pane,
+  prompt-workspace pane, holding-in-context panel, thread timeline, header metrics.
+- **`jarvisorb.js`** (186 L) — audio-driven canvas orb: state machine (idle/listening/
+  thinking/speaking), mirroring HubVoice, reusable across tabs.
+- **`jarvischat.js`** (130 L) — in-tab live chat: session transcript, send/receive,
+  liveness.
+
+**`jarvis.js` (112 L) remains the cross-tab helper** — shared by both run.js and
+jarvistab.js. Owns: `initJarvis()`, `analyzePromptComplexity()`, `jarvisDistill()`,
+`DISTILL_MIN_WORDS`, **`JARVIS_HUE` table** (single source of truth for per-persona
+orb hue), **`jarvisHueOf(id)`**.
+
+**Four defects fixed in the finalization:**
+1. Transcript poller now resumes after a chat send completes/errors (was stuck paused).
+2. Chat send button re-enables on stream error (was stuck disabled).
+3. Holding-in-context panel anchors to in-tab chat session id, falls back to Run-tab chat.
+4. Duplicate HUE/hueOf definitions hoisted to jarvis.js (single source).
+
+**Smoke script extended** with GET checks for `jarvisorb.js` and `jarvischat.js` —
+**all 88 checks green**. The UI port (jarvistab.js + jarvis.css) remains blocked
+pending the final Lovable design; the backend + voice mechanics are stable.
