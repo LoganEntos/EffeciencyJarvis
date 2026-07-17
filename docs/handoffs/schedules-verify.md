@@ -21,7 +21,7 @@ the served `index.html` — fetch `/`, extract, send as `X-Hub-Token`).
    and only when `/api/runs` shows no active run.
 
 Left OUT of this handoff (needs an interactive session with the user):
-wake-word "Suzy" real-mic test; Projects tab at 375px. Note them in your
+wake-word "Jarvis" real-mic test; Projects tab at 375px. Note them in your
 final reply as still-pending.
 
 Record the outcome in HANDOFF.md (O3b line) + `docs/roadmap.md`; review

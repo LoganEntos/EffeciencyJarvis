@@ -19,7 +19,7 @@
         <label class="chk" style="margin-top:8px" title="in a call, ignore anything you say that doesn't include the wake word — stops room noise or my own voice from triggering a turn"><input type="checkbox" id="vWakeGate"${store.wakeGate ? ' checked' : ''}> Only act when you say my name (wake-word gate)</label>
         <div class="flex" style="margin-top:8px;align-items:center">
           <span class="muted" style="font-size:12px">Wake word</span>
-          <input type="text" id="vWake" value="${esc(store.wake)}" maxlength="24" style="width:130px" placeholder="Suzy">
+          <input type="text" id="vWake" value="${esc(store.wake)}" maxlength="24" style="width:130px" placeholder="Jarvis">
           <span class="muted" style="font-size:11.5px">During a call, say e.g. “<b>${esc(store.wake)}</b>, what's on the schedule” — the name is stripped from the prompt. Off = every turn is heard.</span>
         </div>
         <div class="flex" style="margin-top:12px;align-items:center;gap:10px">

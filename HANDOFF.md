@@ -200,8 +200,10 @@ Standing constraints for every item: ⚠ voice behavior (barge-in, Kokoro
 self-heal, reply queue) untouchable · no `$` anywhere (tokens + % only) ·
 zero-dep · <500-line files · check `/api/runs` + `git status` before editing.
 
-Interactive verifications that still need the USER: wake-word "Suzy" real-mic
-test; a real-mic pass on the orb waveform once voice-orb-live ships.
+Interactive verifications that still need the USER: wake-word "Jarvis"
+real-mic test (default flipped from "Suzy" 2026-07-17, with jarvis/jervis/
+javis misrecognition variants); a real-mic pass on the orb waveform once
+voice-orb-live ships.
 
 **O4. Then the roadmap queue** (`docs/roadmap.md`): N2 mobile ergonomic pass,
 R3 auto session summaries (cheap-model, cached), R4 image thumbnails + day

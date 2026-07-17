@@ -52,7 +52,7 @@
     get csmSpeaker() { try { const n = parseInt(localStorage.getItem('hub.voice.csmspk'), 10); return isNaN(n) ? 0 : Math.max(0, Math.min(9, n)); } catch { return 0; } },
     set csmSpeaker(v) { try { localStorage.setItem('hub.voice.csmspk', String(v)); } catch {} },
     // wake word — during a call, only speech that addresses me by name counts
-    get wake() { try { return (localStorage.getItem('hub.voice.wake') || 'Suzy').trim() || 'Suzy'; } catch { return 'Suzy'; } },
+    get wake() { try { return (localStorage.getItem('hub.voice.wake') || 'Jarvis').trim() || 'Jarvis'; } catch { return 'Jarvis'; } },
     set wake(v) { try { localStorage.setItem('hub.voice.wake', String(v || '').trim()); } catch {} },
     // wake-word gate on/off (default ON — user asked: don't interrupt unless named)
     get wakeGate() { try { const v = localStorage.getItem('hub.voice.wakegate'); return v === null ? true : v === '1'; } catch { return true; } },
@@ -64,13 +64,15 @@
   // noise or my own talk-back bleeding back through the speakers used to get
   // transcribed and fired as a spurious turn — "you interrupted yourself" with
   // nothing actually said. With the gate on, a re-listened utterance is only
-  // acted on if it addresses me by name (default "Suzy"); the name is then
+  // acted on if it addresses me by name (default "Jarvis"); the name is then
   // stripped from the prompt. Matches the name as a whole word, tolerant of the
-  // common misrecognitions of "Suzy". A custom wake word matches literally.
+  // common misrecognitions of "Jarvis" (and legacy "Suzy" for anyone who kept
+  // it). Any other custom wake word matches literally.
   function wakeRe() {
-    const w = store.wake || 'Suzy';
-    const body = /^suzy$/i.test(w) ? '(?:suzy|susie|suzie|susy|soozy|sussy)'
-                                   : w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const w = store.wake || 'Jarvis';
+    const body = /^jarvis$/i.test(w) ? '(?:jarvis|jarvas|jervis|jarves|javis|jarvus|travis)'
+      : /^suzy$/i.test(w) ? '(?:suzy|susie|suzie|susy|soozy|sussy)'
+      : w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp('\\b' + body + '\\b', 'i');
   }
   function stripWake(text) {
@@ -259,7 +261,7 @@
       V.finalText = '';
       let send = heard;
       // Wake-word gate (call mode only): unless the utterance names me, treat it
-      // as noise — don't send, don't cut off my reply. Say "Suzy …" to talk.
+      // as noise — don't send, don't cut off my reply. Say "Jarvis …" to talk.
       if (heard && V.call && store.wakeGate) {
         send = wakeRe().test(heard) ? stripWake(heard) : '';
       }

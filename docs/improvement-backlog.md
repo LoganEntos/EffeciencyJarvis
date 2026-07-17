@@ -103,4 +103,4 @@ Two audits ran 2026-07-11 (code-reviewer + ui-designer subagents over
 ## Voice engine (this session — UNVERIFIED, pending user install)
 - Kokoro-82M fast engine added (scripts/kokoro-server.py, generalized lib/voice.js
   ENGINES table, 3-way picker in Config). Needs `.kokoro/venv` install + browser test.
-- Wake-word gate ("Suzy") added to the call loop. Needs real-mic test.
+- Wake-word gate ("Jarvis" — default flipped from "Suzy" 07-17) added to the call loop. Needs real-mic test.
