@@ -25,6 +25,12 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ---
 
+## ✅ Shipped (2026-07-16 → 07-17)
+
+| # | Item | Where |
+|---|------|-------|
+| S-LP | **Lovable Jarvis + Overview ports (1:1) + Projects inline chat** — both tabs ported from the live preview DOM of the user's amber-agent-orb build (`c30fa91`, `682c63e`; hermes panel dormant at 0, never activated); Jarvis then split into `jarvistab/jarvisorb/jarvischat` with 4 defects fixed (`fbc1fee`); Projects gained an inline project chat + detail split with the P1 projectId-payload fix verified end-to-end (`639b317`). **Next queue = HANDOFF EXECUTE NEXT, user-ordered 07-17** | `assets/jarvis*.js`, `assets/overview.*`, `assets/project*.js` |
+
 ## ✅ Shipped (2026-07-15)
 
 | # | Item | Where |

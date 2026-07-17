@@ -1,9 +1,10 @@
 # Handoff: Jarvis tab — 1:1 port of the user's Lovable design
 
-**Status: BLOCKED — the user is still improving the design on lovable.com.**
-Do NOT restyle the Jarvis tab speculatively. When the user hands over the
-final Lovable preview URL (or screenshots), this becomes the top-priority UI
-handoff. Model: **Opus 4.8**.
+**Status: DONE (2026-07-16).** The user delivered the preview (project
+`7ce003de`); the port shipped in `c30fa91` (Jarvis) + `682c63e` (Overview),
+then the module split + defect fixes in `fbc1fee` (see the postscript at the
+bottom). Only Jarvis + Overview were in scope — the other Lovable tabs still
+"need work" and must NOT be ported. Kept for the record + port method.
 
 ## The port method (proven on the clean-dark redesign)
 

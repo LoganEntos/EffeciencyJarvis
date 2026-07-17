@@ -1,8 +1,14 @@
 # Handoff: Persona manager — wire CRUD into the Jarvis tab
 
-**Status: backend DONE + live-verified (2026-07-15); UI wiring waits for the
-user's Lovable design (do it as part of, or right after,
-`jarvis-ui-port.md`).** Model: Opus 4.8.
+**Status: READY — UNBLOCKED (user priority #4, 2026-07-17).** The Lovable
+port shipped (`c30fa91` + `fbc1fee`), so the persona cards exist; this wires
+the missing verbs into them. Backend DONE + live-verified since 2026-07-15.
+Model: Opus 4.8.
+
+UI notes for the shipped design: add a small `✕` (delete, two-step confirm)
+and `✎` (rename id) affordance to each `.jcard` on hover, drag-to-reorder the
+cards row → POST the id array to `/api/personas/order`, and a `＋` ghost card
+at the end that opens the soul editor in new-persona mode.
 
 ## What the user asked for
 

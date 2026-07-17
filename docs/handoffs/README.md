@@ -25,16 +25,25 @@ Commit at each working, browser-verified stage.
    `HANDOFF.md` + `docs/roadmap.md` when the handoff closes; mark the handoff
    file DONE at the top rather than deleting it.
 
-## Current handoffs (execute READY ones top-to-bottom)
+## Current handoffs (execute READY ones top-to-bottom — order set by the user 2026-07-17)
 
 | # | file | status | model |
 | --- | --- | --- | --- |
+| 1 | `projects-tab-polish.md` | READY — polish on the working inline project chat (`639b317`) | Opus 4.8 |
+| 2 | `jarvis-chat-parity.md` | READY — chat-first panel, run-this in-tab, speak replies, file attach | Opus 4.8 |
+| 3 | `voice-orb-live.md` | READY — wire orb waveform/rtt/think/timeline live | Opus 4.8 |
+| 4 | `persona-manager-ui.md` | READY — delete/rename/reorder onto the shipped persona cards | Opus 4.8 |
+| 5 | `schedules-verify.md` | READY — schedules UI polish + the R5 stress test (never proven) | Opus 4.8 |
+| 6 | `distill-latency.md` | OPTIONAL — only after 1–5 | Opus 4.8 |
+| ✅ | `jarvis-tab-finalize.md` | DONE 07-16 (`fbc1fee`) — module split + 4 defects fixed | — |
+| ✅ | `jarvis-ui-port.md` | DONE 07-16 (`c30fa91`, postscript inside) — Lovable port shipped | — |
 | ✅ | `jarvis-error-hunt.md` | DONE 07-16 (`d212169`) — beacon works; only catch was the already-fixed `6c09bd7` crash | — |
 | ✅ | `skills-cleanup.md` | DONE 07-15 (`573212a`) — design suite 6→2, borderline three deleted | — |
-| 1 | `schedules-verify.md` | READY — O3 headless part (R5 never proven) | Opus 4.8 |
-| 2 | `distill-latency.md` | OPTIONAL — only after schedules-verify | Opus 4.8 |
-| — | `jarvis-ui-port.md` | **BLOCKED — user is finishing the Lovable design** | Opus 4.8 |
-| — | `persona-manager-ui.md` | backend DONE; UI blocked on the same design | Opus 4.8 |
+
+(User's spoken priority list, verbatim: "1. Projects tab 2. FAL-ish 3. Voice
+orb 4. Quality persona manager 5. UI schedule 6. Verify" — #2 interpreted as
+the file-attach/chat-parity work from the same Q&A; #5+#6 folded into
+`schedules-verify.md`. If #2 meant something else, re-order before running.)
 
 ⚠ Since 2026-07-15 the hub shows **no dollar figures anywhere** — tokens +
 completion/routing % are the metrics (`39e6ed6`). Any handoff that touches UI

@@ -173,32 +173,35 @@ P1/P2/P3 find-fix round closed; **N7 SharePoint Breakdown** shipped — see
 - **~190-entry claude-flow purge** (`bd09b68`) — 166 dead commands + 28 dead
   skills removed per `docs/agent-skill-efficiency-report.md`.
 
-## EXECUTE NEXT — Opus 4.8 finish list (ordered; handoff 2026-07-15)
+## EXECUTE NEXT — agent-team queue (user-ordered 2026-07-17)
 
 **O0. Work orders live in `docs/handoffs/` — read its README first.** Each is
 sized for one hub run and carries the mandatory review pipeline (verify →
-smoke → code-reviewer → commit).
+smoke → code-reviewer → commit). The Lovable Jarvis+Overview ports are DONE
+(`c30fa91`, `682c63e`, `fbc1fee`); the Projects inline chat is DONE with its
+P1 projectId fix (`639b317`). Scope rule still stands: only Jarvis + Overview
+were ported from the Lovable build — the other tabs' Lovable screens "need
+work", don't port them.
 
-**O1. ✅ DONE — Jarvis tab error hunt** (`d212169`; see
-`docs/handoffs/jarvis-error-hunt.md`). Beacon stays live — keep reading
-`/api/clientlog` after UI changes. Voice behavior still must not change.
+**The queue (execute top-to-bottom):**
+1. `docs/handoffs/projects-tab-polish.md` — composer model select, thread-
+   resume clarity, re-render churn, ✦ distiller toggle, 375px, empty-state.
+2. `docs/handoffs/jarvis-chat-parity.md` — chat-first panel (transcript tail
+   → collapsed strip), ▷ run-this in-tab, spoken replies, file attach.
+3. `docs/handoffs/voice-orb-live.md` — mic-driven orb waveform, real rtt,
+   ◐ think → extended thinking, timeline dots jump.
+4. `docs/handoffs/persona-manager-ui.md` — delete/rename/reorder/＋ new on
+   the persona cards (backend live since `1fb6cd4`).
+5. `docs/handoffs/schedules-verify.md` — schedules UI polish + the R5
+   stress test (never proven to fire).
+6. `docs/handoffs/distill-latency.md` — optional, last.
 
-**O1.5. Jarvis tab UI port** → `docs/handoffs/jarvis-ui-port.md` +
-`docs/handoffs/persona-manager-ui.md`. **BLOCKED: the user is improving the
-design on Lovable — do NOT restyle the Jarvis tab until they deliver the
-final preview URL.** (An interim operator-console layout shipped in `045ee51`;
-the Lovable port supersedes it when the design lands.) The persona-CRUD
-backend is live and verified. ⚠ No `$` in any new UI — tokens + % only.
+Standing constraints for every item: ⚠ voice behavior (barge-in, Kokoro
+self-heal, reply queue) untouchable · no `$` anywhere (tokens + % only) ·
+zero-dep · <500-line files · check `/api/runs` + `git status` before editing.
 
-**O2. ✅ DONE — skills-layer cleanup** (`573212a`; see
-`docs/handoffs/skills-cleanup.md`). Open user question: do the 5 logistics
-skills move to a separate work profile?
-
-**O3. Verify the unverified.** Headless part →
-`docs/handoffs/schedules-verify.md` (R5 schedules have never been proven to
-fire). Interactive part stays with the user: (a) wake-word "Suzy" real-mic
-test, (b) Projects tab at 375px. Optional after all READY handoffs:
-`docs/handoffs/distill-latency.md` (~12.6 s cold Shaping… wait).
+Interactive verifications that still need the USER: wake-word "Suzy" real-mic
+test; a real-mic pass on the orb waveform once voice-orb-live ships.
 
 **O4. Then the roadmap queue** (`docs/roadmap.md`): N2 mobile ergonomic pass,
 R3 auto session summaries (cheap-model, cached), R4 image thumbnails + day
