@@ -50,3 +50,24 @@ table.pruns th{text-align:left;font-family:var(--font-mono);font-size:10px;lette
    Files tab; here it's one of five stacked sections, so shrink its padding. */
 #projects .dropzone{padding:20px;margin-bottom:0}
 #projects .pfiles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+
+/* Inline chat panel (projectchat.js) — one bordered instrument box: a
+   history-pill rail, the transcript (reuses jarvis.css's global .jconv), and
+   a pinned composer row (reuses .jchat-row). Panel target ~380px tall. */
+.pchat-panel{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+.pchat-hist{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;
+  border-bottom:1px solid var(--line);background:color-mix(in srgb, var(--panel) 92%, var(--accent) 5%);min-height:16px}
+.pchat-hpill{display:flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);border-radius:20px;
+  cursor:pointer;font-size:10.5px;background:var(--panel2);max-width:280px;transition:border-color .12s,color .12s}
+.pchat-hpill:hover{border-color:var(--accent-dim);color:var(--accent)}
+.pchat-hwhen,.pchat-htok{color:var(--dim);white-space:nowrap;font-family:var(--font-mono)}
+.pchat-hprompt{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pchat-panel .pchat-conv{max-height:290px}
+#pchatIn{flex:1;min-width:0;box-sizing:border-box;margin:0;resize:none;overflow:hidden;
+  background:var(--bg-2,var(--panel));color:var(--txt);border:1px solid var(--line);border-radius:3px;padding:8px 10px;
+  font-family:var(--font-mono);font-size:12px;line-height:1.5;min-height:34px;max-height:120px;transition:border-color .15s}
+#pchatIn:focus{outline:none;border-color:var(--accent-dim)}
+.pchat-resuming{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--accent);
+  padding:3px 8px;border:1px solid var(--accent-dim);border-radius:20px}
+.pchat-resuming .dim{color:var(--dim);margin-right:4px}
+.pchat-hpill[data-id]:active{transform:translateY(1px)}
