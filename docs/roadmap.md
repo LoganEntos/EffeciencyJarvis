@@ -29,6 +29,7 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 | # | Item | Where |
 |---|------|-------|
+| S-VC | **Voice conversation engine (user-planned + approved)** — `assets/voiceconvo.js` state machine replaces the per-utterance wake gate: passive wake-listening on the Jarvis tab, "Jarvis" alone → persona-flavored spoken ack (`ack:` frontmatter), open conversation needs no wake word, closes after a configurable held-silence window (default 5 s), endpointing with trailing-connector grace, name-only barge-in + self-echo filter, spoken turns render in the in-tab chat and always speak back. Wake word = "Jarvis" (`60ccb93`). Headless-verified via `_ingest`; **real-mic pass pending with the user** | `36bd72d`, `assets/voiceconvo.js`, `voice*.js`, `jarvischat.js`, `lib/personas.js` |
 | S-LP | **Lovable Jarvis + Overview ports (1:1) + Projects inline chat** — both tabs ported from the live preview DOM of the user's amber-agent-orb build (`c30fa91`, `682c63e`; hermes panel dormant at 0, never activated); Jarvis then split into `jarvistab/jarvisorb/jarvischat` with 4 defects fixed (`fbc1fee`); Projects gained an inline project chat + detail split with the P1 projectId-payload fix verified end-to-end (`639b317`). **Next queue = HANDOFF EXECUTE NEXT, user-ordered 07-17** | `assets/jarvis*.js`, `assets/overview.*`, `assets/project*.js` |
 
 ## ✅ Shipped (2026-07-15)
