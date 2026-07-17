@@ -20,11 +20,14 @@ paste/drop — and the chat OWNS the conversation panel.
    in-tab chat (`jarvisChat.send` path) so the user never leaves Jarvis.
    Keep a small "⤴ run tab" secondary affordance for when they want the big
    composer.
-3. **Speak replies aloud.** In `jarvischat.js renderLine()`, on assistant
-   text: `if (window.HubVoice && HubVoice.onAssistantText) HubVoice.onAssistantText(text)`
-   — the SAME streamed-reply queue the Run tab uses (see run.js:262). ⚠ Do
-   NOT touch voice.js itself — barge-in, Kokoro self-heal, and the reply
-   queue are exactly as the user wants (standing constraint).
+3. **✅ DONE (`36bd72d`) — Speak replies aloud.** jarvischat now streams
+   every assistant block through `HubVoice.onAssistantText` and closes with
+   `onRunDone` (the same queue the Run tab uses), and gained `sendText()` —
+   the voice conversation engine (`assets/voiceconvo.js`) routes spoken
+   turns through it. ⚠ Constraint update: the conversation loop is now the
+   voiceconvo state machine (user-approved rebuild) — coordinate with it,
+   don't reintroduce a second mic path. Kokoro self-heal + the TTS reply
+   queue in voicetts.js remain untouchable.
 4. **File attach.** Paste/drop/📎 on the Jarvis chat composer, same inbox
    upload path as the Run tab (`attachFiles` pattern in run.js: images via
    clipboard items, docs via files; POST /api/files; pass refs in the run

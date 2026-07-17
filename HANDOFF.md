@@ -75,6 +75,20 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
   pull-rebase-then-push. `data/`, `.claude/settings.local.json`, and the sidecar
   dirs are gitignored (per-machine). The user drives push; don't push unprompted.
 
+## Latest work shipped (2026-07-14 → 07-17)
+2026-07-17 (commit `36bd72d`, planned + approved): **voice conversation
+engine** — new `assets/voiceconvo.js` state machine fixes "Jarvis doesn't
+reply after being woken": passive wake-listening on the Jarvis tab (hot mic,
+everything but the wake word discarded), bare "Jarvis" gets a persona-flavored
+spoken ack (`ack:` frontmatter, editable in the soul editor), an OPEN
+conversation needs no wake word between turns and closes itself after a
+configurable window of held silence (default 5 s), endpointing with
+trailing-connector grace so pauses never cut speech off, name-only barge-in
+with a self-echo filter, and spoken turns route through the in-tab Jarvis
+chat. Headless-verified via `HubVoiceConvo._ingest`; **real-mic pass still
+needed from the user**. `60ccb93` set the wake word to "Jarvis" (+ STT
+misrecognition variants).
+
 ## Latest work shipped (2026-07-14 → 07-15)
 2026-07-15 night (commits `045ee51`→`39e6ed6` — reconcile of the background
 handoff run + the no-dollars directive):
@@ -196,9 +210,12 @@ work", don't port them.
    stress test (never proven to fire).
 6. `docs/handoffs/distill-latency.md` — optional, last.
 
-Standing constraints for every item: ⚠ voice behavior (barge-in, Kokoro
-self-heal, reply queue) untouchable · no `$` anywhere (tokens + % only) ·
-zero-dep · <500-line files · check `/api/runs` + `git status` before editing.
+Standing constraints for every item: ⚠ voice CONVERSATION behavior is now the
+`36bd72d` engine (`assets/voiceconvo.js` — wake→ack→open window→close on held
+silence; the old "don't touch the call loop" note is superseded by that
+user-approved rebuild; Kokoro self-heal + the TTS reply queue remain as-is) ·
+no `$` anywhere (tokens + % only) · zero-dep · <500-line files · check
+`/api/runs` + `git status` before editing.
 
 Interactive verifications that still need the USER: wake-word "Jarvis"
 real-mic test (default flipped from "Suzy" 2026-07-17, with jarvis/jervis/
