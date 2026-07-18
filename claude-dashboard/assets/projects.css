@@ -71,3 +71,24 @@ table.pruns th{text-align:left;font-family:var(--font-mono);font-size:10px;lette
   padding:3px 8px;border:1px solid var(--accent-dim);border-radius:20px}
 .pchat-resuming .dim{color:var(--dim);margin-right:4px}
 .pchat-hpill[data-id]:active{transform:translateY(1px)}
+/* Composer controls: compact model <select> + ✦ distiller toggle, sitting
+   inline before the ＋new / Run buttons. */
+.pchat-model{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);background:var(--panel2);
+  border:1px solid var(--line);border-radius:3px;padding:6px 6px;cursor:pointer;align-self:flex-end;transition:border-color .12s,color .12s}
+.pchat-model:hover,.pchat-model:focus{outline:none;border-color:var(--accent-dim);color:var(--accent)}
+.pchat-distill{display:inline-flex;align-items:center;gap:4px;align-self:flex-end;font-family:var(--font-mono);
+  font-size:12px;color:var(--muted);cursor:pointer;user-select:none;padding-bottom:7px}
+.pchat-distill input{accent-color:var(--accent);cursor:pointer;margin:0}
+.pchat-distill:hover{color:var(--accent)}
+/* Runs table overflows at narrow widths — let it scroll horizontally instead
+   of blowing out the layout. */
+.pruns-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* ── 375px pass ── keep the detail view usable on a phone: the composer
+   controls wrap to a second line, file tiles pack tighter, tables scroll. */
+@media (max-width:430px){
+  .pchat-row{flex-wrap:wrap}
+  .pchat-row #pchatIn{flex:1 1 100%;order:-1}
+  #projects .pfiles-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  .pruns .ptrunc{max-width:150px}
+}

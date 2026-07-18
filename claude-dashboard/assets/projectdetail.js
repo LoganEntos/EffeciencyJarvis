@@ -25,6 +25,40 @@ async function renderProjectDetail(id) {
   if (d.error) { projSel = null; return renderers.projects(); }
   const p = d.project, files = d.files || [], mem = (d.memory && d.memory.items) || [], runs = d.runs || [];
   const sessions = d.sessions || [], claude = p.kind === 'claude';
+
+  const secInstr = `
+    <div class="row">
+      <div class="psection"><span class="name">▤ Instructions <span class="muted" style="font-weight:400;font-size:11.5px">— injected ahead of every run started in this project</span></span>
+        <span id="pSaved" class="pcharcount"></span></div>
+      <div class="presetrow">${P_PRESETS.map((x, i) => `<span class="presetchip" data-preset="${i}">+ ${esc(x.label)}</span>`).join('')}</div>
+      <textarea id="pInstr" style="min-height:120px;margin:8px 0 0;resize:vertical" placeholder="e.g. You are working on the Jarvis persona. Prefer the donor patterns in the attached files. Keep replies short…">${esc(p.instructions)}</textarea>
+      <div class="flex" style="margin-top:8px"><button id="pSave" class="ghost">Save instructions</button>
+        <button id="pChat" class="ghost" style="margin-left:auto">⤴ Escalate to Run tab</button></div>
+    </div>`;
+
+  const secFiles = `
+    <div class="row">
+      <div class="psection"><span class="name">◇ Attached files <span class="muted" style="font-weight:400;font-size:11.5px">— ${files.length} in this project</span></span>
+        ${files.length ? '<button id="pManifest" class="ghost" style="padding:5px 11px;font-size:11px">Show manifest</button>' : ''}</div>
+      <div id="pManifestBox" class="hidden"></div>
+      <div class="dropzone" id="pDrop" style="margin-top:8px">Drop files here or click to add<br><span class="muted" style="font-size:11.5px">50 MB per upload · grouped under data/inbox/${esc(p.slug)}/</span></div>
+      <input type="file" id="pFileIn" multiple class="hidden">
+      <div id="pUpStatus" class="badgebar" style="margin:8px 0"></div>
+      <div id="pFiles" class="pfiles-grid">${files.length ? files.map(projFileTile).join('') : '<div class="muted">No files yet.</div>'}</div>
+    </div>`;
+
+  const secChat = `
+    <div class="row">
+      <div class="psection"><span class="name">▷ Chat in this project <span class="muted" style="font-weight:400;font-size:11.5px">— runs here auto-carry the instructions, files and memory above</span></span></div>
+      <div id="pChatMount" style="margin-top:8px"></div>
+    </div>`;
+
+  // Empty-state UX: a brand-new project with no files and no instructions
+  // otherwise stacks three empty setup sections above the chat. Lead with the
+  // chat so the first thing you see is somewhere to start.
+  const emptyStart = !claude && files.length === 0 && !(p.instructions && p.instructions.trim());
+  const setupSections = emptyStart ? (secChat + secInstr + secFiles) : (secInstr + secFiles + secChat);
+
   el.innerHTML = `
     <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <button id="pBack" class="ghost" style="padding:5px 11px;font-size:11.5px">← All projects</button>
@@ -43,35 +77,9 @@ async function renderProjectDetail(id) {
       <div class="note" style="font-size:11.5px;margin:8px 0">To continue a session, open a terminal in that folder and run <span class="mono">claude --resume &lt;id&gt;</span>. Each session opens read-only here for reference.</div>
       <div id="pSessions" style="display:grid;gap:8px;margin-top:6px">${sessions.length ? sessions.map(sessionRow).join('') : '<div class="muted">No sessions in this workspace.</div>'}</div>
     </div>` : ''}
+    ${setupSections}
 
-    <div class="row">
-      <div class="psection"><span class="name">▤ Instructions <span class="muted" style="font-weight:400;font-size:11.5px">— injected ahead of every run started in this project</span></span>
-        <span id="pSaved" class="pcharcount"></span></div>
-      <div class="presetrow">${P_PRESETS.map((x, i) => `<span class="presetchip" data-preset="${i}">+ ${esc(x.label)}</span>`).join('')}</div>
-      <textarea id="pInstr" style="min-height:120px;margin:8px 0 0;resize:vertical" placeholder="e.g. You are working on the Jarvis persona. Prefer the donor patterns in the attached files. Keep replies short…">${esc(p.instructions)}</textarea>
-      <div class="flex" style="margin-top:8px"><button id="pSave" class="ghost">Save instructions</button>
-        <button id="pChat" class="ghost" style="margin-left:auto">⤴ Escalate to Run tab</button></div>
-    </div>
-
-    <div class="row">
-      <div class="psection"><span class="name">◇ Attached files <span class="muted" style="font-weight:400;font-size:11.5px">— ${files.length} in this project</span></span>
-        ${files.length ? '<button id="pManifest" class="ghost" style="padding:5px 11px;font-size:11px">Show manifest</button>' : ''}</div>
-      <div id="pManifestBox" class="hidden"></div>
-      <div class="dropzone" id="pDrop" style="margin-top:8px">Drop files here or click to add<br><span class="muted" style="font-size:11.5px">50 MB per upload · grouped under data/inbox/${esc(p.slug)}/</span></div>
-      <input type="file" id="pFileIn" multiple class="hidden">
-      <div id="pUpStatus" class="badgebar" style="margin:8px 0"></div>
-      <div id="pFiles" class="pfiles-grid">${files.length ? files.map(projFileTile).join('') : '<div class="muted">No files yet.</div>'}</div>
-    </div>
-
-    <div class="row">
-      <div class="psection"><span class="name">▷ Chat in this project <span class="muted" style="font-weight:400;font-size:11.5px">— runs here auto-carry the instructions, files and memory above</span></span></div>
-      <div id="pChatMount" style="margin-top:8px"></div>
-    </div>
-
-    <div class="row">
-      <div class="psection"><span class="name">▷ Recent runs <span class="muted" style="font-weight:400;font-size:11.5px">— launched in this project</span></span></div>
-      ${runs.length ? runsTable(runs) : '<div class="muted" style="margin-top:6px">No runs yet. Send a message above and it shows up in this list.</div>'}
-    </div>
+    <div class="row" id="pRunsSection">${runsSection(runs)}</div>
 
     <div class="row">
       <div class="psection"><span class="name">✦ Project memory <span class="muted" style="font-weight:400;font-size:11.5px">— engram recall scoped to this project (its own runs + notes; no vectors)</span></span></div>
@@ -130,11 +138,7 @@ async function renderProjectDetail(id) {
   });
 
   // recent-runs rows → open the run in the Sessions/history view if available
-  el.querySelectorAll('tr.prun[data-id]').forEach(tr => tr.onclick = () => {
-    const rid = tr.dataset.id;
-    if (typeof openRun === 'function') openRun(rid);
-    else if (typeof showTab === 'function') showTab('sessions');
-  });
+  wireRunRows(el);
 
   // Claude sessions → open the transcript read-only
   el.querySelectorAll('.psession-row[data-sid]').forEach(row => row.onclick = () => showTranscript(p.id, row.dataset.sid, row.dataset.title));
@@ -159,9 +163,33 @@ function wireDelete(p) {
   };
 }
 
+// The runs section body (header + table|empty), rebuilt on its own so an
+// in-place refresh doesn't reload files/memory/sessions and jump scroll.
+function runsSection(runs) {
+  return `<div class="psection"><span class="name">▷ Recent runs <span class="muted" style="font-weight:400;font-size:11.5px">— launched in this project</span></span></div>
+    ${runs.length ? runsTable(runs) : '<div class="muted" style="margin-top:6px">No runs yet. Send a message above and it shows up in this list.</div>'}`;
+}
+// Fetch just this project's runs and swap the runs section in place, preserving
+// scroll. Called by projectchat.js on run done/error instead of the whole view.
+async function refreshProjectRuns(id) {
+  const sec = $('#pRunsSection'); if (!sec) return;
+  let d;
+  try { d = await api('/api/projects/get?id=' + encodeURIComponent(id)); } catch { return; }
+  if (d.error) return;
+  sec.innerHTML = runsSection(d.runs || []);
+  wireRunRows(sec);
+}
+// Recent-runs rows → open the run in the Sessions/history view if available.
+function wireRunRows(root) {
+  (root || document).querySelectorAll('tr.prun[data-id]').forEach(tr => tr.onclick = () => {
+    const rid = tr.dataset.id;
+    if (typeof openRun === 'function') openRun(rid);
+    else if (typeof showTab === 'function') showTab('sessions');
+  });
+}
 function runsTable(runs) {
-  return `<table class="pruns"><thead><tr><th>When</th><th>Model</th><th>Duration</th><th>Tokens</th><th>Status</th><th>Prompt</th></tr></thead>
-    <tbody>${runs.map(runRow).join('')}</tbody></table>`;
+  return `<div class="pruns-wrap"><table class="pruns"><thead><tr><th>When</th><th>Model</th><th>Duration</th><th>Tokens</th><th>Status</th><th>Prompt</th></tr></thead>
+    <tbody>${runs.map(runRow).join('')}</tbody></table></div>`;
 }
 function runRow(r) {
   const tok = (r.tokensIn || r.tokensOut) ? fmtTok((r.tokensIn || 0) + (r.tokensOut || 0)) : '—';

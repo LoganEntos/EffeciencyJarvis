@@ -11,8 +11,20 @@
 'use strict';
 (function () {
   const S = { es: null, running: false, runId: null, seen: -1, sessionId: null,
-    bubbleEntry: null, buf: '', project: null, log: [] };
+    bubbleEntry: null, buf: '', project: null, log: [], model: 'auto', distill: false, distilling: false };
   const timeOf = iso => { try { return new Date(iso).toLocaleTimeString(undefined, { hour12: false }); } catch { return ''; } };
+
+  // Per-project composer prefs live in localStorage under hub.proj.<id>.<key>.
+  const MODELS = ['auto', 'opus', 'sonnet', 'haiku'];
+  const lsKey = (id, k) => `hub.proj.${id}.${k}`;
+  function loadPrefs(id) {
+    let m = 'auto', d = false;
+    try { m = localStorage.getItem(lsKey(id, 'model')) || 'auto'; } catch {}
+    try { d = localStorage.getItem(lsKey(id, 'distill')) === '1'; } catch {}
+    S.model = MODELS.includes(m) ? m : 'auto';
+    S.distill = d;
+  }
+  const savePref = (k, v) => { if (S.project) { try { localStorage.setItem(lsKey(S.project.id, k), v); } catch {} } };
 
   function jmsgHtml(kind, textHtml) {
     const av = kind === 'user' ? `<div class="java user">you</div>`
@@ -118,7 +130,15 @@
     // reset panel state, keep project
     S.log = []; S.buf = ''; S.bubbleEntry = null; S.sessionId = null; S.runId = runId; S.seen = -1;
     const feed = $('#pchatConv'); if (feed) feed.innerHTML = '';
-    convAppend('jmsg meta', () => `<div class="jmsg-meta">↺ resuming run ${esc(runId.slice(0,8))}${t.truncated ? ' · long transcript truncated' : ''}</div>`);
+    // A run only resumes if its transcript carried a CLI sessionId. When it
+    // didn't, this is a read-only replay and the next message would silently
+    // start fresh — say so plainly instead of implying continuity.
+    const resumable = !!(t.meta && t.meta.sessionId);
+    if (resumable) S.sessionId = t.meta.sessionId;
+    const trunc = t.truncated ? ' · long transcript truncated' : '';
+    convAppend('jmsg meta', () => `<div class="jmsg-meta">${resumable
+      ? '↺ resuming run ' + esc(runId.slice(0, 8)) + ' · next message continues this thread'
+      : '⟲ read-only replay of ' + esc(runId.slice(0, 8)) + ' · next message starts fresh'}${trunc}</div>`);
     if (t.prompt) convAppend('jmsg user', () => jmsgHtml('user', esc(t.prompt)));
     // Replay assistant/tool/result lines through renderLine so bubbles reuse
     // the same builder — S.bubbleEntry gets seeded so mid-turn tool blocks work.
@@ -128,24 +148,43 @@
       renderLine(o);
     }
     setBubble(S.buf || '(no reply captured)', false);
-    if (t.meta && t.meta.sessionId) S.sessionId = t.meta.sessionId;
     loadHistory();
   }
 
   async function send() {
     const ta = $('#pchatIn'); if (!ta || !S.project) return;
-    const prompt = ta.value.trim();
-    if (!prompt || S.running) return;
+    let prompt = ta.value.trim();
+    if (!prompt || S.running || S.distilling) return;
+    const btn = $('#pchatSend');
+    // ✦ distiller: a long vibe-dump gets a Haiku pre-pass (the same gate the Run
+    // tab uses); short prompts get only the instant local cleanup. The refined
+    // text BECOMES the visible turn, so what you see is what runs.
+    if (S.distill && typeof jarvisDistill === 'function') {
+      const words = prompt.split(/\s+/).filter(Boolean).length;
+      if (words > (typeof DISTILL_MIN_WORDS === 'number' ? DISTILL_MIN_WORDS : 25)) {
+        S.distilling = true;
+        const label = btn ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = '✦ Shaping…'; }
+        const refined = await jarvisDistill(prompt);
+        S.distilling = false;
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+        if (S.running) return; // a send slipped in while we were distilling
+        if (refined) prompt = refined;
+        else if (typeof jarvisTransform === 'function') { const tr = jarvisTransform(prompt); if (tr) prompt = tr.buffered; }
+      } else if (typeof jarvisTransform === 'function') {
+        const tr = jarvisTransform(prompt); if (tr) prompt = tr.buffered;
+      }
+    }
     const feed = $('#pchatConv');
     if (feed && S.log.length === 0) feed.innerHTML = '';
     ta.value = ''; ta.style.height = 'auto'; S.buf = '';
     convAppend('jmsg user', () => jmsgHtml('user', esc(prompt)));
     S.bubbleEntry = addAssistantBubble('thinking…');
-    const btn = $('#pchatSend'); if (btn) btn.disabled = true;
+    if (btn) btn.disabled = true;
     let r;
     try {
       r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, engine: 'claude', model: 'auto', permissionMode: 'bypassPermissions',
+        body: JSON.stringify({ prompt, engine: 'claude', model: S.model || 'auto', permissionMode: 'bypassPermissions',
           resume: S.sessionId || '', projectId: S.project.id }) });
     } catch (e) { setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); if (btn) btn.disabled = false; return; }
     if (r.error) { setBubble('✗ ' + r.error, false); if (btn) btn.disabled = false; return; }
@@ -166,7 +205,9 @@
       setBubble(S.buf || '(no reply)', false);
       const b2 = $('#pchatSend'); if (b2) b2.disabled = false;
       loadHistory();
-      if (typeof renderProjectDetail === 'function' && S.project) renderProjectDetail(S.project.id);
+      // Refresh ONLY the runs table + history strip in place — a full
+      // renderProjectDetail() reloads files/memory/sessions and jumps scroll.
+      if (typeof refreshProjectRuns === 'function' && S.project) refreshProjectRuns(S.project.id);
     });
     // jarvischat's known bug: onerror only reset the button when !S.running,
     // so a mid-stream drop left "send" disabled forever. Always reset here.
@@ -175,7 +216,7 @@
       if (S.running) { S.running = false; setBubble(S.buf || '✗ connection lost', false); }
       const b3 = $('#pchatSend'); if (b3) b3.disabled = false;
       loadHistory();
-      if (typeof renderProjectDetail === 'function' && S.project) renderProjectDetail(S.project.id);
+      if (typeof refreshProjectRuns === 'function' && S.project) refreshProjectRuns(S.project.id);
     };
   }
 
@@ -194,6 +235,10 @@
     }
     const sb = $('#pchatSend'); if (sb) { sb.onclick = send; sb.disabled = S.running; }
     const nb = $('#pchatNew'); if (nb) nb.onclick = newChat;
+    const ms = $('#pchatModel');
+    if (ms) { ms.value = S.model; ms.onchange = () => { S.model = MODELS.includes(ms.value) ? ms.value : 'auto'; savePref('model', S.model); }; }
+    const dt = $('#pchatDistill');
+    if (dt) { dt.checked = S.distill; dt.onchange = () => { S.distill = dt.checked; savePref('distill', dt.checked ? '1' : '0'); }; }
   }
 
   function mount(container, project) {
@@ -204,11 +249,16 @@
       S.running = false; S.runId = null; S.seen = -1; S.sessionId = null; S.bubbleEntry = null; S.buf = ''; S.log = [];
     }
     S.project = project;
+    loadPrefs(project.id);
     container.innerHTML = `<div class="pchat-panel">
       <div class="pchat-hist" id="pchatHist"><span class="muted" style="font-size:11px">loading recent runs…</span></div>
       <div class="jconv pchat-conv" id="pchatConv"></div>
       <div class="jchat-row pchat-row">
         <textarea id="pchatIn" rows="1" placeholder="Ask Claude to work in this project… (Enter to send, Shift+Enter for newline)"></textarea>
+        <label class="pchat-distill" title="✦ Distill — route long vibe-prompts through Haiku before running"><input type="checkbox" id="pchatDistill"> ✦</label>
+        <select id="pchatModel" class="pchat-model" title="Model — auto routes by complexity">
+          <option value="auto">auto</option><option value="opus">opus</option>
+          <option value="sonnet">sonnet</option><option value="haiku">haiku</option></select>
         <button class="jp-ghost" id="pchatNew" title="Start a fresh CLI session">＋ new</button>
         <button class="jp-btn" id="pchatSend">▷ Run in project</button>
       </div></div>`;
