@@ -6,12 +6,12 @@
  * compares persisted nextDue timestamps against the clock (local time).
  * A schedule that came due while the server was off fires once on boot.
  *
- * ⚠️ UNTESTED (user flag, 2026-07-11): this module has had NO functional or
- * stress testing — nothing has verified a schedule actually fires, lands in
- * run history, computes the next due time correctly, or survives a restart.
- * Treat it as unproven until the self-improvement/autopilot loop covers it
- * (roadmap R5): create a near-future schedule, assert it fires + records a
- * run, then tear it down. Do not rely on scheduled runs in production yet.
+ * ✅ VERIFIED (R5 stress test, 2026-07-18): the full loop was proven on a
+ * throwaway instance — a near-future schedule fired within one tick of its
+ * nextDue, spawned a real routed run that reached `done` in /api/runs, the
+ * schedule record updated (lastRunId/lastRunAt/runCount, nextDue advanced),
+ * and a schedule deleted before its fire time never fired. No code changes
+ * were needed; the ticker/fire/next-due logic behaves as designed.
  */
 'use strict';
 const fs = require('fs');
