@@ -228,10 +228,10 @@ scannable. Run it on session close / on a cheap batch, cache the summary.
 uploaded image (you must see the context the AI is given). Group/sort by upload
 day; >10 images is unrememberable without categorization.
 
-**R5. Scheduled tasks are UNTESTED — no stress testing done** (`lib/schedules.js`,
-`data/schedules.json`). NOTHING has verified they actually fire. Fold
-scheduled-task testing into the self-improvement/autopilot loop (create a
-near-future schedule, assert it fires + lands in run history, tear down).
+**R5. ✅ VERIFIED 07-18 (`d7cb3c7`)** (`lib/schedules.js`, `data/schedules.json`).
+Stress test proven: a near-future schedule fired end-to-end and landed in run
+history, then torn down. Remaining: fold recurring scheduled-task checks into
+the self-improvement/autopilot loop.
 
 ## 🔜 DO NEXT — autonomous, no user action needed (execute top-down)
 
@@ -404,10 +404,10 @@ Show a visual thumbnail of every uploaded image (you must see the context the
 AI is given). Group/sort by upload day; >10 images is unrememberable without
 categorization.
 
-### N4. Schedules UI polish + R5 stress test
-Polish the Scheduled section in Tasks tab. The `/lib/schedules.js` has NEVER been
-stress-tested — no verification that it actually fires. Create a near-future
-schedule, assert it fires + lands in run history, tear down. Fold into the
+### N4. Schedules UI polish (R5 stress test ✅ done 07-18, `d7cb3c7`)
+Polish the Scheduled section in Tasks tab. The R5 fire test is proven — a
+near-future schedule fired end-to-end and landed in run history. Remaining:
+the UI polish itself, plus folding recurring checks into the
 self-improvement/autopilot loop.
 
 ---

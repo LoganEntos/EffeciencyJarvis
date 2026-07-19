@@ -29,11 +29,11 @@ Commit at each working, browser-verified stage.
 
 | # | file | status | model |
 | --- | --- | --- | --- |
-| 1 | `projects-tab-polish.md` | PENDING — polish on the working inline project chat (`639b317`) | Opus 4.8 |
+| 1 | `projects-tab-polish.md` | ✅ DONE 07-18 (`f77ffff`, `5946b6b`) | — |
 | 2 | `jarvis-chat-parity.md` | ✅ DONE 07-19 (`b73ba5a`, `1c7ca98`) | — |
 | 3 | `voice-orb-live.md` | ✅ DONE 07-19 (`9421d61`, `8ae1c87`) | — |
 | 4 | `persona-manager-ui.md` | ✅ DONE 07-19 (`eeccf1a`, `272282f`) | — |
-| 5 | `schedules-verify.md` | READY — schedules UI polish + the R5 stress test (never proven) | Opus 4.8 |
+| 5 | `schedules-verify.md` | ✅ R5 PROVEN 07-18 (`d7cb3c7` — live fire verified end-to-end); UI polish portion still open | Opus 4.8 |
 | 6 | `distill-latency.md` | ✅ DONE 07-19 (`20a43cd`, `477c1fc`) | — |
 | ✅ | `jarvis-tab-finalize.md` | DONE 07-16 (`fbc1fee`) — module split + 4 defects fixed | — |
 | ✅ | `jarvis-ui-port.md` | DONE 07-16 (`c30fa91`, postscript inside) — Lovable port shipped | — |
