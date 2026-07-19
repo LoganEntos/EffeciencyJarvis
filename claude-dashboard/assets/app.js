@@ -242,18 +242,24 @@ renderers.commands = function () { return listView('#commands', 'Commands', '/ap
 
 
 renderers.sessions = async function () {
-  const [d, runsList, teamsD] = await Promise.all([
+  const [d, runsList, teamsD, sumD] = await Promise.all([
     api('/api/sessions'),
     api('/api/runs').catch(() => []),
     api('/api/teams').catch(() => null),
+    api('/api/session-summaries').catch(() => ({ summaries: {} })),
   ]);
   const list = Array.isArray(d) ? d : (d.list || []);
-  const dir = Array.isArray(d) ? '' : (d.dir || '');
+  let summaries = (sumD && sumD.summaries) || {};
   // map each Claude Code session → the agent team of the hub run that produced it
   const teamBySid = {};
   (Array.isArray(runsList) ? runsList : []).forEach(m => { if (m.sessionId && m.team && !teamBySid[m.sessionId]) teamBySid[m.sessionId] = m.team; });
   const activeTeamName = teamsD ? ((teamsD.teams.find(t => t.id === teamsD.active) || {}).name || '') : '';
-  $('#sessions').innerHTML = `<h2>Claude Code Sessions (this project) <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— peek at raw activity, or have Claude summarize a session for you</span></h2>
+  const sumHtml = (s) => {
+    const c = summaries[s.id];
+    if (c && c.summary) return `<div class="desc sessSum" data-id="${esc(s.id)}" style="margin-top:8px">${esc(c.summary)}</div>`;
+    return `<div class="desc sessSum" data-id="${esc(s.id)}" style="margin-top:8px;font-style:italic;opacity:.6">Summarizing…</div>`;
+  };
+  $('#sessions').innerHTML = `<h2>Claude Code Sessions (this project) <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— auto-summarized debriefs; peek at raw activity anytime</span></h2>
     ${activeTeamName ? `<div class="flex" style="margin:-2px 0 14px"><span class="pill neutral" title="the agent team the hub is steering right now">⛬ active team: ${esc(activeTeamName)}</span></div>` : ''}` +
     (list.length ? list.map((s, i) => `<div class="row" data-id="${esc(s.id)}">
       <div class="flex" style="justify-content:space-between">
@@ -261,15 +267,36 @@ renderers.sessions = async function () {
           <span class="muted" style="font-weight:400;font-size:11.5px">${i === 0 ? 'newest' : ''}</span>${teamBySid[s.id] ? `<span class="pill neutral" style="font-size:10px" title="team that worked this thread">⛬ ${esc(teamBySid[s.id])}</span>` : ''}</span>
         <span class="muted" style="font-size:11.5px">${rel(s.modified)} · ${s.sizeKb} KB</span>
       </div>
+      ${sumHtml(s)}
       <div class="flex" style="margin-top:8px">
         <button class="ghost peekBtn" data-id="${esc(s.id)}" style="padding:6px 12px;font-size:11.5px">Peek activity</button>
-        <button class="ghost sumBtn" data-id="${esc(s.id)}" style="padding:6px 12px;font-size:11.5px">✦ Summarize with Claude</button>
+        <button class="ghost resumBtn" data-id="${esc(s.id)}" style="padding:6px 12px;font-size:11.5px" title="re-run the Claude debrief for this session">↻ Re-summarize</button>
       </div></div>`).join('')
     : '<div class="muted">No session transcripts found.</div>');
   $('#sessions').querySelectorAll('.peekBtn').forEach(b => b.onclick = () => showSessionTail(b.dataset.id));
-  $('#sessions').querySelectorAll('.sumBtn').forEach(b => b.onclick = () => prefillRun(
-    `Read the tail (last ~300 lines) of the Claude Code session transcript at ${dir}\\${b.dataset.id}.jsonl — it is JSONL, one event per line. Summarize for a project manager: what was worked on, key decisions, errors or failures hit, and open items. Under 250 words, bullet points.`));
+  $('#sessions').querySelectorAll('.resumBtn').forEach(b => b.onclick = () => buildSummaries([b.dataset.id], true));
+  // zero-click auto-fill: any session missing a cached summary gets one built now
+  const missing = list.filter(s => !(summaries[s.id] && summaries[s.id].summary)).map(s => s.id);
+  if (missing.length) buildSummaries(missing.slice(0, 12), false);
+
+  async function buildSummaries(ids, spin) {
+    ids.forEach(id => { const el = $(`.sessSum[data-id="${cssq(id)}"]`); if (el) { el.textContent = 'Summarizing…'; el.style.fontStyle = 'italic'; el.style.opacity = '.6'; } });
+    let r;
+    try { r = await api('/api/session-summaries/build', { method: 'POST', body: JSON.stringify({ ids }) }); }
+    catch { ids.forEach(id => { const el = $(`.sessSum[data-id="${cssq(id)}"]`); if (el) el.textContent = '(summary unavailable)'; }); return; }
+    summaries = (r && r.summaries) || summaries;
+    ids.forEach(id => {
+      const el = $(`.sessSum[data-id="${cssq(id)}"]`);
+      if (!el) return;
+      const c = summaries[id];
+      el.textContent = c && c.summary ? c.summary : '(no summary — transcript too thin)';
+      el.style.fontStyle = 'normal'; el.style.opacity = '1';
+    });
+  }
 };
+// escape a session id for use inside a CSS attribute selector (ids are hex+dash,
+// but guard anyway so a stray char can't break the querySelector)
+const cssq = s => (s || '').replace(/["\\]/g, '\\$&');
 
 async function listView(sel, title, endpoint, type, extraHtml = '') {
   const data = await api(endpoint);

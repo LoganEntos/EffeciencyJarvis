@@ -339,4 +339,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, PROJECT_DIR, DASH_DIR };
+module.exports = { handle, PROJECT_DIR, DASH_DIR, sessions, sessionTail };

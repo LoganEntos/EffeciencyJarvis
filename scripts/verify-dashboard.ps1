@@ -46,6 +46,7 @@ Check "GET /api/skills"        "$base/api/skills"
 Check "GET /api/commands"      "$base/api/commands"
 Check "GET /api/config"        "$base/api/config"
 Check "GET /api/sessions"      "$base/api/sessions"
+Check "GET /api/session-summaries" "$base/api/session-summaries"
 Check "GET /api/activity"      "$base/api/activity"
 Check "GET /api/graph/stats"   "$base/api/graph/stats"
 Check "GET /api/runs"          "$base/api/runs"
@@ -118,6 +119,7 @@ CheckPost "POST /api/personas/rename w/o token (403)" "$base/api/personas/rename
 CheckPost "POST /api/personas/order w/o token (403)" "$base/api/personas/order" '{"ids":[]}' 403
 CheckPost "POST /api/personas/guidelines w/o token (403)" "$base/api/personas/guidelines" '{"body":"x"}' 403
 CheckPost "POST /api/jarvis/distill w/o token (403)" "$base/api/jarvis/distill" '{"text":"x"}' 403
+CheckPost "POST /api/session-summaries/build w/o token (403)" "$base/api/session-summaries/build" '{"ids":[]}' 403
 CheckPost "POST /api/voice/open-folder w/o token (403)" "$base/api/voice/open-folder" '{"engine":"kokoro"}' 403
 
 if ($fails -eq 0) { Write-Host "`nAll checks passed." -ForegroundColor Green; exit 0 }
