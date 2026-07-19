@@ -10,7 +10,8 @@
    HubVoiceTTS factory global exists when voice.js's IIFE runs. */
 'use strict';
 window.HubVoiceTTS = function (ctx) {
-  const { SS, store, V, setState, reListenSoon, say, isMobileDevice } = ctx;
+  const { SS, store, V, setState, reListenSoon, say, isMobileDevice, markRttEnd } = ctx;
+  const stampRtt = () => { try { if (markRttEnd) markRttEnd(); } catch {} };
 
   // ---- text-to-speech ------------------------------------------------------
   function pickVoice() {
@@ -58,7 +59,7 @@ window.HubVoiceTTS = function (ctx) {
     const u = new SpeechSynthesisUtterance(clean);
     const v = pickVoice(); if (v) u.voice = v;
     u.rate = store.rate;
-    u.onstart = () => { setState('speaking'); stopTtsKeepAlive(); V.ttsKA = setInterval(() => { try { if (SS.speaking) { SS.pause(); SS.resume(); } } catch {} }, 9000); };
+    u.onstart = () => { setState('speaking'); stampRtt(); stopTtsKeepAlive(); V.ttsKA = setInterval(() => { try { if (SS.speaking) { SS.pause(); SS.resume(); } } catch {} }, 9000); };
     u.onend = u.onerror = () => {
       stopTtsKeepAlive();
       // onDone → the queue advances (next block / re-listen / idle). No onDone
@@ -87,7 +88,7 @@ window.HubVoiceTTS = function (ctx) {
     if (V.audioUrl) { try { URL.revokeObjectURL(V.audioUrl); } catch {} }
     V.audioUrl = URL.createObjectURL(blob);
     const el = V.audioEl = V.audioEl || new Audio();
-    el.onplay = () => setState('speaking');
+    el.onplay = () => { setState('speaking'); stampRtt(); };
     el.onended = el.onerror = () => { if (onDone) onDone(); };
     el.src = V.audioUrl;
     // a rejected play() (autoplay policy, device change) must still advance

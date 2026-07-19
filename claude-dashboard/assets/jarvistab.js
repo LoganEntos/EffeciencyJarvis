@@ -6,10 +6,11 @@
    specular + terminator) driven by voice state and — when a mic is granted —
    an AnalyserNode envelope. Per-persona hue drives --accent-live and an
    ambient radial light. In-tab chat streams to /api/run and renders directly
-   into the transcript panel. Styling in assets/jarvis.css. */
+   into the transcript panel. Thread-timeline dots live in
+   assets/jarvistimeline.js. Styling in assets/jarvis.css. */
 'use strict';
 (function () {
-  const J = { txTimer: null, txSig: '', personas: [], active: null, shaped: '' };
+  const J = { txTimer: null, txSig: '', personas: [], active: null, shaped: '', thinkOn: false };
   const inCall = () => !!(window.HubVoice && !HubVoice._disabled && HubVoice._call());
   const voiceState = () => (window.HubVoice && !HubVoice._disabled) ? HubVoice._state() : 'idle';
   const visible = () => { const s = $('#jarvis'); return s && !s.classList.contains('hidden') && !document.hidden; };
@@ -93,6 +94,17 @@
     renderRecall(); renderHolding();
     flash(next ? '✓ memory recall on' : '✓ memory recall off');
   }
+
+  // ---- ◐ think toggle: one-shot extended thinking on the NEXT in-tab send --
+  // jarvischat.js reads window.jarvisThink.get() at send time and clears it
+  // right after, so it never carries over to a second turn. Server-side
+  // mapping (--effort max) lives in lib/runs.js startRun().
+  function renderThink() { const b = $('#jThinkBtn'); if (b) b.classList.toggle('on', J.thinkOn); }
+  function toggleThink() {
+    J.thinkOn = !J.thinkOn; renderThink();
+    flash(J.thinkOn ? '◐ think armed — the next send gets full extended-thinking effort' : '◐ think disarmed');
+  }
+  window.jarvisThink = { get: () => J.thinkOn, clear: () => { J.thinkOn = false; renderThink(); } };
 
   // ---- prompt in progress (distiller, surfaced) ------------------------------
   const REFINERS = [
@@ -202,17 +214,10 @@
         <div class="jmsg-text">${esc(e.text || '')}</div>
       </div></div>`;
   }
-  function renderTimeline(n) {
-    const track = $('#jtlTrack'); if (!track) return;
-    const count = Math.min(8, Math.max(1, n || 1));
-    let dots = '<div class="jtl-line"></div>';
-    for (let i = 0; i < count; i++) {
-      const pct = count === 1 ? 0 : (i / (count - 1)) * 92;
-      dots += `<button class="jtl-dot${i === count - 1 ? ' active' : ''}" style="left:${pct}%" title="turn ${i + 1}"></button>`;
-    }
-    dots += '<div class="jtl-end">→</div>';
-    track.innerHTML = dots;
-  }
+  // Thread-timeline dots (click → jump to that turn in #jconv) live in
+  // assets/jarvistimeline.js — jarvischat.js calls jarvisTimeline.render()
+  // directly after each turn, so this tab doesn't need to touch it at all
+  // beyond the initial mount below.
   // #jconv is owned permanently by the in-tab chat (jarvischat.js) — this tail
   // renders into the collapsed "live activity" strip (#jactBody) instead, so
   // the two never fight over the same container. No pause/resume needed since
@@ -231,7 +236,8 @@
     J.txSig = sig;
     const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 60;
     feed.innerHTML = events.length ? events.map(fmtEvent).join('') : '<div class="jmsg-meta" style="padding:4px">(no conversation events yet)</div>';
-    renderTimeline(events.length);
+    // Thread-timeline dots track #jconv turns (jarvischat.js), not this
+    // session-tail strip — see renderTimeline/jarvisHooks below.
     if (force || atBottom) feed.scrollTop = feed.scrollHeight;
   }
 
@@ -404,7 +410,8 @@
     // control cluster
     $('#jTalkBtn').onclick = tap;
     $('#jCallBtn').onclick = () => { if (!window.HubVoice) return; inCall() ? HubVoice.endCall() : HubVoice.beginCall(); };
-    $('#jThinkBtn').onclick = () => flash('think mode follows the run — the orb shows it live');
+    $('#jThinkBtn').onclick = toggleThink;
+    renderThink();
     $('#jBargeBtn').onclick = () => { try { if (window.HubVoice && HubVoice.bargeIn) HubVoice.bargeIn(); else if (window.HubVoice && HubVoice.stop) HubVoice.stop(); } catch {} };
 
     // header pills
@@ -449,6 +456,9 @@
     // rtt readout (mirrors the header orb's round-trip if voice exposes it)
     const rtt = $('#jrtt');
     if (rtt && window.HubVoice && HubVoice._rtt) { const v = HubVoice._rtt(); if (v) rtt.textContent = 'rtt ' + v; }
+    // thread timeline: #jconv itself was just rebuilt blank above, but
+    // jarvischat.js's turn counter survives a tab switch — reflect it.
+    if (window.jarvisTimeline) jarvisTimeline.render(window.jarvisChat ? jarvisChat.turnCount() : 0);
 
     await loadPersonas();
     orbSetPersona();

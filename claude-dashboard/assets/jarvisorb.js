@@ -189,10 +189,14 @@
     if (!reducedMotion() && O.raf == null) O.raf = requestAnimationFrame(loop);
   }
   function setPersona(id) { O.personaId = id; }
+  // Called by voice.js once a conversation opens a real mic AnalyserNode:
+  // setAudio({ analyser, buf: Uint8Array(analyser.frequencyBinCount) }).
+  // setAudio(null) on call end so pullAudio() never reads a stale/closed node.
+  function setAudio(a) { O.audio = a || null; }
   function stop() {
     try { O.ro && O.ro.disconnect(); } catch {}
     if (O.raf) { cancelAnimationFrame(O.raf); O.raf = null; }
     if (O.watch) { clearInterval(O.watch); O.watch = null; }
   }
-  window.jarvisOrb = { init, setPersona, stop, updateStateLine };
+  window.jarvisOrb = { init, setPersona, setAudio, stop, updateStateLine };
 })();

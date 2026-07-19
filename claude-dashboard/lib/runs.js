@@ -135,7 +135,7 @@ function resolveImages(images) {
   return out;
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files }) {
+function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think }) {
   engine = ENGINES.includes(engine) ? engine : 'claude';
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
@@ -229,6 +229,11 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     if (MODELS.includes(model) && model && model !== 'auto') args.push('--model', model);
     if (perm !== 'default') args.push('--permission-mode', perm);
     if (resume && /^[a-f0-9-]{8,}$/.test(resume)) args.push('--resume', resume);
+    // Jarvis-tab ◐ think toggle: one-shot extended-thinking effort for THIS
+    // turn only. The CLI has no literal "thinking budget" flag, but --effort
+    // max is the real equivalent (verified via `claude --help`: low/medium/
+    // high/xhigh/max) — a genuine argv flag, not a prompt-prepend hack.
+    if (think) args.push('--effort', 'max');
   }
 
   const meta = {
@@ -239,6 +244,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     team: teamName, persona: personaName, routedReason, recallCount: recalled ? recalled.count : 0,
     imageCount: imgPaths.length,
     project: projectName, projectSlug: projectSlug || null,
+    think: engine === 'claude' && !!think,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);
@@ -248,6 +254,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   if (team) pushLine(st, JSON.stringify({ type: 'hub_status', text: `⛬ team: ${team.name} — steering delegation to its specialists` }));
   if (personaName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◈ persona: ${personaName} — communication bearing active` }));
   if (projectName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `▤ project: ${projectName} — instructions${projRecall ? ` + ${projRecall.count} memor${projRecall.count === 1 ? 'y' : 'ies'}` : ''} injected` }));
+  if (meta.think) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◐ think: max-effort extended thinking for this turn` }));
   if (runningCount() < MAX_ACTIVE) launch(st);
   else {
     queue.push(id);
@@ -342,6 +349,7 @@ async function handle(req, res, url) {
       recall: b.recall === true,
       engine: (b.engine || '').toString(),
       projectId: (b.projectId || '').toString(),
+      think: b.think === true,
       images: Array.isArray(b.images) ? b.images : [],
       files: Array.isArray(b.files) ? b.files : [],
     });
