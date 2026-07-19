@@ -141,6 +141,20 @@ button.jp-pill:hover { color: var(--txt); border-color: var(--line-strong); }
 .jcustom textarea { font-family: var(--font-mono); font-size: 12px; min-height: 220px; resize: vertical; }
 .jcustom label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 4px; }
 
+/* ---- two-layer editor: contract (layer 1) + persona finder ---- */
+.jlayer { border: 1px solid var(--line); border-radius: var(--r-sm, 8px); padding: 12px 14px; margin-bottom: 14px; background: color-mix(in srgb, var(--panel) 88%, var(--accent-live, var(--accent)) 5%); }
+.jlayer-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.jlayer-h .muted { font-size: 11px; }
+.jcustom textarea.jgide { min-height: 150px; margin-bottom: 8px; }
+.jsurvey { display: flex; flex-direction: column; gap: 12px; }
+.jsq-k { font-size: 12.5px; color: var(--txt); margin-bottom: 6px; }
+.jsq-a { display: flex; gap: 6px; flex-wrap: wrap; }
+.jsq-opt { cursor: pointer; }
+.jsq-opt.on { color: var(--accent-live, var(--accent)); border-color: color-mix(in srgb, var(--accent-live, var(--accent)) 60%, transparent); background: color-mix(in srgb, var(--accent-live, var(--accent)) 12%, transparent); }
+.jsq-out { min-height: 18px; font-size: 12px; }
+.jsq-rec { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--line); }
+.jsq-rec b { color: var(--accent-live, var(--accent)); }
+
 /* ---- in-tab chat composer (inside .jconv-panel) ---- */
 .jchat-row { display: flex; align-items: flex-end; gap: 8px; padding: 10px 14px; background: color-mix(in srgb, var(--panel) 90%, var(--accent-live, var(--accent)) 6%); }
 .jchat-caret { font-family: var(--font-mono); color: var(--accent-live, var(--accent)); font-size: 15px; padding-bottom: 8px; user-select: none; }

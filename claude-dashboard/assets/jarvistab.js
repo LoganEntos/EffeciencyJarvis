@@ -29,6 +29,9 @@
     renderCards(); renderNameplate(); renderHolding(); applyAccent();
     const sel = $('#jpSel'); if (sel) fillEditorSelect(sel.value);
   }
+  // Let jarvispersona.js (survey activate) refresh the whole tab after it flips
+  // the active persona out from under us.
+  window.jarvisTabRefresh = loadPersonas;
   function renderNameplate() {
     const p = J.personas.find(x => x.id === J.active);
     const nm = $('#jname'); if (nm) nm.textContent = p ? p.name : 'Jarvis';
@@ -327,6 +330,19 @@
       <div class="jcustom">
         <span class="jmsg-flash" id="jmsg"></span>
         <div id="jcustPanel" class="hidden">
+          <div class="jlayer">
+            <div class="jlayer-h"><span class="jp-label">layer 1 · output contract</span><span class="muted" style="text-transform:none;letter-spacing:0">obeyed by every persona — plain language, no code talk, concise, progress-forward</span></div>
+            <textarea id="jgideBody" class="jgide" spellcheck="false" placeholder="loading the shared contract…"></textarea>
+            <button class="jp-btn" id="jgideSave">Save contract</button>
+          </div>
+
+          <div class="jlayer">
+            <div class="jlayer-h"><span class="jp-label">persona finder</span><span class="muted" style="text-transform:none;letter-spacing:0">three questions → the persona that fits how you want to be spoken to</span></div>
+            <div id="jsurvey" class="jsurvey"></div>
+            <button class="jp-ghost" id="jsqReset" style="margin-top:6px">↺ reset answers</button>
+          </div>
+
+          <div class="jlayer-h" style="margin-top:14px"><span class="jp-label">layer 2 · personality</span><span class="muted" style="text-transform:none;letter-spacing:0">the character on top of the contract</span></div>
           <div class="jfields">
             <div class="wide"><label for="jpSel">Persona</label><select id="jpSel"></select></div>
             <div><label for="jpId">id <span style="text-transform:none;letter-spacing:0">(filename — new only)</span></label><input id="jpId" placeholder="e.g. scout" disabled></div>
@@ -368,7 +384,7 @@
     $('#jrecall').onclick = toggleRecall;
     $('#jcustBtn').onclick = () => {
       const p = $('#jcustPanel'); p.classList.toggle('hidden');
-      if (!p.classList.contains('hidden')) { fillEditorSelect(); loadEditor($('#jpSel').value); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+      if (!p.classList.contains('hidden')) { fillEditorSelect(); loadEditor($('#jpSel').value); if (window.jarvisPersona) window.jarvisPersona.mount(J.personas); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
     };
     renderRecall();
 

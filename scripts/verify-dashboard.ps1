@@ -116,6 +116,7 @@ CheckPost "POST /api/personas/save w/o token (403)" "$base/api/personas/save" '{
 CheckPost "POST /api/personas/delete w/o token (403)" "$base/api/personas/delete" '{"id":"x"}' 403
 CheckPost "POST /api/personas/rename w/o token (403)" "$base/api/personas/rename" '{"id":"x","newId":"y"}' 403
 CheckPost "POST /api/personas/order w/o token (403)" "$base/api/personas/order" '{"ids":[]}' 403
+CheckPost "POST /api/personas/guidelines w/o token (403)" "$base/api/personas/guidelines" '{"body":"x"}' 403
 CheckPost "POST /api/jarvis/distill w/o token (403)" "$base/api/jarvis/distill" '{"text":"x"}' 403
 CheckPost "POST /api/voice/open-folder w/o token (403)" "$base/api/voice/open-folder" '{"engine":"kokoro"}' 403
 

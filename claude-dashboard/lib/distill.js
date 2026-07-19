@@ -29,10 +29,15 @@ const CLAUDE_EXE = process.env.HUB_CLAUDE_EXE || path.join(
 // straight into the run + the transcript turn.
 const SYS =
   'You are a prompt engineer for a coding agent working in a software repository. '
-  + 'Rewrite the user\'s rough, spoken "vibe" request below into ONE clear, specific, '
-  + 'self-contained prompt. Preserve their intent and every concrete detail; keep it '
-  + 'concise. Do NOT invent requirements, do NOT ask questions, do NOT answer or perform '
-  + 'the task, do NOT add preamble or quotes. Output ONLY the rewritten prompt.';
+  + 'Rewrite the user\'s rough, spoken "vibe" request below into ONE clear, self-contained '
+  + 'prompt that keeps their intent and every concrete detail. '
+  + 'Match the ask: a build/fix/edit request becomes a precise, actionable instruction; '
+  + 'a question or conversational ask stays a natural-language request — do NOT inflate it '
+  + 'into a rigid spec, acceptance criteria, or a wall of technical jargon it did not ask for. '
+  + 'Write in plain words a person would say; only name a specific file, function, or flag when '
+  + 'the user named it themselves. Keep it concise. Do NOT invent requirements, do NOT ask '
+  + 'questions, do NOT answer or perform the task, do NOT add preamble or quotes. '
+  + 'Output ONLY the rewritten prompt.';
 
 function distill(text, timeoutMs = 20000) {
   return new Promise(resolve => {

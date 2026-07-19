@@ -28,6 +28,35 @@ const U = require('./util');
 const DASH_DIR = path.resolve(__dirname, '..');
 const PERSONAS_DIR = path.join(DASH_DIR, 'personas');
 const STATE_FILE = path.join(DASH_DIR, 'data', 'personas.json');
+// Layer 1 — the shared output contract. This LEADS every persona injection and
+// overrides any character styling that would conflict, so switching persona
+// changes the voice but never the standard: plain language, no code dialect,
+// concise, progress-forward. Editable at personas/_guidelines.md (the leading
+// underscore keeps it out of okId, so it can never be selected/deleted as a
+// persona). The personality file (layer 2) only adds character on top.
+const GUIDELINES_FILE = path.join(PERSONAS_DIR, '_guidelines.md');
+const DEFAULT_GUIDELINES =
+`Every reply is spoken aloud to a person — not written into a document. These rules outrank the persona's own styling wherever they conflict:
+
+- **Plain language, no code dialect.** Never say a variable, function, file, flag, or config-key name out loud. If you changed how something works, describe what it now does in ordinary words — "I made the shaped prompt shorter," not the name of the thing you edited. The exact names belong in the commit or an artifact, never in the reply.
+- **Lead with the result.** First sentence is the outcome or the recommendation. No restating the question, no "I went ahead and…", no warm-up.
+- **Short by default.** A few sentences covers almost everything; stretch to two short paragraphs only when depth is explicitly requested. No headings or bullet lists in a spoken reply.
+- **Engaged and specific, never dull.** Give one sharp, useful next step, not a survey of options. Momentum over completeness — you are helping someone move faster.
+- **Candid.** If the idea is weak, say so in a sentence and offer the better line.`;
+
+// Layer 1 text — the file override if present and non-empty, else the built-in.
+function guidelines() {
+  try { const raw = fs.readFileSync(GUIDELINES_FILE, 'utf8').trim(); if (raw) return parse(raw).body || raw; } catch {}
+  return DEFAULT_GUIDELINES;
+}
+function saveGuidelines(body) {
+  const text = String(body || '').trim();
+  if (!text) return { error: 'guidelines cannot be empty' };
+  if (text.length > 16 * 1024) return { error: 'guidelines too large (16 KB max)' };
+  try { fs.mkdirSync(PERSONAS_DIR, { recursive: true }); fs.writeFileSync(GUIDELINES_FILE, text + '\n'); }
+  catch (e) { return { error: 'could not save: ' + e.message }; }
+  return { ok: true, guidelines: text };
+}
 
 // A persona id is the filename without .md; validated so it can never escape
 // the personas dir (no traversal, no absolute paths).
@@ -220,7 +249,10 @@ function activePrefix() {
   if (!id) return '';
   const p = load(id);
   if (!p || !p.body) return '';
-  return `<persona name="${p.name}">\n${p.body}\n</persona>\n\n` + takeHandoff(id);
+  // Layer 1 (contract) leads, layer 2 (character) follows — the persona speaks
+  // in its own voice but always inside the shared standard.
+  return `<output-contract>\n${guidelines()}\n</output-contract>\n\n`
+    + `<persona name="${p.name}">\n${p.body}\n</persona>\n\n` + takeHandoff(id);
 }
 
 function activeName() {
@@ -232,7 +264,15 @@ function activeName() {
 
 async function handle(req, res, url) {
   if (url.pathname === '/api/personas' && req.method === 'GET') {
-    U.sendJson(res, { personas: list(), active: getActiveId() });
+    U.sendJson(res, { personas: list(), active: getActiveId(), guidelines: guidelines() });
+    return true;
+  }
+  // Layer-1 output contract editor (the two-layer interface's shared half).
+  if (url.pathname === '/api/personas/guidelines' && req.method === 'POST') {
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 32 * 1024) || '{}'); } catch {}
+    const r = saveGuidelines(b.body);
+    U.sendJson(res, r, r.error ? 400 : 200);
     return true;
   }
   if (url.pathname === '/api/personas/active' && req.method === 'POST') {
