@@ -47,7 +47,12 @@ function distill(text, timeoutMs = 20000) {
     let out = '', err = '', done = false, child;
     const finish = r => { if (!done) { done = true; clearTimeout(t); resolve(r); } };
     const t = setTimeout(() => { try { child && child.kill(); } catch {} finish({ prompt: '', error: 'timeout' }); }, timeoutMs);
-    try { child = spawn(CLAUDE_EXE, args, { cwd: PROJECT_DIR, windowsHide: true }); }
+    // stdio[0] MUST be 'ignore', not the node default open pipe: with an open,
+    // unwritten stdin pipe the CLI spends ~3s guessing whether piped input is
+    // coming before it proceeds (see docs/handoffs/distill-latency.md) — that
+    // alone was roughly half of the measured latency. -p already carries the
+    // full prompt as an argv, so stdin is never read.
+    try { child = spawn(CLAUDE_EXE, args, { cwd: PROJECT_DIR, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
     catch (e) { return finish({ prompt: '', error: e.message }); }
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
