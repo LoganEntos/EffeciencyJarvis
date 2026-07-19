@@ -98,3 +98,26 @@ direction; rows still click through to the definition. CSS added under a new
 group with tier pills; Skills shows A/B/C letter groups with counts (api-design,
 backend-patterns…). Sort + collapse controls render, theme intact. Client-only
 change (no new endpoints); smoke green on 5759, 5757 untouched.
+
+---
+
+## Council + Providers panels — ✅ resolved (verified no-op, no code change)
+
+**Finding.** There is **no** Council or Providers chrome in the hub — grep across
+`index.html`, `assets/*.js`, `assets/*.css` for council/provider returns only two
+unrelated hits (a hermes-config regex in `core.js`, a log-noise filter in
+`liveness.js`). The 18 nav tabs contain neither. The memory note
+`redesign-clean-dark` confirms these were only ever **Lovable specs** ("specced
+for Lovable — build them native when the user provides keys"), and the Lovable
+port only brought Jarvis + Overview. So the handoff's worry ("a dead panel that
+looks alive is worse than no panel") does not apply — there is no dead panel to
+wire or remove.
+
+**Decision (no code change, on purpose).** Council = roadmap N10, deprioritized
+to the very bottom (build last if ever) — nothing to do. A Providers panel as
+OpenAI/Perplexity chrome would violate the non-negotiable **Claude-ONLY engine**
+mandate, so it must NOT be built that way; the "engines actually available" are
+just the Claude tiers, and those are already surfaced by the Agents tier groups
+(shipped in R2 above) + the Config tab. Correcting a wrong item with a clean skip
+beats inventing chrome. Updated the `redesign-clean-dark` memory with a
+2026-07-19 verification so the next worker doesn't re-chase this.
