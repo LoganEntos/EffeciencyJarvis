@@ -36,7 +36,7 @@ engines (hermes ACP) only work when the hub is **terminal-launched**, not headle
 server.js                boot + router + static + /vendor/ + X-Hub-Token guard
 lib/util.js              shared helpers (fs, no-shell spawn, body reader, MODELS allowlist)
 lib/core.js              overview / library / assets / sessions / graph endpoints
-lib/runs.js  runs-query.js   run engine: spawn claude CLI, SSE, auto-routing, history, artifacts
+lib/runs.js  runs-engine.js  runs-query.js   run engine: spawn claude CLI, SSE, auto-routing, history, artifacts
 lib/tasks.js schedules.js    hub-native task queue + cron → run engine (data/*.json)
 lib/agentgraph.js liveness.js run stream → persona crew graph; orphan reaper + heartbeat
 lib/files.js             upload inbox (vanilla multipart) + zero-dep xlsx preview
@@ -74,6 +74,31 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
   `github.com/LoganEntos/EffeciencyJarvis.git`). `scripts/sync.ps1` does
   pull-rebase-then-push. `data/`, `.claude/settings.local.json`, and the sidecar
   dirs are gitignored (per-machine). The user drives push; don't push unprompted.
+
+## Latest work shipped (2026-07-19)
+1. **F1 split (2026-07-19, commits 53c6747/3c6eabe):** `lib/runs.js` process
+   lifecycle extracted to new `lib/runs-engine.js` via createEngine factory
+   (386+179 lines, zero behavior change).
+2. **Jarvis chat parity (2026-07-19, commits b73ba5a/1c7ca98):** chat owns
+   `#jconv`; transcript tail moved to collapsed "▸ live activity" strip; ▷
+   run-this fires in-tab with ⤴ run-tab secondary; file attach (new
+   `assets/jarvisattach.js`) via paste/drop/📎; session badge; send() returns
+   honest true/false.
+3. **Distill latency (2026-07-19, commits 20a43cd/477c1fc):** root cause was
+   child stdin left open; fixed with stdio ignore; ~12.6s → 6-8s typical.
+4. **Voice orb live (2026-07-19, commits 9421d61/8ae1c87):** mic-driven orb
+   waveform (shared AnalyserNode, `jarvisOrb.setAudio`), real RTT badge
+   (end-of-speech → first TTS audio, rolling last-3, `HubVoice._rtt`), ◐ think
+   one-shot → `--effort max` mapped in `lib/runs.js`, timeline dots jump (new
+   `assets/jarvistimeline.js`).
+5. **Persona manager UI (2026-07-19, commits eeccf1a/272282f):** new
+   `assets/jarvispersonacards.js` (206 L): hover ✎/✕ with two-step delete
+   confirm, inline rename-id, drag-to-reorder → `/api/personas/order`, ＋ ghost
+   card → soul editor new-persona mode.
+6. **Spoken-reply contract tightened (2026-07-19, commit 6dbea80):**
+   `personas/_guidelines.md` + `lib/personas.js` DEFAULT_GUIDELINES — under
+   1 min of speech, casual friend tone, no jargon, updates only when they
+   matter.
 
 ## Latest work shipped (2026-07-14 → 07-17)
 2026-07-17 (commit `36bd72d`, planned + approved): **voice conversation
@@ -187,28 +212,26 @@ P1/P2/P3 find-fix round closed; **N7 SharePoint Breakdown** shipped — see
 - **~190-entry claude-flow purge** (`bd09b68`) — 166 dead commands + 28 dead
   skills removed per `docs/agent-skill-efficiency-report.md`.
 
-## EXECUTE NEXT — agent-team queue (user-ordered 2026-07-17)
+## EXECUTE NEXT — agent-team queue
 
-**O0. Work orders live in `docs/handoffs/` — read its README first.** Each is
-sized for one hub run and carries the mandatory review pipeline (verify →
-smoke → code-reviewer → commit). The Lovable Jarvis+Overview ports are DONE
-(`c30fa91`, `682c63e`, `fbc1fee`); the Projects inline chat is DONE with its
-P1 projectId fix (`639b317`). Scope rule still stands: only Jarvis + Overview
-were ported from the Lovable build — the other tabs' Lovable screens "need
-work", don't port them.
+**Status:** items 2–6 from the 2026-07-17 queue SHIPPED 2026-07-19. Work orders
+live in `docs/handoffs/` — read its README first. Each is sized for one hub run
+and carries the mandatory review pipeline (verify → smoke → code-reviewer →
+commit). The Lovable Jarvis+Overview ports are DONE (`c30fa91`, `682c63e`,
+`fbc1fee`); the Projects inline chat is DONE with its P1 projectId fix
+(`639b317`). Scope rule still stands: only Jarvis + Overview were ported from
+the Lovable build — the other tabs' Lovable screens "need work", don't port
+them.
 
-**The queue (execute top-to-bottom):**
+**Next queue (execute top-to-bottom):**
 1. `docs/handoffs/projects-tab-polish.md` — composer model select, thread-
-   resume clarity, re-render churn, ✦ distiller toggle, 375px, empty-state.
-2. `docs/handoffs/jarvis-chat-parity.md` — chat-first panel (transcript tail
-   → collapsed strip), ▷ run-this in-tab, spoken replies, file attach.
-3. `docs/handoffs/voice-orb-live.md` — mic-driven orb waveform, real rtt,
-   ◐ think → extended thinking, timeline dots jump.
-4. `docs/handoffs/persona-manager-ui.md` — delete/rename/reorder/＋ new on
-   the persona cards (backend live since `1fb6cd4`).
-5. `docs/handoffs/schedules-verify.md` — schedules UI polish + the R5
-   stress test (never proven to fire).
-6. `docs/handoffs/distill-latency.md` — optional, last.
+   resume clarity, re-render churn, ✦ distiller toggle, 375px, empty-state
+   (PENDING — not yet started).
+2. Real-mic pass on **voice-orb-live** (orb waveform + RTT badge listen-through,
+   Bluetooth-headset contention check — user interactive verification only).
+3. Real-browser drag/keyboard-nav pass on **persona cards** (headless browser
+   can't spawn in run sandbox — user verification).
+4. `docs/handoffs/schedules-verify.md` — schedules UI polish + R5 stress test.
 
 Standing constraints for every item: ⚠ voice CONVERSATION behavior is now the
 `36bd72d` engine (`assets/voiceconvo.js` — wake→ack→open window→close on held
@@ -222,19 +245,19 @@ real-mic test (default flipped from "Suzy" 2026-07-17, with jarvis/jervis/
 javis misrecognition variants); a real-mic pass on the orb waveform once
 voice-orb-live ships.
 
-**O4. Then the roadmap queue** (`docs/roadmap.md`): N2 mobile ergonomic pass,
-R3 auto session summaries (cheap-model, cached), R4 image thumbnails + day
+**Then the roadmap queue** (`docs/roadmap.md`): N2 mobile ergonomic pass, R3
+auto session summaries (cheap-model, cached), R4 image thumbnails + day
 grouping in Files, N8 iPhone polish (Tailscale PWA already live). 🙋 Q1
 Playwright still awaits the user's yes. **N10 Council is lowest priority —
 build last, if ever** (user call 2026-07-15).
 
-## Pending USER actions (remind them; you can't do these)
-- **Permission allowlist for hub runs.** Auto-mode agents can't self-widen execution
-  perms (anti-injection). For hub runs to execute `node`/`curl`/`powershell`/web, the
-  user must set the run mode to `bypassPermissions` (the current default) or hand-add
-  the `Bash(…)`/`WebSearch`/`WebFetch(...)` entries in `.claude/settings.json`.
+## Pending USER actions (interactive verifications)
+- **Real-mic pass on voice orb** — once voice-orb-live ships, test the mic-driven
+  waveform, RTT badge, and think toggle with a real microphone and Bluetooth-headset
+  scenarios.
+- **Real-browser persona-card pass** — drag-to-reorder, rename inline, delete confirm,
+  and ＋ new-persona flow on the Jarvis tab at desktop + 375px. (Headless browser
+  can't spawn interactive runs in the run sandbox.)
 - **Mobile:** install Tailscale (PC + phone), `tailscale serve --bg 5757`, bookmark the URL.
 - **Autostart:** `powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1`.
 - **Q1 Playwright** (dev-only, no run tax): a quick "yes" and the E2E net gets built.
-- **Deliver the final Lovable Jarvis-tab design** (preview URL) — unblocks
-  `docs/handoffs/jarvis-ui-port.md` + `persona-manager-ui.md`.

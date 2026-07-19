@@ -25,6 +25,17 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 
 ---
 
+## ✅ Shipped (2026-07-19)
+
+| # | Item | Where |
+|---|------|-------|
+| S-F1 | **F1 split** — `lib/runs.js` process lifecycle extracted to `lib/runs-engine.js` via createEngine factory (386+179 lines, zero behavior change) | `53c6747`, `3c6eabe` |
+| S-JCP | **Jarvis chat parity** — chat owns `#jconv`; transcript tail → collapsed "▸ live activity" strip; ▷ run-this in-tab, ⤴ run-tab secondary; file attach via paste/drop/📎; session badge; send() returns honest true/false | `b73ba5a`, `1c7ca98` |
+| S-DL | **Distill latency** — child stdin left open fixed with stdio ignore; ~12.6s → 6-8s typical | `20a43cd`, `477c1fc` |
+| S-VOL | **Voice orb live** — mic-driven waveform (shared AnalyserNode), real RTT badge (rolling last-3), ◐ think → `--effort max`, timeline dots jump | `9421d61`, `8ae1c87` |
+| S-PMU | **Persona manager UI** — hover ✎/✕ two-step delete, inline rename-id, drag-to-reorder → `/api/personas/order`, ＋ ghost card → new-persona mode | `eeccf1a`, `272282f` |
+| S-SRC | **Spoken-reply contract** — under 1 min speech, casual friend tone, no jargon, updates only when they matter | `6dbea80` |
+
 ## ✅ Shipped (2026-07-16 → 07-17)
 
 | # | Item | Where |
@@ -231,6 +242,10 @@ near-future schedule, assert it fires + lands in run history, tear down).
 > (3) the whole system is observable (runs, spend, live agent graph, memory);
 > (4) it survives regressions (smoke + Playwright). The list below is what
 > remains to reach that; H2→H4 and N9 Track B are the load-bearing items.
+>
+> **2026-07-19 update:** Jarvis chat parity, voice-orb-live, and persona-manager-ui
+> shipped this session. Projects-tab-polish is PENDING. Schedule-verify is N4 in
+> the new queue.
 
 ### H1–H4. Hermes integration (H1 ✅ shipped; credentials ✅ done; H2–H4 next)
 hermes-agent IS the second agentic stack (model tiering: cheap models for
@@ -371,27 +386,29 @@ talks to the hub over the user's Tailscale HTTPS URL (revisits the earlier
 "Base44 can't reach localhost" objection — Tailscale changes the math);
 (c) a thin native wrapper. Depends on N2 mobile polish either way.
 
-### N2. Mobile polish  (was P2)
+### N2. Mobile ergonomic pass  (was P2)
 Audit every tab at 375px width (the nav already collapses <760px). Fix touch
 targets, composer ergonomics, card wrapping, table overflow. Files:
 `assets/style.css` + per-tab tweaks. Done when: all 11 tabs usable one-handed on
 a phone. (Pairs with the user's Tailscale setup — see 🙋 below.) Spot-check at
 375px during S16 showed no regressions; this item is the full ergonomic pass.
 
-### N4. Routing-accuracy feedback loop
-Compare each auto-routed model against the run outcome (did haiku succeed, or
-error/retry?). Surface a small stat and tune `routeModel()` thresholds from real
-data. Files: `lib/runs.js`, a metrics view. Sharpens the core token lever.
+### R3. Auto session summaries
+Sessions must NOT require clicking "summarize with Claude". A cheap model
+(haiku/sonnet) auto-scans every session and writes an exact debrief — improves
+memory, makes old sessions scannable. Run it on session close / on a cheap batch,
+cache the summary.
 
-### N5. Dark/light theme toggle
-System-preference detection + manual toggle in the header. The light-theme
-variable set already exists (`:root[data-theme="light"]` in `assets/style.css`,
-shipped with S16) — remaining work is just the header toggle + persistence in
-`assets/app.js`.
+### R4. Files: image thumbnails + day grouping
+Show a visual thumbnail of every uploaded image (you must see the context the
+AI is given). Group/sort by upload day; >10 images is unrememberable without
+categorization.
 
-### N6. xlsx structural preview in Files
-Zero-dep zip/xml parse to show sheet names + dimensions for uploaded `.xlsx`
-before a run reads them. Files: `lib/files.js`, `assets/files.js`.
+### N4. Schedules UI polish + R5 stress test
+Polish the Scheduled section in Tasks tab. The `/lib/schedules.js` has NEVER been
+stress-tested — no verification that it actually fires. Create a near-future
+schedule, assert it fires + lands in run history, tear down. Fold into the
+self-improvement/autopilot loop.
 
 ---
 

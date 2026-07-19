@@ -29,12 +29,12 @@ Commit at each working, browser-verified stage.
 
 | # | file | status | model |
 | --- | --- | --- | --- |
-| 1 | `projects-tab-polish.md` | READY — polish on the working inline project chat (`639b317`) | Opus 4.8 |
-| 2 | `jarvis-chat-parity.md` | READY — chat-first panel, run-this in-tab, speak replies, file attach | Opus 4.8 |
-| 3 | `voice-orb-live.md` | READY — wire orb waveform/rtt/think/timeline live | Opus 4.8 |
-| 4 | `persona-manager-ui.md` | READY — delete/rename/reorder onto the shipped persona cards | Opus 4.8 |
+| 1 | `projects-tab-polish.md` | PENDING — polish on the working inline project chat (`639b317`) | Opus 4.8 |
+| 2 | `jarvis-chat-parity.md` | ✅ DONE 07-19 (`b73ba5a`, `1c7ca98`) | — |
+| 3 | `voice-orb-live.md` | ✅ DONE 07-19 (`9421d61`, `8ae1c87`) | — |
+| 4 | `persona-manager-ui.md` | ✅ DONE 07-19 (`eeccf1a`, `272282f`) | — |
 | 5 | `schedules-verify.md` | READY — schedules UI polish + the R5 stress test (never proven) | Opus 4.8 |
-| 6 | `distill-latency.md` | OPTIONAL — only after 1–5 | Opus 4.8 |
+| 6 | `distill-latency.md` | ✅ DONE 07-19 (`20a43cd`, `477c1fc`) | — |
 | ✅ | `jarvis-tab-finalize.md` | DONE 07-16 (`fbc1fee`) — module split + 4 defects fixed | — |
 | ✅ | `jarvis-ui-port.md` | DONE 07-16 (`c30fa91`, postscript inside) — Lovable port shipped | — |
 | ✅ | `jarvis-error-hunt.md` | DONE 07-16 (`d212169`) — beacon works; only catch was the already-fixed `6c09bd7` crash | — |
