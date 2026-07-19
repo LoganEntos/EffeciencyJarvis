@@ -80,7 +80,7 @@ browser check and deleted afterward (inbox is back to the user's real files).
 
 ## R2 — Navigable libraries ✅ shipped
 
-**Commit:** `__R2_HASH__`
+**Commit:** `46dfc67`
 
 **What shipped.** Agents, Skills, and Commands were already filterable but flat.
 All three share one function (`listView` in `assets/app.js`), so enhancing it
