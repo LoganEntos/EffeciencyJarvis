@@ -7,7 +7,7 @@ claim what the commit doesn't show.
 
 ## R3 — Auto session summaries ✅ shipped
 
-**Commit:** `__R3_HASH__`
+**Commit:** `970a3a9`
 
 **What shipped.** The Sessions view no longer needs a manual "Summarize with
 Claude" click (which just prefilled a full run). New server module
