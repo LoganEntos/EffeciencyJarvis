@@ -1,13 +1,30 @@
 /* Jarvis tab — in-tab live chat. Own /api/run + SSE. Streams assistant text
    into #jconv as a growing bubble with a ▍ caret, renders tool_use blocks,
-   and resumes the CLI session across turns. Split out of jarvistab.js to keep
-   both files under the 500-line project cap; talks to jarvistab via
-   window.jarvisHooks (pause/resume transcript poll, refresh holding grid). */
+   and resumes the CLI session across turns. #jconv is this module's alone —
+   the session-tail poller in jarvistab.js renders into a separate #jactBody
+   strip, so the two never clobber each other. Split out of jarvistab.js to
+   keep both files under the 500-line cap; talks to jarvistab via
+   window.jarvisHooks (refresh holding grid) and to assets/jarvisattach.js
+   (pending file chips → images/files refs on the run payload). */
 'use strict';
 (function () {
   const S = { es: null, running: false, runId: null, seen: -1, sessionId: null, bubble: null, buf: '' };
   const recallOn = () => { try { return localStorage.getItem('hub.recall') === '1'; } catch { return false; } };
   const timeOf = iso => { try { return new Date(iso).toLocaleTimeString(undefined, { hour12: false }); } catch { return ''; } };
+
+  // ---- session badge (panel header): short id when resumed, "＋ new" when fresh
+  function renderSessBadge() {
+    const el = $('#jsessBadge'); if (!el) return;
+    if (S.sessionId) {
+      el.textContent = 'sess · ' + S.sessionId.slice(0, 8);
+      el.title = 'resumed CLI session ' + S.sessionId;
+      el.classList.add('on');
+    } else {
+      el.textContent = '＋ new';
+      el.title = 'fresh CLI session — the next prompt starts it';
+      el.classList.remove('on');
+    }
+  }
 
   function jconvAppend(html, cls) {
     const feed = $('#jconv'); if (!feed) return null;
@@ -64,14 +81,30 @@
     }
   }
   async function send(textArg) {
+    if (S.running) return;
     const ta = $('#jchatIn');
-    const prompt = (typeof textArg === 'string' && textArg.trim()) || (ta ? ta.value.trim() : '');
-    if (!prompt || S.running) return;
-    if (window.jarvisHooks && window.jarvisHooks.pauseTranscript) window.jarvisHooks.pauseTranscript();
+    let prompt = (typeof textArg === 'string' && textArg.trim()) || (ta ? ta.value.trim() : '');
+    // Attachments: same inbox path as the Run tab (assets/jarvisattach.js).
+    // Block while one is still uploading; allow an attachment-only send.
+    const attList = window.jarvisAttach ? jarvisAttach.pending() : [];
+    if (attList.some(c => c.pending)) {
+      jconvAppend(`<div class="jmsg-meta">still uploading an attachment — try again in a moment.</div>`, 'jmsg result');
+      return;
+    }
+    const atts = attList.filter(c => c.ref);
+    const imgs = atts.filter(c => c.isImage);
+    const docs = atts.filter(c => !c.isImage);
+    if (!prompt && !atts.length) return;
+    if (!prompt && atts.length) {
+      const noun = imgs.length && !docs.length ? ('image' + (imgs.length > 1 ? 's' : '')) : ('file' + (atts.length > 1 ? 's' : ''));
+      prompt = 'Take a look at the attached ' + noun + '.';
+    }
     const feed = $('#jconv');
     if (feed && feed.querySelector('.jmsg-meta[style]')) feed.innerHTML = '';
     if (ta) { ta.value = ''; ta.style.height = 'auto'; } S.buf = '';
     jconvAppend(jmsgHtml('user', esc(prompt)), 'jmsg user');
+    if (imgs.length) jconvAppend(imgs.map(c => `<img src="${esc(c.url)}" alt="attached image" class="jattach-img">`).join(''), 'jmsg attachimgs');
+    if (docs.length) jconvAppend(jmsgHtml('user', '📎 ' + esc(docs.map(c => c.name).join(', '))), 'jmsg user');
     S.bubble = jconvAppend(jmsgHtml('assistant', '<span class="jshimmer">thinking…</span>'), 'jmsg assistant');
     const model = ($('#runModel') && $('#runModel').value) || 'auto';
     const perm = ($('#runPerm') && $('#runPerm').value) || 'bypassPermissions';
@@ -79,9 +112,10 @@
     try {
       r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, engine: 'claude', model, permissionMode: perm,
-          resume: S.sessionId || '', recall: recallOn() }) });
+          resume: S.sessionId || '', recall: recallOn(), images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
     } catch (e) { setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); return; }
     if (r.error) { setBubble('✗ ' + r.error, false); return; }
+    if (window.jarvisAttach) jarvisAttach.clear();
     S.running = true; S.runId = r.id; S.seen = -1;
     const btn = $('#jchatSend'); if (btn) btn.disabled = true;
     setBubble('', true);
@@ -101,22 +135,19 @@
       setBubble(S.buf || '(no reply)', false);
       try { if (window.HubVoice && HubVoice.onRunDone) HubVoice.onRunDone(S.buf); } catch {}
       const b2 = $('#jchatSend'); if (b2) b2.disabled = false;
+      renderSessBadge();
       if (window.jarvisHooks && window.jarvisHooks.renderHolding) window.jarvisHooks.renderHolding();
-      // Turn is over — let the transcript tail refresh again (paused on send).
-      if (window.jarvisHooks && window.jarvisHooks.resumeTranscript) window.jarvisHooks.resumeTranscript();
     });
     es.onerror = () => {
-      // A stream that drops mid-run (server restart, network blip) never sends a
-      // 'done', so recover here instead of hanging: stop, keep whatever streamed,
-      // re-enable send, and resume the transcript tail (paused on send) so the
-      // run's result still surfaces from history.
+      // A stream that drops mid-run (server restart, network blip) never sends
+      // a 'done', so recover here instead of hanging: stop, keep whatever
+      // streamed, and re-enable send.
       if (S.running) {
         S.running = false;
         try { es.close(); } catch {}
         S.es = null;
         setBubble(S.buf || '✗ connection lost — see transcript', false);
         const b3 = $('#jchatSend'); if (b3) b3.disabled = false;
-        if (window.jarvisHooks && window.jarvisHooks.resumeTranscript) window.jarvisHooks.resumeTranscript();
       }
     };
   }
@@ -125,7 +156,8 @@
     S.running = false; S.runId = null; S.seen = -1;
     S.sessionId = null; S.bubble = null; S.buf = '';
     const feed = $('#jconv'); if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">new conversation — the next prompt starts a fresh CLI session</div>';
-    if (window.jarvisHooks && window.jarvisHooks.resumeTranscript) window.jarvisHooks.resumeTranscript();
+    if (window.jarvisAttach) jarvisAttach.clear();
+    renderSessBadge();
     const btn = $('#jchatSend'); if (btn) btn.disabled = false;
   }
   function wire() {
@@ -136,6 +168,7 @@
     }
     const sb = $('#jchatSend'); if (sb) sb.onclick = send;
     const nb = $('#jchatNew'); if (nb) nb.onclick = newChat;
+    renderSessBadge();
   }
   // sendText = programmatic entry for the voice conversation engine
   // (assets/voiceconvo.js): spoken turns render in-tab like typed ones.
