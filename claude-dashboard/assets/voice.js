@@ -230,7 +230,11 @@
   // under the 500-line rule. reListenSoon (the after-reply hook) now hands the
   // turn back to the conversation engine instead of blindly re-opening the mic.
   const _tts = window.HubVoiceTTS({ SS, store, V, setState, say, isMobileDevice,
-    reListenSoon: () => { if (convo) convo.onReplyDone(); else setState('idle'); } });
+    reListenSoon: () => { if (convo) convo.onReplyDone(); else setState('idle'); },
+    // rtt: stamps the moment audio actually starts (speakBrowser's u.onstart /
+    // playBlob's el.onplay) — see markRttEnd below. Hoisted function decl, so
+    // this reference is valid even though markRttEnd is defined further down.
+    markRttEnd: () => markRttEnd() });
   // The reply speech queue + run-reply hooks (replyStart/Text/Done) live in
   // voicetts.js alongside the engines they drive; voice.js keeps the orb and
   // hotkeys. stopSpeak here is the queue-aware barge-in.
@@ -246,6 +250,68 @@
   // working; a "call" is now an open conversation with the silence window.
   function beginCall() { convo.open(); }
   function endCall() { convo.close(); }
+
+  // ---- shared mic analyser for the orb waveform (assets/jarvisorb.js) ------
+  // SpeechRecognition (voiceconvo.js's mic) exposes no raw audio — the Web
+  // Speech API only ever hands back a transcript — so the orb's waveform
+  // corona needs its OWN tap on the mic purely for visualization. This is a
+  // second, independent getUserMedia() stream (fftSize 128 AnalyserNode,
+  // never connected to a destination — capture only, no echo). It is
+  // additive: it never touches SR/voiceconvo's recognition lifecycle, and it
+  // is acquired/released purely off V.call so it's live only while a
+  // conversation is actually open, same as the browser's own mic light.
+  let micStream = null, analyserCtx = null, analyser = null, analyserBuf = null, analyserBusy = false;
+  async function ensureAnalyser() {
+    if (analyser || analyserBusy || !navigator.mediaDevices) return;
+    analyserBusy = true;
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      analyserCtx = analyserCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (analyserCtx.state === 'suspended') analyserCtx.resume();
+      const src = analyserCtx.createMediaStreamSource(micStream);
+      analyser = analyserCtx.createAnalyser();
+      analyser.fftSize = 128;
+      src.connect(analyser); // capture only — no connect(analyserCtx.destination)
+      analyserBuf = new Uint8Array(analyser.frequencyBinCount);
+      if (window.jarvisOrb) jarvisOrb.setAudio({ analyser, buf: analyserBuf });
+    } catch {
+      // mic denied/unavailable — the orb just falls back to its synthetic
+      // breathing motion, same as before this feature existed.
+    }
+    analyserBusy = false;
+  }
+  function releaseAnalyser() {
+    if (!micStream && !analyser) return;
+    try { micStream && micStream.getTracks().forEach(t => t.stop()); } catch {}
+    micStream = null; analyser = null; analyserBuf = null;
+    if (window.jarvisOrb) jarvisOrb.setAudio(null);
+  }
+  // 400ms watcher, same cadence as jarvisorb.js's own visibility watcher —
+  // acquire the instant a conversation opens, release the instant it closes.
+  setInterval(() => { if (!VOICE_DISABLED) (V.call ? ensureAnalyser() : releaseAnalyser()); }, 400);
+
+  // ---- rtt: end-of-turn → first spoken audio, rolling last-3 average -------
+  // "End of turn" is approximated by onRunStart() (fires right after the
+  // conversation engine posts /api/run — a few ms after STT's endpoint, the
+  // soonest safe hook without touching voiceconvo.js's recognition timers).
+  // "First audio" is the existing onstart/onplay hooks inside voicetts.js
+  // (speakBrowser / playBlob) — passed in via markRttEnd so this stays a
+  // pure timestamp read, no change to the speak/queue control flow.
+  let rttStart = 0;
+  const rttSamples = [];
+  function markRttStart() { rttStart = performance.now(); }
+  function markRttEnd() {
+    if (!rttStart) return;
+    const dt = (performance.now() - rttStart) / 1000;
+    rttStart = 0;
+    rttSamples.push(dt); if (rttSamples.length > 3) rttSamples.shift();
+    const el = $('#jrtt'); if (el) el.textContent = 'rtt ' + rttText();
+  }
+  function rttText() {
+    if (!rttSamples.length) return '';
+    const avg = rttSamples.reduce((a, b) => a + b, 0) / rttSamples.length;
+    return avg.toFixed(1) + 's';
+  }
 
   // ---- gesture unlock (mobile autoplay) ------------------------------------
   // Mobile browsers (iOS Safari especially, Android Chrome too) only let
@@ -314,7 +380,7 @@
   // queue (barge-in on the previous reply); onAssistantText speaks each block as
   // it streams (progress narration + the answer) so long CLI wind-down doesn't
   // read as lag; onRunDone closes the queue so the mic/orb transitions once.
-  function onRunStart() { if (!VOICE_DISABLED) replyStart(); }
+  function onRunStart() { if (!VOICE_DISABLED) { markRttStart(); replyStart(); } }
   function onAssistantText(text) {
     if (VOICE_DISABLED) return;
     if (convo) convo.noteReply(text); // feed the self-echo filter BEFORE audio plays
@@ -385,6 +451,10 @@
   window.HubVoice = {
     init, onRunStart, onRunDone, onAssistantText, speak, beginCall, endCall,
     _state: () => V.state, _call: () => V.call,
+    // rolling last-3-turn avg, end-of-turn → first spoken audio; '' until a
+    // voice turn has actually spoken once (jarvistab.js only shows the badge
+    // when this returns something).
+    _rtt: () => rttText(),
     _disabled: VOICE_DISABLED,
     // closure internals for the Config settings panel (assets/voicecfg.js,
     // loaded right after this file — it attaches HubVoice.renderSettings)

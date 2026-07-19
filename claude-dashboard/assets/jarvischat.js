@@ -4,11 +4,13 @@
    the session-tail poller in jarvistab.js renders into a separate #jactBody
    strip, so the two never clobber each other. Split out of jarvistab.js to
    keep both files under the 500-line cap; talks to jarvistab via
-   window.jarvisHooks (refresh holding grid) and to assets/jarvisattach.js
+   window.jarvisHooks (refresh holding grid) and window.jarvisTimeline
+   (redraw the thread-timeline dots after each turn), reads window.jarvisThink
+   (the ◐ think toggle, one-shot), and talks to assets/jarvisattach.js
    (pending file chips → images/files refs on the run payload). */
 'use strict';
 (function () {
-  const S = { es: null, running: false, runId: null, seen: -1, sessionId: null, bubble: null, buf: '' };
+  const S = { es: null, running: false, runId: null, seen: -1, sessionId: null, bubble: null, buf: '', turnCount: 0 };
   const recallOn = () => { try { return localStorage.getItem('hub.recall') === '1'; } catch { return false; } };
   const timeOf = iso => { try { return new Date(iso).toLocaleTimeString(undefined, { hour12: false }); } catch { return ''; } };
 
@@ -106,16 +108,25 @@
     const feed = $('#jconv');
     if (feed && feed.querySelector('.jmsg-meta[style]')) feed.innerHTML = '';
     if (ta) { ta.value = ''; ta.style.height = 'auto'; } S.buf = '';
-    jconvAppend(jmsgHtml('user', esc(prompt)), 'jmsg user');
+    // thread timeline (assets/jarvistimeline.js): tag this turn's user bubble
+    // so a dot can scrollIntoView it later; the count also drives the dots.
+    S.turnCount++;
+    const turnEl = jconvAppend(jmsgHtml('user', esc(prompt)), 'jmsg user');
+    if (turnEl) turnEl.dataset.turn = String(S.turnCount);
+    if (window.jarvisTimeline) jarvisTimeline.render(S.turnCount);
     if (imgs.length) jconvAppend(imgs.map(c => `<img src="${esc(c.url)}" alt="attached image" class="jattach-img">`).join(''), 'jmsg attachimgs');
     if (docs.length) jconvAppend(jmsgHtml('user', '📎 ' + esc(docs.map(c => c.name).join(', '))), 'jmsg user');
     S.bubble = jconvAppend(jmsgHtml('assistant', '<span class="jshimmer">thinking…</span>'), 'jmsg assistant');
     const model = ($('#runModel') && $('#runModel').value) || 'auto';
     const perm = ($('#runPerm') && $('#runPerm').value) || 'bypassPermissions';
+    // ◐ think toggle (jarvistab.js #jThinkBtn): one-shot — armed for exactly
+    // this send, then cleared regardless of outcome.
+    const think = window.jarvisThink ? jarvisThink.get() : false;
+    if (window.jarvisThink) jarvisThink.clear();
     let r;
     try {
       r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, engine: 'claude', model, permissionMode: perm,
+        body: JSON.stringify({ prompt, engine: 'claude', model, permissionMode: perm, think,
           resume: S.sessionId || '', recall: recallOn(), images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
     } catch (e) { setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); return false; }
     if (r.error) { setBubble('✗ ' + r.error, false); return false; }
@@ -159,9 +170,10 @@
   function newChat() {
     if (S.es) { try { S.es.close(); } catch {} S.es = null; }
     S.running = false; S.runId = null; S.seen = -1;
-    S.sessionId = null; S.bubble = null; S.buf = '';
+    S.sessionId = null; S.bubble = null; S.buf = ''; S.turnCount = 0;
     const feed = $('#jconv'); if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">new conversation — the next prompt starts a fresh CLI session</div>';
     if (window.jarvisAttach) jarvisAttach.clear();
+    if (window.jarvisTimeline) jarvisTimeline.render(0);
     renderSessBadge();
     const btn = $('#jchatSend'); if (btn) btn.disabled = false;
   }
@@ -178,5 +190,5 @@
   // sendText = programmatic entry for the voice conversation engine
   // (assets/voiceconvo.js): spoken turns render in-tab like typed ones.
   window.jarvisChat = { wire, send, sendText: t => send(t), newChat,
-    isRunning: () => S.running, sessionId: () => S.sessionId };
+    isRunning: () => S.running, sessionId: () => S.sessionId, turnCount: () => S.turnCount };
 })();

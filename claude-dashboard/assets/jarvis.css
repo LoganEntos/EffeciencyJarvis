@@ -143,9 +143,17 @@ button.jp-pill:hover { color: var(--txt); border-color: var(--line-strong); }
 .jtimeline-h { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); margin-bottom: 10px; }
 .jtl-track { position: relative; height: 32px; }
 .jtl-line { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line); }
-.jtl-dot { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 8px; height: 8px; border-radius: 50%; background: var(--muted); border: none; padding: 0; cursor: pointer; }
+.jtl-dot { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 8px; height: 8px; border-radius: 50%; background: var(--muted); border: none; padding: 0; cursor: pointer; transition: background-color .15s, transform .15s; }
+.jtl-dot:hover { background: var(--accent-live, var(--accent)); transform: translate(-50%, -50%) scale(1.3); }
 .jtl-dot.active { background: var(--accent); }
-.jtl-end { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: var(--accent); font-family: var(--font-mono); font-size: 12px; }
+.jtl-end {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  color: var(--accent); font-family: var(--font-mono); font-size: 12px;
+  background: none; border: none; padding: 0; cursor: pointer; line-height: 1;
+}
+.jtl-end:hover { color: var(--accent-live, var(--accent)); }
+/* brief flash on the turn a timeline dot jumps to (keyframes below) */
+.jtl-hit { animation: jtlFlash .9s var(--ease-out, cubic-bezier(.2,.7,.2,1)); border-radius: 4px; }
 
 /* ---- soul editor ---- */
 .jcustom { max-width: 900px; margin: 24px auto 0; }
@@ -214,6 +222,9 @@ button.jp-pill:hover { color: var(--txt); border-color: var(--line-strong); }
 /* ---- state badge on the state pill ---- */
 .jp-pill.on { color: var(--accent-live, var(--accent)); border-color: color-mix(in srgb, var(--accent-live, var(--accent)) 55%, transparent); animation: jlivePulse 1.8s var(--ease-out, cubic-bezier(.2,.7,.2,1)) infinite; }
 .jctrls .jp-btn.on { background: var(--accent-live, var(--accent)); border-color: var(--accent-live, var(--accent)); }
+/* ◐ think armed — same on-state color language as .jp-pill.on, no pulse
+   (it's a one-shot arm, not a live status) */
+#jThinkBtn.on { color: var(--accent-live, var(--accent)); border-color: color-mix(in srgb, var(--accent-live, var(--accent)) 55%, transparent); background: color-mix(in srgb, var(--accent-live, var(--accent)) 12%, transparent); }
 
 /* ---- keyframes ---- */
 @keyframes jreveal { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
@@ -228,6 +239,10 @@ button.jp-pill:hover { color: var(--txt); border-color: var(--line-strong); }
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-live, var(--accent)) 40%, transparent), 0 0 28px 0 color-mix(in srgb, var(--accent-live, var(--accent)) 14%, transparent); }
   50%      { box-shadow: 0 0 0 12px transparent, 0 0 32px 4px color-mix(in srgb, var(--accent-live, var(--accent)) 35%, transparent); }
 }
+@keyframes jtlFlash {
+  0% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-live, var(--accent)) 55%, transparent); background: color-mix(in srgb, var(--accent-live, var(--accent)) 10%, transparent); }
+  100% { box-shadow: inset 0 0 0 1px transparent; background: transparent; }
+}
 
 /* ---- staggered page-load reveal ---- */
 .stagger > * { opacity: 0; animation: jreveal .45s cubic-bezier(.2,.7,.2,1) forwards; }
@@ -239,7 +254,7 @@ button.jp-pill:hover { color: var(--txt); border-color: var(--line-strong); }
 .stagger > *:nth-child(6) { animation-delay: 340ms; }
 @media (prefers-reduced-motion: reduce) {
   .stagger > * { opacity: 1; animation: none; }
-  .jcaret, .jshimmer, .jp-pill.on { animation: none; }
+  .jcaret, .jshimmer, .jp-pill.on, .jtl-hit { animation: none; }
 }
 
 /* ---- mobile ---- */
