@@ -105,13 +105,53 @@ function sessionsDir() {
   return dir;
 }
 
+// The hub's own headless one-shots (the distiller + the session summarizer)
+// spawn `claude -p` with cwd = PROJECT_DIR, so the CLI writes their transcript
+// into this project's session folder. Their only "conversation" is our system
+// prompt echoed back, so they must never appear as real coding sessions. Detect
+// them by the marker text their prompt always starts with (same markers as
+// lib/sessionsum.js) and drop them from sessions()/activity(). Memoized by
+// id+size — these files are tiny and immutable once written, so we read a file's
+// head at most once.
+const ONESHOT_MARKERS = ['You are debriefing a past Claude Code', 'You are a prompt engineer for a coding agent'];
+// The prompt of a hub one-shot always appears as a `content` value at the very
+// top of its transcript (the CLI's queue-operation "enqueue" record carries the
+// full `-p` prompt), so match the marker as the start of any content value in the
+// file HEAD. We regex the raw head rather than JSON.parse per line because these
+// one-shots embed a whole transcript tail in one line that can run tens of KB —
+// longer than any fixed head read — which would truncate the line and defeat
+// line-based parsing. An 8KB head always contains that top enqueue record.
+const ONESHOT_RE = new RegExp('"content"\\s*:\\s*"(' +
+  ONESHOT_MARKERS.map(m => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')');
+const oneShotMemo = new Map(); // `${id}:${size}` -> bool
+function isInternalOneShot(file, id, size) {
+  const key = id + ':' + size;
+  if (oneShotMemo.has(key)) return oneShotMemo.get(key);
+  let hit = false;
+  try {
+    const bytes = Math.min(size, 8 * 1024);
+    const buf = Buffer.alloc(bytes);
+    const fd = fs.openSync(file, 'r');
+    try { fs.readSync(fd, buf, 0, bytes, 0); } finally { fs.closeSync(fd); }
+    hit = ONESHOT_RE.test(buf.toString('utf8'));
+  } catch {}
+  oneShotMemo.set(key, hit);
+  return hit;
+}
+
 function sessions() {
   const dir = sessionsDir();
-  return U.listDir(dir).filter(e => e.isFile() && e.name.endsWith('.jsonl')).map(e => {
+  const out = [];
+  for (const e of U.listDir(dir)) {
+    if (!e.isFile() || !e.name.endsWith('.jsonl')) continue;
     const full = path.join(dir, e.name);
     let st; try { st = fs.statSync(full); } catch { st = {}; }
-    return { id: e.name.replace('.jsonl', ''), sizeKb: st.size ? Math.round(st.size / 1024) : 0, modified: st.mtime || null };
-  }).sort((a, b) => new Date(b.modified) - new Date(a.modified));
+    const size = st.size || 0;
+    const id = e.name.replace('.jsonl', '');
+    if (size && isInternalOneShot(full, id, size)) continue; // hub one-shot, not a coding session
+    out.push({ id, sizeKb: size ? Math.round(size / 1024) : 0, modified: st.mtime || null });
+  }
+  return out.sort((a, b) => new Date(b.modified) - new Date(a.modified));
 }
 
 // ---- transcript hygiene (adapted from Nimbalyst's ClaudeCodeSessionSync) ----

@@ -205,3 +205,42 @@ Client-only, no server change (`/api/usage` already returns the numbers).
 panel rendering on-theme: header with burn rate + week total, cheap/mid/heavy
 legend, and 7 per-day stacked bars with tier colors (amber cheap + red heavy) and
 right-aligned totals. Smoke green; 5757 untouched.
+
+---
+
+# Revision pass (Opus 4.8, continuing 2026-07-19)
+
+## Rev-1 — Sessions noise filter (R3 follow-up) ✅ shipped
+
+**Commit:** `<fill>`
+
+**What shipped.** The R3 follow-up left open: the hub's own headless one-shots
+(the distiller + the session summarizer) spawn `claude -p` with `cwd =
+PROJECT_DIR`, so the CLI writes their transcript into this project's session
+folder. They were showing up as junk "sessions" (their only content is our own
+system prompt echoed back). R3 merely *labeled* them; this filters them out
+entirely. New `isInternalOneShot()` in `lib/core.js` drops a session from
+`sessions()` when a `content` value in the file HEAD starts with one of the same
+marker prompts used in `lib/sessionsum.js` (`ONESHOT_MARKERS`). Because
+`/api/sessions`, `/api/activity`, and the summary sweep all derive from
+`sessions()`, all three declutter at once — the Sessions tab and Overview
+activity feed now show only real coding sessions, and the summarizer no longer
+wastes a pass on internal one-shots (its own marker guard stays as a backstop).
+Memoized by id+size (these files are immutable once written), so each head is
+read at most once.
+
+**Gotcha (why the first cut missed some).** A line-based `JSON.parse` over the
+head fails on these one-shots: they embed a whole transcript tail in one JSON
+line that can exceed any fixed head read, so the truncated line won't parse and
+the marker is missed. The prompt reliably appears in the CLI's top-of-file
+`queue-operation` "enqueue" record's `content` field — NOT a `user` line — so the
+fix regexes the raw 8KB head for `"content":"<marker>` instead of parsing lines.
+
+**Verification (5759 throwaway).** Raw session folder had 184 `.jsonl` files;
+`sessions()` now returns 121 — 63 hub one-shots filtered out (incl. giant-line
+ones the line-parse cut missed). Confirmed via `/api/sessions`: a known internal
+one-shot (`2e34f6ec…`) is gone while real coding sessions (`5d621c94…`,
+`c1aa3038…`) remain, and `/api/activity`'s newest session is the real live
+coding session. Browser screenshot of the Sessions tab shows no "Hub internal
+one-shot" rows. Smoke green (all checks). `core.js` at 382 lines. 5757 untouched;
+throwaway stopped after verifying.
