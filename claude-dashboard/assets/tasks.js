@@ -56,6 +56,7 @@ function ensureTasksUI() {
           <option value="haiku">haiku</option>
           <option value="sonnet">sonnet</option>
           <option value="opus">opus</option>
+          <option value="claude-fable-5">Fable 5</option>
         </select>
         <button id="schAdd">＋ Schedule</button>
       </div>
