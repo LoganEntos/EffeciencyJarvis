@@ -15,13 +15,16 @@
   const voiceState = () => (window.HubVoice && !HubVoice._disabled) ? HubVoice._state() : 'idle';
   const visible = () => { const s = $('#jarvis'); return s && !s.classList.contains('hidden') && !document.hidden; };
   const toneWords = t => (t || '').split(/[·,]/).map(s => s.trim()).filter(Boolean);
-  const GLYPH = { jarvis: '◉', 'jarvis-wit': '⌁', dispatch: '⚑', sage: '❋', athena: '❋', vulcan: '⚒', hermes: '⌁' };
-  const glyphFor = id => GLYPH[id] || '◉';
   // Hue per persona lives in jarvis.js (jarvisHueOf) — shared with jarvisorb.js.
   const hueOf = id => jarvisHueOf(id);
   // Orb + audio + draw loop lives in assets/jarvisorb.js. Tell it which persona
   // is active (drives hue) so the sphere/halo/waveform recolor immediately.
   const orbSetPersona = () => { if (window.jarvisOrb) window.jarvisOrb.setPersona(J.active); };
+  // Card row (add/rename/delete/reorder) lives in assets/jarvispersonacards.js
+  // — distinct from assets/jarvispersona.js (the survey + output-contract
+  // editor mounted in the customize foldout, see $('#jcustBtn') below). It
+  // renders #jcards and calls back here for activate/flash/reload/new.
+  const PERSONA_CB = { activate: id => switchPersona(id), flash: (m, e) => flash(m, e), reload: () => loadPersonas(), openNew: () => openNewPersona() };
 
   // ---- personas --------------------------------------------------------------
   async function loadPersonas() {
@@ -47,23 +50,8 @@
     root.style.setProperty('--accent-live-soft', `hsla(${H}, 78%, 58%, 0.18)`);
     orbSetPersona();
   }
-  function card(p, on) {
-    const id = p ? p.id : 'none';
-    const name = p ? p.name : 'Off';
-    const glyph = on ? (p ? glyphFor(id) : '○') : (p ? glyphFor(id) : '○');
-    const tag = p ? esc(p.tagline || '') : 'plain Claude — no persona';
-    const tone = p ? toneWords(p.tone).join(' · ') : 'neutral · unstyled';
-    return `<button class="jcard${on ? ' active' : ''}" data-id="${esc(id)}">
-      <div class="jc-top"><span class="jc-name">${esc(name)}</span><span class="jc-mark">${on ? '◉' : glyph}</span></div>
-      <div class="jc-tag">${tag}</div>
-      <div class="jc-tone">${esc(tone)}</div>
-      ${on ? '<div class="jp-pill live jc-conn">◉ has the conn</div>' : ''}
-    </button>`;
-  }
   function renderCards() {
-    const el = $('#jcards'); if (!el) return;
-    el.innerHTML = J.personas.map(p => card(p, p.id === J.active)).join('') + card(null, !J.active);
-    el.querySelectorAll('.jcard').forEach(b => b.onclick = () => switchPersona(b.dataset.id));
+    if (window.jarvisPersonaCards) window.jarvisPersonaCards.render(J.personas, J.active, PERSONA_CB);
   }
   async function switchPersona(id) {
     const r = await api('/api/personas/active', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id === 'none' ? null : id }) });
@@ -247,6 +235,17 @@
   window.jarvisHooks = { renderHolding };
 
   // ---- customize (soul editor) ----------------------------------------------
+  // The "+" ghost card (jarvispersonacards.js) opens straight into new-persona
+  // mode instead of routing through the "customize" dropdown.
+  function openNewPersona() {
+    const p = $('#jcustPanel'); if (!p) return;
+    p.classList.remove('hidden');
+    fillEditorSelect();
+    const sel = $('#jpSel'); if (sel) sel.value = '__new';
+    loadEditor('__new');
+    if (window.jarvisPersona) window.jarvisPersona.mount(J.personas);
+    p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
   function fillEditorSelect(keep) {
     const sel = $('#jpSel'); if (!sel) return;
     sel.innerHTML = J.personas.map(p => `<option value="${esc(p.id)}">${esc(p.name)} (${esc(p.id)})</option>`).join('')
