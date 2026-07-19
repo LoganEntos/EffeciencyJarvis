@@ -224,9 +224,10 @@ the Lovable build — the other tabs' Lovable screens "need work", don't port
 them.
 
 **Next queue (execute top-to-bottom):**
-1. `docs/handoffs/projects-tab-polish.md` — composer model select, thread-
-   resume clarity, re-render churn, ✦ distiller toggle, 375px, empty-state
-   (PENDING — not yet started).
+1. ~~`docs/handoffs/projects-tab-polish.md`~~ — ✅ SHIPPED in `f77ffff` (all six
+   parts: per-project model select, thread-resume clarity, in-place run refresh,
+   ✦ distiller toggle, runs-table `overflow-x:auto`, empty-state reorder). The
+   prior "PENDING" marker was stale; verified present 2026-07-19.
 2. Real-mic pass on **voice-orb-live** (orb waveform + RTT badge listen-through,
    Bluetooth-headset contention check — user interactive verification only).
 3. Real-browser drag/keyboard-nav pass on **persona cards** (headless browser

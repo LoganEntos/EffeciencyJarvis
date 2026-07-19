@@ -274,6 +274,36 @@ sound. Logged as reviewed rather than inventing churn.
 
 ---
 
+## Rev-4 — Next roadmap items (handoff item 4) ✅ assessed (projects-tab-polish already shipped)
+
+**Commit:** doc-only (this log + HANDOFF.md stale-marker fix).
+
+**Finding.** The handoff's named item-4 targets yield no new work: the O-items
+(O1 error hunt, O2 skills cleanup) are already DONE, and N8 iPhone polish / N2
+375px are the same headless-viewport blocker as Rev-3. The top **PENDING** entry
+in HANDOFF.md's "Next queue" — `docs/handoffs/projects-tab-polish.md` — is **stale**:
+all six of its parts are already implemented in commit `f77ffff` ("Projects tab
+polish…"). Verified by reading the source, not guessing:
+- composer per-project model select (`#pchatModel`, persisted `hub.proj.<id>.model`);
+- thread-resume clarity (`openThread` → "⟲ read-only replay … next message starts
+  fresh" when no `meta.sessionId`);
+- in-place runs refresh on `done` (`refreshProjectRuns()`, no full re-render);
+- ✦ distiller toggle (`#pchatDistill` → `jarvisDistill` over >25-word prompts);
+- runs table wrapped in `.pruns-wrap{overflow-x:auto}` (375px scroll);
+- empty-state reorder (`emptyStart` → chat panel first for a bare project).
+
+Fixed the stale "PENDING — not yet started" marker in HANDOFF.md so the next
+worker doesn't re-chase it (same class of stale-queue correction as R4/R2/N4).
+
+**Left for a deliberate run (NOT done here, on purpose).** `schedules-verify.md`
+fires a real scheduled `claude -p` run on the LIVE 5757 hub and needs a 2–3 min
+poll + teardown — it pollutes the user's live schedules/history and contends with
+this very run, so it belongs in its own supervised run, not tacked onto a revision
+pass. The two remaining queue items (voice-orb real-mic, persona-card real-browser
+drag/keyboard-nav) are user-interactive only. No code change warranted for item 4.
+
+---
+
 ## Rev-3 — N2 real-viewport 375px pass ⏭ honest skip (unverifiable here) + clean code audit
 
 **Commit:** doc-only (this log).
