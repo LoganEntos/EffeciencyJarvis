@@ -147,3 +147,32 @@ beats inventing chrome. Updated the `redesign-clean-dark` memory with a
 schedule rendered `◷ next in 32m`. Smoke green; 5757 untouched. The clickable
 last-run chip couldn't be exercised live (the only schedule hasn't fired yet, so
 `lastRunId` is null) but reuses a previously-verified handler.
+
+---
+
+## N2 — Mobile ergonomic pass (375px) — assessed, no code change (honest skip)
+
+**Finding.** N2's targets are already comprehensively handled and this can't be
+newly verified from this run. `assets/style.css` has a large
+`@media (max-width:760px)` block (bottom tab-bar as a 2-row 8-per-row grid so no
+tab overflows, full-width runbar column, header compaction with safe-area insets,
+2-col cards, history-stat-row trimming) plus an `@media (pointer:coarse)` block
+(tap targets: `button,select{min-height:36px}`, enlarged `.delRunBtn`), and a
+code comment records a prior **2026-07-11 375px audit** ("no tab overflows
+horizontally"). The handoff's named concerns — tap targets, overflow, runbar
+selector-row wrapping, composer usability — each map to an existing rule.
+
+**This session's new UI is mobile-safe by construction:** the R2 `.lib-toolbar`
+uses `flex-wrap` (search fills row 1, sort/collapse buttons wrap below); the R4
+image lightbox is `position:fixed; inset:0; padding:5vmin` (responsive); the N4
+run-history badges + schedule countdown are `font-size:10px` inline-block pills
+that wrap. None introduce fixed widths or horizontal overflow.
+
+**Why no edit.** I could not drive a real 375px viewport from this run — scrapling
+screenshots render at desktop width and `additional_args:{viewport}` did not take
+effect, so the mobile `@media` rules never trigger in the headless browser.
+Making speculative blind CSS changes to a carefully-tuned, recently-audited
+mobile layout would risk regression with no way to verify the result here. Per
+the handoff ("an honest skip beats a half-landed feature"), N2 is logged as
+already-satisfied; the only remaining nice-to-have is a fresh real-device /
+emulator visual sweep, which needs a viewport this headless run can't control.
