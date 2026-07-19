@@ -181,7 +181,7 @@ emulator visual sweep, which needs a viewport this headless run can't control.
 
 ## Stretch (R0 reframed) — Overview token-burn panel ✅ shipped
 
-**Commit:** `__STRETCH_HASH__`
+**Commit:** `d3c1b96`
 
 **What shipped.** A new "token burn · 7-day by tier" panel on the Overview,
 between the model-distribution table and the current-chat strip. It surfaces the
