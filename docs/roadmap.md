@@ -35,7 +35,8 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 | S-VOL | **Voice orb live** — mic-driven waveform (shared AnalyserNode), real RTT badge (rolling last-3), ◐ think → `--effort max`, timeline dots jump | `9421d61`, `8ae1c87` |
 | S-PMU | **Persona manager UI** — hover ✎/✕ two-step delete, inline rename-id, drag-to-reorder → `/api/personas/order`, ＋ ghost card → new-persona mode | `eeccf1a`, `272282f` |
 | S-SRC | **Spoken-reply contract** — under 1 min speech, casual friend tone, no jargon, updates only when they matter | `6dbea80` |
-| S-F5G | **Fable 5 god prompt on opus runs** — Anthropic's official Fable-5 playbook (`claude-dashboard/prompts/fable5-god-prompt.md`) appended to the system prompt of every opus-tier run via `--append-system-prompt` (covers Run tab, tasks, schedules, autopilot); condensed copy in the two opus agents (architect, security-auditor); `meta.fable5` + ⟡ live status line; source: platform.claude.com Fable-5 prompting guide via user's reel | this commit |
+| S-F5G | **Fable 5 god prompt on opus runs** — Anthropic's official Fable-5 playbook (`claude-dashboard/prompts/fable5-god-prompt.md`) appended to the system prompt of every opus-tier run via `--append-system-prompt` (covers Run tab, tasks, schedules, autopilot); condensed copy in the two opus agents (architect, security-auditor); `meta.fable5` + ⟡ live status line; source: platform.claude.com Fable-5 prompting guide via user's reel | `dd17b47` |
+| S-UC5 | **Effort tiers / ULTRA CODE selector** — Run-tab 5-tier effort selector (`--effort low→max`, tier 5 labeled ULTRA CODE per the user's Fable-5 reel), persisted in localStorage, validated server-side (EFFORTS allowlist), `meta.effort` + ▲ live status line; ◐ think still wins when both set | this commit |
 
 ## ✅ Shipped (2026-07-16 → 07-17)
 

@@ -63,6 +63,10 @@ try {
 } catch {}
 const isOpusTier = m => m === 'opus' || /^claude-opus/.test(m || '');
 
+// The five Fable-5-era utilization tiers (claude --effort). Tier 5 = 'max' is
+// "Ultra Code": deepest reasoning, longest turns. '' = let the CLI decide.
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
 // 'auto' model allocation — route each prompt to the cheapest model that can
 // handle it (3-tier: haiku ≈ $0.04/run for trivia vs opus ≈ $0.25+). Purely
 // lexical, zero-cost, instant; the decision is streamed to the chat so the
@@ -148,7 +152,7 @@ function resolveImages(images) {
   return out;
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think }) {
+function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think, effort }) {
   engine = ENGINES.includes(engine) ? engine : 'claude';
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
@@ -224,7 +228,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     : '';
   const fullPrompt = persona + projectPrefix + (recalled ? recalled.block + '\n\n' : '')
     + (projRecall ? projRecall.block + '\n\n' : '') + prompt + imgBlock + fileBlock + (team ? team.text : '') + hint;
-  let args = null, hermesCfg = null;
+  let args = null, hermesCfg = null, effApplied = '';
   // Default is bypassPermissions: hub runs are headless (`-p`), so there is no
   // approval prompt — under acceptEdits/default every Bash/MCP call is silently
   // DENIED and the run just reports it "lacks permission" (this was the
@@ -247,7 +251,10 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     // turn only. The CLI has no literal "thinking budget" flag, but --effort
     // max is the real equivalent (verified via `claude --help`: low/medium/
     // high/xhigh/max) — a genuine argv flag, not a prompt-prepend hack.
-    if (think) args.push('--effort', 'max');
+    // The Run tab's persistent effort selector rides the same flag; ◐ think
+    // wins when both are set (it's an explicit this-turn escalation).
+    effApplied = think ? 'max' : (EFFORTS.includes(effort) ? effort : '');
+    if (effApplied) args.push('--effort', effApplied);
   }
 
   const meta = {
@@ -259,6 +266,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     imageCount: imgPaths.length,
     project: projectName, projectSlug: projectSlug || null,
     think: engine === 'claude' && !!think,
+    effort: effApplied || null,
     fable5: engine === 'claude' && !!GOD_PROMPT && isOpusTier(model),
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
@@ -270,6 +278,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   if (personaName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◈ persona: ${personaName} — communication bearing active` }));
   if (projectName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `▤ project: ${projectName} — instructions${projRecall ? ` + ${projRecall.count} memor${projRecall.count === 1 ? 'y' : 'ies'}` : ''} injected` }));
   if (meta.think) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◐ think: max-effort extended thinking for this turn` }));
+  else if (meta.effort) pushLine(st, JSON.stringify({ type: 'hub_status', text: `▲ effort: tier ${EFFORTS.indexOf(meta.effort) + 1}/5 (${meta.effort})${meta.effort === 'max' ? ' — ULTRA CODE' : ''}` }));
   if (meta.fable5) pushLine(st, JSON.stringify({ type: 'hub_status', text: `⟡ fable5: god prompt injected — opus run steered by the Fable 5 playbook` }));
   if (runningCount() < MAX_ACTIVE) launch(st);
   else {
@@ -366,6 +375,7 @@ async function handle(req, res, url) {
       engine: (b.engine || '').toString(),
       projectId: (b.projectId || '').toString(),
       think: b.think === true,
+      effort: (b.effort || '').toString(),
       images: Array.isArray(b.images) ? b.images : [],
       files: Array.isArray(b.files) ? b.files : [],
     });

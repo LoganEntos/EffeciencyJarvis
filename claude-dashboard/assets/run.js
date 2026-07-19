@@ -41,6 +41,14 @@ function ensureRunUI() {
         <option value="default">perms: default (most tools denied)</option>
         <option value="plan">perms: plan</option>
       </select>
+      <select id="runEffort" title="effort — the five Fable-5-era utilization tiers (claude --effort). Tier 5 'Ultra Code' (max) = deepest reasoning + longest turns; default lets the CLI decide. Sticks across reloads.">
+        <option value="">effort: CLI default</option>
+        <option value="low">effort 1 · low</option>
+        <option value="medium">effort 2 · medium</option>
+        <option value="high">effort 3 · high</option>
+        <option value="xhigh">effort 4 · xhigh</option>
+        <option value="max">effort 5 · ULTRA CODE</option>
+      </select>
       <label class="chk" title="inject the top 3 relevant hub memories into the prompt (costs a few hundred prompt tokens — off by default)">
         <input type="checkbox" id="runRecall"> ◇ memory recall</label>
       <button id="newChatBtn" class="ghost">＋ New chat</button>
@@ -118,6 +126,8 @@ function ensureRunUI() {
     const m = localStorage.getItem('hub.model'), p = localStorage.getItem('hub.perm');
     if (m !== null) $('#runModel').value = m;
     if (p !== null) $('#runPerm').value = p;
+    const ef = localStorage.getItem('hub.effort');
+    if (ef !== null) $('#runEffort').value = ef;
     $('#runEngine').value = localStorage.getItem('hub.engine') === 'hermes' ? 'hermes' : 'claude';
     $('#runRecall').checked = localStorage.getItem('hub.recall') === '1'; // default OFF
     $('#jarvisToggle').checked = localStorage.getItem('hub.jarvis') === '1'; // default OFF
@@ -128,6 +138,7 @@ function ensureRunUI() {
   $('#runEngine').onchange = e => { try { localStorage.setItem('hub.engine', e.target.value); } catch {} applyEngineUI(); };
   $('#runModel').onchange = e => { try { localStorage.setItem('hub.model', e.target.value); } catch {} updateJarvisStatus(); };
   $('#runPerm').onchange = e => { try { localStorage.setItem('hub.perm', e.target.value); } catch {} };
+  $('#runEffort').onchange = e => { try { localStorage.setItem('hub.effort', e.target.value); } catch {} };
   $('#runRecall').onchange = e => { try { localStorage.setItem('hub.recall', e.target.checked ? '1' : '0'); } catch {} };
   $('#jarvisToggle').onchange = e => { try { localStorage.setItem('hub.jarvis', e.target.checked ? '1' : '0'); } catch {} initJarvis(); };
 }
@@ -469,6 +480,7 @@ async function sendPrompt() {
   try {
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, engine, model: $('#runModel').value, permissionMode: $('#runPerm').value,
+        effort: $('#runEffort').value,
         resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked,
         projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
