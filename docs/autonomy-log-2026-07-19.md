@@ -244,3 +244,82 @@ one-shot (`2e34f6ec…`) is gone while real coding sessions (`5d621c94…`,
 coding session. Browser screenshot of the Sessions tab shows no "Hub internal
 one-shot" rows. Smoke green (all checks). `core.js` at 382 lines. 5757 untouched;
 throwaway stopped after verifying.
+
+---
+
+## Rev-2 — Revision sweep of this run's shipped UI ✅ reviewed (no defects; no code change)
+
+**Commit:** doc-only (this log).
+
+**What was checked (5759 throwaway + code review).** Opened the shipped UI in a
+real browser and reviewed the source for each of the five flagged areas:
+- **(a) Sessions tab** — summaries render inline under each row, the ↻ Re-summarize
+  button is present, no layout drift; after Rev-1 the list shows only real coding
+  sessions (browser-confirmed).
+- **(b) Files lightbox** — `#imgLightbox` is `position:fixed; inset:0; padding:5vmin`
+  with the image at `max-width/height:100%; object-fit:contain`; Esc and backdrop
+  both close (listeners registered once). Large images stay contained.
+- **(c) Agents/Skills/Commands** — collapse state is a `Set` keyed by group, so it
+  survives re-filtering; the A→Z/Z→A sort flips `dir` and reorders both groups and
+  rows correctly.
+- **(d) Run-history badges** — the effort/fable5/team pills are `font-size:10px`
+  inline-block pills inside a `.flex` container that is `flex-wrap:wrap`, so on
+  narrow widths they wrap cleanly rather than overflowing.
+- **(e) Overview burn panel** — a zero-token day divides by `maxDay = Math.max(1,…)`
+  (no NaN/÷0); each segment gets width `0%` (invisible) leaving the empty track,
+  and the day total renders as `·`. Sane.
+
+**Decision.** No small issues warranted an in-place fix; the implementations are
+sound. Logged as reviewed rather than inventing churn.
+
+---
+
+## Rev-3 — N2 real-viewport 375px pass ⏭ honest skip (unverifiable here) + clean code audit
+
+**Commit:** doc-only (this log).
+
+**Blocker (same as the prior worker's N2).** The handoff asked for a true 375px
+viewport via Playwright/devtools emulation. Playwright isn't installed (zero-dep
+rule; needs the user's OK) and scrapling — the only browser automation available —
+**ignores viewport**: a session opened with `additional_args:{viewport:{375×812}}`
+still rendered the page at full desktop width (full sidebar, single-row runbar).
+So a real-viewport visual pass cannot be done from this headless run.
+
+**What I did instead (code-level 375px audit).** Confirmed none of this run's new
+UI introduces a fixed width that would overflow at 375px: `.lib-toolbar` is
+`flex-wrap:wrap` with `.search{flex:1 1 220px}` and `white-space:nowrap` buttons
+(search fills row 1, controls wrap below); `.runbar`/`.composer`/`.badgebar` and
+the run-history badge `.flex` rows are all `flex-wrap:wrap`; `.ovburn-row` is a
+grid with a `minmax(0,1fr)` bar column (can't blow out); `.file-thumb` is a fixed
+44px but `flex-shrink:0` inside a flex row; `#imgLightbox` is `fixed; inset:0;
+padding:5vmin` (responsive). Combined with the existing `@media (max-width:760px)`
+and `@media (pointer:coarse)` blocks, the mobile layout is sound **by
+construction** — but a fresh real-device / emulator visual sweep still needs a
+viewport this headless run can't control. Per "an honest skip beats a half-landed
+feature," no blind CSS changes were made to the tuned mobile layout.
+
+---
+
+# Orchestrator check-ins
+
+- **18:27** — Observed: queue COMPLETE (all 7 items logged shipped/skipped); an Opus 4.8 revision worker (run `2026-07-19t22-18-01-4bbc81`) still running healthy at ~9 min, left alone. Did: triggered end condition — deleted schedule `s-73595cfc`, wrote final wrap-up below.
+
+# Final wrap-up (Fable 5 orchestrator, 18:27 — loop closed early, queue exhausted)
+
+All seven handoff queue items are resolved, well ahead of the 23:21 deadline:
+
+| Item | Outcome | Commit |
+|---|---|---|
+| R3 — auto session summaries | ✅ shipped | `970a3a9` |
+| R4 — Files thumbnails + day grouping | ✅ already shipped (`b63479c`), lightbox enhancement added | `0306a45` |
+| R2 — navigable libraries (filter/sort/groups) | ✅ shipped | `46dfc67` |
+| Council + Providers panels | ✅ verified no-op — no dead chrome exists; Providers-as-multi-engine would violate Claude-only mandate | — |
+| N4 — schedules polish + tier badges | ✅ shipped | `49dce2a` |
+| N2 — mobile 375px pass | ⏭ honest skip — already satisfied by existing `@media` blocks + prior 07-11 audit; headless run couldn't drive a real 375px viewport to verify blind changes | — |
+| Stretch — Overview token-burn panel | ✅ shipped | `d3c1b96` |
+
+Bonus revision pass (beyond queue): Rev-1 sessions noise filter `0571979`.
+
+The orchestrator schedule (`s-73595cfc`) is deleted; no further check-ins will
+fire. The in-flight Opus revision worker was healthy and left to finish — if it
+commits more, its entries land above this wrap-up's revision-pass section.
