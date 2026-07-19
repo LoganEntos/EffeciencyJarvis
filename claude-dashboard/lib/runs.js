@@ -50,6 +50,19 @@ const PINNED_MODELS = [
 const MODELS = [...U.SIMPLE_MODELS, ...PINNED_MODELS];
 const PERM_MODES = ['default', 'acceptEdits', 'bypassPermissions', 'plan'];
 
+// Fable 5 "god prompt": Anthropic's official Fable-5 prompting playbook
+// (prompts/fable5-god-prompt.md), appended to the SYSTEM prompt of every
+// opus-tier run via --append-system-prompt — so Opus threads get the same
+// discipline (act-when-ready, evidence-backed claims, scope control) without
+// touching the user's prompt.txt. Fable-5 runs don't need it: the CLI already
+// ships these behaviors natively for that model. Read once at boot.
+const GOD_PROMPT_FILE = path.join(DASH_DIR, 'prompts', 'fable5-god-prompt.md');
+let GOD_PROMPT = '';
+try {
+  GOD_PROMPT = fs.readFileSync(GOD_PROMPT_FILE, 'utf8').replace(/^<!--[\s\S]*?-->\s*/, '').trim();
+} catch {}
+const isOpusTier = m => m === 'opus' || /^claude-opus/.test(m || '');
+
 // 'auto' model allocation — route each prompt to the cheapest model that can
 // handle it (3-tier: haiku ≈ $0.04/run for trivia vs opus ≈ $0.25+). Purely
 // lexical, zero-cost, instant; the decision is streamed to the chat so the
@@ -227,6 +240,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   } else {
     args = ['-p', fullPrompt, '--output-format', 'stream-json', '--verbose'];
     if (MODELS.includes(model) && model && model !== 'auto') args.push('--model', model);
+    if (GOD_PROMPT && isOpusTier(model)) args.push('--append-system-prompt', GOD_PROMPT);
     if (perm !== 'default') args.push('--permission-mode', perm);
     if (resume && /^[a-f0-9-]{8,}$/.test(resume)) args.push('--resume', resume);
     // Jarvis-tab ◐ think toggle: one-shot extended-thinking effort for THIS
@@ -245,6 +259,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     imageCount: imgPaths.length,
     project: projectName, projectSlug: projectSlug || null,
     think: engine === 'claude' && !!think,
+    fable5: engine === 'claude' && !!GOD_PROMPT && isOpusTier(model),
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);
@@ -255,6 +270,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   if (personaName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◈ persona: ${personaName} — communication bearing active` }));
   if (projectName) pushLine(st, JSON.stringify({ type: 'hub_status', text: `▤ project: ${projectName} — instructions${projRecall ? ` + ${projRecall.count} memor${projRecall.count === 1 ? 'y' : 'ies'}` : ''} injected` }));
   if (meta.think) pushLine(st, JSON.stringify({ type: 'hub_status', text: `◐ think: max-effort extended thinking for this turn` }));
+  if (meta.fable5) pushLine(st, JSON.stringify({ type: 'hub_status', text: `⟡ fable5: god prompt injected — opus run steered by the Fable 5 playbook` }));
   if (runningCount() < MAX_ACTIVE) launch(st);
   else {
     queue.push(id);

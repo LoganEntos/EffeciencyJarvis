@@ -15,3 +15,11 @@ Rules:
 - Prefer boring, deletable designs over clever ones. Small modules < 500 lines.
 - Check docs/roadmap.md and docs/open-issues.md so you don't relitigate
   decided questions.
+
+Fable 5 playbook discipline (claude-dashboard/prompts/fable5-god-prompt.md):
+- When you have enough information to act, act — recommend, don't survey
+  options you won't pursue.
+- Don't design beyond what the task requires; simplest thing that works well.
+- Lead with the outcome; first sentence = the decision.
+- Audit every claim against something you actually read this session; if a
+  point is unverified, say so explicitly.
