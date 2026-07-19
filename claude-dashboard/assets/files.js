@@ -79,7 +79,7 @@ async function refreshFiles() {
     <div class="row">
       <div class="flex" style="justify-content:space-between">
         <span class="flex" style="min-width:0">
-          ${isImg ? `<img class="file-thumb" src="/api/files/view?name=${encodeURIComponent(f.name)}" alt="" loading="lazy">` : ''}
+          ${isImg ? `<img class="file-thumb" src="/api/files/view?name=${encodeURIComponent(f.name)}" data-name="${esc(f.name)}" alt="" title="click to enlarge" loading="lazy">` : ''}
           <span class="name mono">${esc(f.name)}</span>
         </span>
         <span class="muted" style="font-size:11.5px;white-space:nowrap">${fmt(f.size)} · ${f.modified ? new Date(f.modified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
@@ -96,6 +96,9 @@ async function refreshFiles() {
   el.innerHTML = html;
   el.querySelectorAll('.procBtn').forEach(b => b.onclick = () =>
     prefillRun(`Process the uploaded file at ${b.dataset.path} — `));
+  // R4: a 44px thumb tells you an image is there; click enlarges it so you can
+  // actually see the context a run was given (that's the whole point of R4).
+  el.querySelectorAll('.file-thumb').forEach(t => t.onclick = () => showImageLightbox(t.dataset.name));
   // N6: zero-dep workbook preview — sheet names + grid dimensions, no values
   el.querySelectorAll('.xlsxBtn').forEach(b => b.onclick = async () => {
     const box = el.querySelector(`.xlsxInfo[data-for="${CSS.escape(b.dataset.name)}"]`);
@@ -117,4 +120,22 @@ async function refreshFiles() {
     catch {}
     refreshFiles();
   });
+}
+
+// Full-size image preview served through the same traversal-guarded /view path.
+// Reuses one lazily-built overlay; click the backdrop or press Escape to close.
+function showImageLightbox(name) {
+  let ov = document.getElementById('imgLightbox');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'imgLightbox';
+    ov.innerHTML = '<img alt=""><button class="lb-close" aria-label="Close">Close ✕</button>';
+    document.body.appendChild(ov);
+    const close = () => ov.classList.remove('show');
+    ov.onclick = e => { if (e.target === ov || e.target.classList.contains('lb-close')) close(); };
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  }
+  ov.querySelector('img').src = '/api/files/view?name=' + encodeURIComponent(name);
+  ov.querySelector('img').alt = name;
+  ov.classList.add('show');
 }

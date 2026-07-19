@@ -49,3 +49,29 @@ now cleanly labeled, but a future item could filter hub-internal one-shots out
 of `sessions()` (core.js) entirely so the list only shows real coding sessions —
 this would also declutter the Overview activity feed. Left untouched to avoid
 regressing `/api/sessions` / `/api/activity` mid-item.
+
+---
+
+## R4 — Files: image thumbnails + day grouping ✅ (already shipped + enhanced)
+
+**Commit:** `__R4_HASH__` (enhancement) — core was already shipped in `b63479c`.
+
+**Found already done.** The queue lists R4 as pending, but its acceptance
+criteria were already met and committed in `b63479c`: `assets/files.js` groups
+the inbox by upload day (Today / Yesterday / weekday / date via `dayLabel`) and
+renders image thumbnails through the traversal-guarded, CSP-sandboxed
+`/api/files/view` endpoint in `lib/files.js`. CSS (`.file-daygroup`,
+`.file-thumb`) was in place. Verified in-browser on 5759 with 92 inbox files
+spanning several days: day-group headers and thumbnails render, theme intact.
+
+**Enhancement shipped this pass.** The one real gap vs R4's stated intent ("you
+must be able to see what context the AI was given") was that thumbnails were
+32×32 — too small to recognize. Bumped to 44px with a hover cue, and made them
+**click-to-enlarge** into a full-size lightbox (`#imgLightbox`, backdrop/Esc to
+close), served through the same `/view` path. Confirmed the endpoint serves the
+full image (200 image/svg+xml), still blocks traversal (404) and non-images
+(400). Smoke green on 5759.
+
+**Note for orchestrator.** R4 needed no server changes — the endpoint and guards
+already existed. Two temporary test SVGs were added to `data/inbox/` for the
+browser check and deleted afterward (inbox is back to the user's real files).
