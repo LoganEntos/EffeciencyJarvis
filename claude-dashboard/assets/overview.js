@@ -213,6 +213,36 @@ renderers.overview = async function () {
     </div>
   </section>`;
 
+  // ---------- token burn · 7-day by tier (stretch: real token metrics) ----------
+  // Buckets the last 7 days of runs by tier, and surfaces the burn rate + week
+  // volume that /api/usage already computes but the page had been discarding.
+  // Tokens + rates only — no dollars (user directive).
+  const TIER_COL = { cheap: 'var(--accent)', mid: 'var(--amber)', heavy: 'var(--red)' };
+  const burnDays = [];
+  for (let i = 6; i >= 0; i--) { const dd = new Date(); dd.setHours(0, 0, 0, 0); dd.setDate(dd.getDate() - i); burnDays.push({ label: dd.toLocaleDateString(undefined, { weekday: 'short' }), start: dd.getTime(), cheap: 0, mid: 0, heavy: 0 }); }
+  runs.forEach(m => {
+    const tok = (m.tokensIn || 0) + (m.tokensOut || 0);
+    if (!tok) return;
+    const t = new Date(m.startedAt || m.queuedAt || 0).getTime();
+    for (let i = burnDays.length - 1; i >= 0; i--) { if (t >= burnDays[i].start) { burnDays[i][modelTier(m.model)] += tok; break; } }
+  });
+  const maxDay = Math.max(1, ...burnDays.map(b => b.cheap + b.mid + b.heavy));
+  const burnRate = usage && usage.today ? usage.today.tokensPerHour : null;
+  const weekTok = usage && usage.week ? usage.week.tokensTotal : null;
+  const burnRows = burnDays.map(b => {
+    const tot = b.cheap + b.mid + b.heavy;
+    const seg = t => `<span style="width:${((b[t] / maxDay) * 100).toFixed(1)}%;background:${TIER_COL[t]}" title="${t}: ${fmtTok(b[t])} tok"></span>`;
+    return `<div class="ovburn-row"><span class="ovburn-day">${esc(b.label)}</span>
+      <div class="ovburn-bar">${seg('cheap')}${seg('mid')}${seg('heavy')}</div>
+      <span class="ovburn-tot">${tot ? fmtTok(tot) : '·'}</span></div>`;
+  }).join('');
+  const burnPanel = `<section class="ov-panel ovburn">
+    <div class="ovsec-head ov-hair-b"><span class="ov-label">token burn · 7-day by tier</span>
+      <span class="ov-label">${burnRate != null ? fmtTok(burnRate) + ' tok/hr today' : ''}${weekTok != null ? ' · ' + fmtTok(weekTok) + ' this wk' : ''}</span></div>
+    <div class="ovburn-legend">${['cheap', 'mid', 'heavy'].map(t => `<span><i style="background:${TIER_COL[t]}"></i>${t}</span>`).join('')}</div>
+    <div class="ovburn-body">${burnRows}</div>
+  </section>`;
+
   // ---------- current-chat strip ----------
   const chatStrip = chat ? `<section class="ov-panel ovchat">
     <span class="k">ctx</span> <span class="v accent">${ctxPct != null ? ctxPct + '%' : '—'}</span>
@@ -283,6 +313,7 @@ renderers.overview = async function () {
       ${statCards}
       ${enginePanels}
       ${mdTable}
+      ${burnPanel}
       ${chatStrip}
       ${bottom}
       ${tail}

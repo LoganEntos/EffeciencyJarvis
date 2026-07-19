@@ -119,6 +119,17 @@
 .ovtail-btn:hover { color: var(--muted); }
 #ovFeed { margin: 12px 0 0; max-height: 200px; }
 
+/* token burn · 7-day by tier */
+.ovburn-legend { display: flex; gap: 14px; padding: 8px 16px 4px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+.ovburn-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ovburn-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.ovburn-body { padding: 4px 16px 14px; display: flex; flex-direction: column; gap: 7px; }
+.ovburn-row { display: grid; grid-template-columns: 34px minmax(0,1fr) 46px; gap: 10px; align-items: center; }
+.ovburn-day { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+.ovburn-bar { display: flex; height: 10px; border-radius: 99px; background: #ffffff12; overflow: hidden; }
+.ovburn-bar > span { height: 100%; transition: width .3s ease; }
+.ovburn-tot { font-family: var(--font-mono); font-size: 10.5px; color: var(--dim); text-align: right; }
+
 /* mobile */
 @media (max-width: 1000px) {
   .ovengines { grid-template-columns: 1fr; }

@@ -176,3 +176,32 @@ mobile layout would risk regression with no way to verify the result here. Per
 the handoff ("an honest skip beats a half-landed feature"), N2 is logged as
 already-satisfied; the only remaining nice-to-have is a fresh real-device /
 emulator visual sweep, which needs a viewport this headless run can't control.
+
+---
+
+## Stretch (R0 reframed) — Overview token-burn panel ✅ shipped
+
+**Commit:** `__STRETCH_HASH__`
+
+**What shipped.** A new "token burn · 7-day by tier" panel on the Overview,
+between the model-distribution table and the current-chat strip. It surfaces the
+"real token metrics" the item asked for — Claude-only, tokens + rates only, no
+dollars:
+- **per-day tokens by model tier**: last 7 days bucketed by day × tier
+  (cheap/mid/heavy) from run history, rendered as per-day stacked bars with the
+  day's total (e.g. Wed 65.5M, Tue 39M);
+- **burn rate + week volume**: `121.7k tok/hr today · 134.6M this wk`, pulled
+  from `/api/usage.today.tokensPerHour` / `week.tokensTotal` — which the Overview
+  was already **fetching but discarding** (real latent gap, now used);
+- **completion %** was already covered by the existing "success rate" card + the
+  hero's `today: N runs · X% ok`.
+
+Client-only, no server change (`/api/usage` already returns the numbers).
+`assets/overview.js` (+ the burn computation, ~30 lines, file at 331/500) and a
+`.ovburn-*` CSS block in `assets/overview.css`. Numbers use the global `fmtTok`
+(M/k) so large weekly totals read as "134.6M" not "134630k".
+
+**Verification (browser on 5759 via scrapling).** Full-page screenshot shows the
+panel rendering on-theme: header with burn rate + week total, cheap/mid/heavy
+legend, and 7 per-day stacked bars with tier colors (amber cheap + red heavy) and
+right-aligned totals. Smoke green; 5757 untouched.
