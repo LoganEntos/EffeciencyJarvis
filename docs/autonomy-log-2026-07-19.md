@@ -54,7 +54,7 @@ regressing `/api/sessions` / `/api/activity` mid-item.
 
 ## R4 — Files: image thumbnails + day grouping ✅ (already shipped + enhanced)
 
-**Commit:** `__R4_HASH__` (enhancement) — core was already shipped in `b63479c`.
+**Commit:** `0306a45` (enhancement) — core was already shipped in `b63479c`.
 
 **Found already done.** The queue lists R4 as pending, but its acceptance
 criteria were already met and committed in `b63479c`: `assets/files.js` groups
