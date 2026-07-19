@@ -212,7 +212,7 @@ right-aligned totals. Smoke green; 5757 untouched.
 
 ## Rev-1 — Sessions noise filter (R3 follow-up) ✅ shipped
 
-**Commit:** `<fill>`
+**Commit:** `0c3ce66`
 
 **What shipped.** The R3 follow-up left open: the hub's own headless one-shots
 (the distiller + the session summarizer) spawn `claude -p` with `cwd =
