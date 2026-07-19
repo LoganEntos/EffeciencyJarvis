@@ -36,7 +36,8 @@ Status: ✅ done · 🔜 next (ready to execute) · ⬜ queued · 🔮 deferred 
 | S-PMU | **Persona manager UI** — hover ✎/✕ two-step delete, inline rename-id, drag-to-reorder → `/api/personas/order`, ＋ ghost card → new-persona mode | `eeccf1a`, `272282f` |
 | S-SRC | **Spoken-reply contract** — under 1 min speech, casual friend tone, no jargon, updates only when they matter | `6dbea80` |
 | S-F5G | **Fable 5 god prompt on opus runs** — Anthropic's official Fable-5 playbook (`claude-dashboard/prompts/fable5-god-prompt.md`) appended to the system prompt of every opus-tier run via `--append-system-prompt` (covers Run tab, tasks, schedules, autopilot); condensed copy in the two opus agents (architect, security-auditor); `meta.fable5` + ⟡ live status line; source: platform.claude.com Fable-5 prompting guide via user's reel | `dd17b47` |
-| S-UC5 | **Effort tiers / ULTRA CODE selector** — Run-tab 5-tier effort selector (`--effort low→max`, tier 5 labeled ULTRA CODE per the user's Fable-5 reel), persisted in localStorage, validated server-side (EFFORTS allowlist), `meta.effort` + ▲ live status line; ◐ think still wins when both set | this commit |
+| S-UC5 | **Effort tiers / ULTRA CODE selector** — Run-tab 5-tier effort selector (`--effort low→max`, tier 5 labeled ULTRA CODE per the user's Fable-5 reel), persisted in localStorage, validated server-side (EFFORTS allowlist), `meta.effort` + ▲ live status line; ◐ think still wins when both set | `ef347b2` |
+| S-A6H | **Fable 5 → Opus autonomy loop** — Fable-5-authored 6h handoff (`claude-dashboard/prompts/opus-6h-handoff.md`: R3/R4/R2/Council/N4/N2 queue), Opus worker runs dispatched through the hub (god prompt + effort active), hourly Fable-5 orchestrator via interval schedule (schedules now accept pinned model ids), progress ground truth in `docs/autonomy-log-2026-07-19.md` | this commit |
 
 ## ✅ Shipped (2026-07-16 → 07-17)
 

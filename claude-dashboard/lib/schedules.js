@@ -121,7 +121,10 @@ function parseSchedule(b) {
   if (!prompt) return { error: 'prompt required' };
   const kind = KINDS.includes(b.kind) ? b.kind : null;
   if (!kind) return { error: 'kind must be interval | daily | weekly' };
-  const model = U.SIMPLE_MODELS.includes(b.model) ? b.model : 'auto';
+  // Tier aliases OR a pinned version id (claude-fable-5 etc.) — startRun
+  // re-checks against its full MODELS allowlist, so an unknown pin just falls
+  // back to the CLI default rather than reaching the argv.
+  const model = (U.SIMPLE_MODELS.includes(b.model) || /^claude-[a-z0-9.-]{1,40}$/.test(String(b.model || ''))) ? b.model : 'auto';
   const s = { kind, title: title || prompt.slice(0, 60), prompt, model };
   if (kind === 'interval') {
     const min = parseInt(b.minutes, 10);
