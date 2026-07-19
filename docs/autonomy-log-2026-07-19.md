@@ -126,7 +126,7 @@ beats inventing chrome. Updated the `redesign-clean-dark` memory with a
 
 ## N4 — Schedules polish + run-history tier badges ✅ shipped
 
-**Commit:** `__N4_HASH__`
+**Commit:** `49dce2a`
 
 **What shipped (two parts).**
 1. *Run-history tier badges* (the clearly-missing piece): rows now surface the
