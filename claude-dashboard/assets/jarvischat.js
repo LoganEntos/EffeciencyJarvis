@@ -80,8 +80,12 @@
       jconvAppend(`<div class="jmsg-meta">${ok ? '✓ done' : '✗ ' + esc(o.subtype || 'error')} ${esc(secs)}</div>`, 'jmsg result');
     }
   }
+  // Returns true once a run has actually been dispatched, false on any no-op
+  // (already running, an attachment still uploading, or nothing to send) —
+  // callers (jarvistab.js runShaped, voiceconvo.js) use this to avoid a false
+  // "sent" flash when the click/turn didn't actually go anywhere.
   async function send(textArg) {
-    if (S.running) return;
+    if (S.running) return false;
     const ta = $('#jchatIn');
     let prompt = (typeof textArg === 'string' && textArg.trim()) || (ta ? ta.value.trim() : '');
     // Attachments: same inbox path as the Run tab (assets/jarvisattach.js).
@@ -89,12 +93,12 @@
     const attList = window.jarvisAttach ? jarvisAttach.pending() : [];
     if (attList.some(c => c.pending)) {
       jconvAppend(`<div class="jmsg-meta">still uploading an attachment — try again in a moment.</div>`, 'jmsg result');
-      return;
+      return false;
     }
     const atts = attList.filter(c => c.ref);
     const imgs = atts.filter(c => c.isImage);
     const docs = atts.filter(c => !c.isImage);
-    if (!prompt && !atts.length) return;
+    if (!prompt && !atts.length) return false;
     if (!prompt && atts.length) {
       const noun = imgs.length && !docs.length ? ('image' + (imgs.length > 1 ? 's' : '')) : ('file' + (atts.length > 1 ? 's' : ''));
       prompt = 'Take a look at the attached ' + noun + '.';
@@ -113,8 +117,8 @@
       r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, engine: 'claude', model, permissionMode: perm,
           resume: S.sessionId || '', recall: recallOn(), images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
-    } catch (e) { setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); return; }
-    if (r.error) { setBubble('✗ ' + r.error, false); return; }
+    } catch (e) { setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); return false; }
+    if (r.error) { setBubble('✗ ' + r.error, false); return false; }
     if (window.jarvisAttach) jarvisAttach.clear();
     S.running = true; S.runId = r.id; S.seen = -1;
     const btn = $('#jchatSend'); if (btn) btn.disabled = true;
@@ -150,6 +154,7 @@
         const b3 = $('#jchatSend'); if (b3) b3.disabled = false;
       }
     };
+    return true;
   }
   function newChat() {
     if (S.es) { try { S.es.close(); } catch {} S.es = null; }

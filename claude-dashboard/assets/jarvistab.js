@@ -131,11 +131,15 @@
   function shapedPrompt() { return (J.shaped || ($('#jwsIn') && $('#jwsIn').value) || '').trim(); }
   // ▷ run this fires in-tab via jarvisChat.send — the user never leaves Jarvis.
   // ⤴ run tab is the small secondary affordance for the big Run-tab composer.
-  function runShaped() {
+  async function runShaped() {
     const prompt = shapedPrompt();
     if (!prompt) { flash('nothing to run yet', true); return; }
     if (window.jarvisChat && jarvisChat.send) {
-      jarvisChat.send(prompt);
+      // send() resolves false on a no-op (already running / attachment still
+      // uploading / nothing to send) — flash the truth instead of assuming success.
+      if (jarvisChat.isRunning && jarvisChat.isRunning()) { flash('a turn is still running — wait for it to finish', true); return; }
+      const ok = await jarvisChat.send(prompt);
+      if (!ok) { flash('✗ not sent — still busy, try again in a moment', true); return; }
       const feed = $('#jconv'); if (feed) feed.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       flash('✓ sent to the conversation');
     } else {
