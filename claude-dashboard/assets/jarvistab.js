@@ -128,8 +128,26 @@
     if (wrap) wrap.classList.remove('hidden');
     flash('✓ shaped' + (mod ? ' · ' + mod.replace(/\.$/, '').toLowerCase() : ''));
   }
-  function runShaped() {
-    const prompt = (J.shaped || ($('#jwsIn') && $('#jwsIn').value) || '').trim();
+  function shapedPrompt() { return (J.shaped || ($('#jwsIn') && $('#jwsIn').value) || '').trim(); }
+  // ▷ run this fires in-tab via jarvisChat.send — the user never leaves Jarvis.
+  // ⤴ run tab is the small secondary affordance for the big Run-tab composer.
+  async function runShaped() {
+    const prompt = shapedPrompt();
+    if (!prompt) { flash('nothing to run yet', true); return; }
+    if (window.jarvisChat && jarvisChat.send) {
+      // send() resolves false on a no-op (already running / attachment still
+      // uploading / nothing to send) — flash the truth instead of assuming success.
+      if (jarvisChat.isRunning && jarvisChat.isRunning()) { flash('a turn is still running — wait for it to finish', true); return; }
+      const ok = await jarvisChat.send(prompt);
+      if (!ok) { flash('✗ not sent — still busy, try again in a moment', true); return; }
+      const feed = $('#jconv'); if (feed) feed.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      flash('✓ sent to the conversation');
+    } else {
+      runInRunTab();
+    }
+  }
+  function runInRunTab() {
+    const prompt = shapedPrompt();
     if (!prompt) { flash('nothing to run yet', true); return; }
     goTab('run');
     if (typeof ensureRunUI === 'function') ensureRunUI();
@@ -138,7 +156,7 @@
     if (typeof sendPrompt === 'function') sendPrompt();
   }
   function copyShaped() {
-    const t = (J.shaped || ($('#jwsIn') && $('#jwsIn').value) || '').trim();
+    const t = shapedPrompt();
     if (!t) { flash('nothing to copy yet', true); return; }
     try { navigator.clipboard.writeText(t); flash('✓ copied'); } catch { flash('✗ clipboard blocked', true); }
   }
@@ -195,8 +213,12 @@
     dots += '<div class="jtl-end">→</div>';
     track.innerHTML = dots;
   }
+  // #jconv is owned permanently by the in-tab chat (jarvischat.js) — this tail
+  // renders into the collapsed "live activity" strip (#jactBody) instead, so
+  // the two never fight over the same container. No pause/resume needed since
+  // the containers are fully separate now.
   async function pollTranscript(force) {
-    const feed = $('#jconv'); if (!feed || !visible()) return;
+    const feed = $('#jactBody'); if (!feed || !visible()) return;
     let list;
     try { const d = await api('/api/sessions'); list = Array.isArray(d) ? d : (d.list || []); } catch { return; }
     if (!list || !list.length) { feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">no session transcript yet — talk to the orb or fire a run</div>'; return; }
@@ -213,13 +235,10 @@
     if (force || atBottom) feed.scrollTop = feed.scrollHeight;
   }
 
-  // In-tab live chat lives in assets/jarvischat.js. Expose the pieces it needs
-  // to coordinate with this tab's transcript poller + holding-in-context grid.
-  window.jarvisHooks = {
-    pauseTranscript() { if (J.txTimer) { clearInterval(J.txTimer); J.txTimer = null; } },
-    resumeTranscript() { if (!J.txTimer) J.txTimer = setInterval(() => pollTranscript(false), 2500); },
-    renderHolding,
-  };
+  // In-tab live chat lives in assets/jarvischat.js; attach lives in
+  // assets/jarvisattach.js. Both call back here only to refresh the
+  // holding-in-context grid — the transcript poller runs on its own now.
+  window.jarvisHooks = { renderHolding };
 
   // ---- customize (soul editor) ----------------------------------------------
   function fillEditorSelect(keep) {
@@ -277,7 +296,7 @@
 
       <div class="jdeck">
         <section class="jp-panel jconv-panel">
-          <header class="jpanel-h jhair-b"><span class="jp-label">live conversation</span><span class="jp-pill" id="jconvState">◌ idle</span></header>
+          <header class="jpanel-h jhair-b"><span class="jp-label">live conversation</span><span class="jp-pill" id="jsessBadge" title="in-tab chat session">＋ new</span><span class="jp-pill" id="jconvState">◌ idle</span></header>
           <div class="jstage">
             <canvas id="jorb" role="button" tabindex="0" aria-label="Voice orb — tap to talk, hold for a hands-free call"></canvas>
             <div class="jstate" id="jstate">${disabled ? 'voice unavailable' : 'idle'}</div>
@@ -289,10 +308,17 @@
             <button class="jp-ghost" id="jThinkBtn">◐ think</button>
             <button class="jp-ghost" id="jBargeBtn">⤾ barge in</button>
           </div>
-          <div class="jconv jhair-t" id="jconv"><div class="jmsg-meta" style="padding:4px">loading transcript…</div></div>
+          <div class="jconv jhair-t" id="jconv"><div class="jmsg-meta" style="padding:4px">say anything, or drop a file — Jarvis picks up where the last CLI session left off</div></div>
+          <div class="jactivity jhair-t">
+            <button class="jact-toggle" id="jactToggle">▸ live activity</button>
+            <div class="jact-body hidden" id="jactBody"><div class="jmsg-meta" style="padding:4px">loading…</div></div>
+          </div>
+          <div id="jattachStrip" class="attachstrip hidden"></div>
           <div class="jchat-row jhair-t">
             <span class="jchat-caret">›</span>
             <textarea id="jchatIn" rows="1" placeholder="say anything — routed with your recall + model choices"></textarea>
+            <input type="file" id="jfileIn" multiple hidden>
+            <button class="jp-ghost" id="jattachBtn" title="Attach files — paste, drop, or pick">📎</button>
             <button class="jp-ghost" id="jchatNew" title="Start a fresh CLI session">＋ new</button>
             <button class="jp-btn" id="jchatSend">↵ send</button>
           </div>
@@ -307,6 +333,7 @@
               <div class="jpip-actions">
                 <button class="jp-ghost" id="jwsCopy">⧉ copy</button>
                 <button class="jp-btn" id="jwsShape">✦ shape</button>
+                <button class="jp-ghost" id="jwsRunTab" title="Open the big composer on the Run tab instead">⤴ run tab</button>
                 <button class="jp-btn" id="jwsRun">▷ run this</button>
               </div>
             </div>
@@ -389,6 +416,17 @@
     renderRecall();
 
     if (window.jarvisChat) window.jarvisChat.wire();
+    if (window.jarvisAttach) window.jarvisAttach.wire();
+    // live-activity strip: collapsed by default, expands to its own scroll area
+    const actBtn = $('#jactToggle');
+    if (actBtn) actBtn.onclick = () => {
+      const body = $('#jactBody'); if (!body) return;
+      const opening = body.classList.contains('hidden');
+      body.classList.toggle('hidden');
+      actBtn.classList.toggle('open', opening);
+      actBtn.textContent = opening ? '▾ live activity' : '▸ live activity';
+      if (opening) pollTranscript(true);
+    };
 
     // stagger reveal on first paint; #jarvis > * inherits per-nth-child delays
     $('#jarvis').classList.add('stagger');
@@ -401,6 +439,7 @@
     $('#jwsShape').onclick = () => shape('');
     $('#jwsCopy').onclick = copyShaped;
     $('#jwsRun').onclick = runShaped;
+    $('#jwsRunTab').onclick = runInRunTab;
     wsMeta();
 
     // soul editor
