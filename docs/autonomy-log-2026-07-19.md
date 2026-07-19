@@ -121,3 +121,29 @@ just the Claude tiers, and those are already surfaced by the Agents tier groups
 (shipped in R2 above) + the Config tab. Correcting a wrong item with a clean skip
 beats inventing chrome. Updated the `redesign-clean-dark` memory with a
 2026-07-19 verification so the next worker doesn't re-chase this.
+
+---
+
+## N4 — Schedules polish + run-history tier badges ✅ shipped
+
+**Commit:** `__N4_HASH__`
+
+**What shipped (two parts).**
+1. *Run-history tier badges* (the clearly-missing piece): rows now surface the
+   run's `meta.effort` and `meta.fable5`. Max-effort shows a filled `⚡ ULTRA
+   CODE` pill, lower tiers `▲ effort N/5`, and god-prompt runs `⟡ fable5`, so
+   ULTRA CODE / Fable-5 runs are identifiable at a glance. No server change —
+   `liveness.annotate` already spreads the whole meta, so effort/fable5 reach
+   `/api/runs`; badges added in `assets/runhistory.js` (`.pill.accent` for
+   ULTRA CODE, `.pill.neutral` otherwise — no new CSS).
+2. *Schedules polish*: the schedule row's `nextDue` is now a prominent green
+   `◷ next in Xm` countdown pill (paused shows `⏸ paused`), so enabled/disabled
+   reads instantly; the last-run status chip is now clickable (reuses the
+   existing `.sOpen` → openRun handler, + keyboard activation) and the redundant
+   separate "last run" button was dropped. `assets/tasks.js`.
+
+**Verification (live DOM on 5759 via scrapling).** Run rows rendered
+`▲ effort 4/5`, `⟡ fable5`, and `⚡ ULTRA CODE`; the enabled F5-orchestrator
+schedule rendered `◷ next in 32m`. Smoke green; 5757 untouched. The clickable
+last-run chip couldn't be exercised live (the only schedule hasn't fired yet, so
+`lastRunId` is null) but reuses a previously-verified handler.

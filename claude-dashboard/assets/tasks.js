@@ -107,19 +107,25 @@ async function refreshSchedules() {
   el.innerHTML = list.length ? list.map(s => {
     const st = s.lastRunStatus;
     const pill = st === 'done' ? 'ok' : (st === 'error' ? 'err' : 'warn');
-    const meta = [s.cadence, s.enabled ? 'next ' + relFuture(s.nextDue) : 'paused',
-      s.runCount ? s.runCount + ' fired' : 'never fired',
+    // N4: last-run status chip links straight to its run; countdown + paused
+    // state are their own prominent pills so enabled/disabled reads at a glance.
+    const statusChip = st ? (s.lastRunId
+      ? `<span class="pill ${pill} sOpen" data-run="${esc(s.lastRunId)}" role="button" tabindex="0" title="open the last run" style="cursor:pointer">last: ${esc(st)} ›</span>`
+      : `<span class="pill ${pill}">last: ${esc(st)}</span>`) : '';
+    const stateChip = s.enabled
+      ? `<span class="pill ok" title="next scheduled fire">◷ next ${relFuture(s.nextDue)}</span>`
+      : '<span class="pill warn">⏸ paused</span>';
+    const meta = [s.cadence, s.runCount ? s.runCount + ' fired' : 'never fired',
       s.lastRunTokensOut != null ? fmtTok((s.lastRunTokensIn || 0) + s.lastRunTokensOut) + ' tok' : ''].filter(Boolean).join(' · ');
     return `<div class="row" style="${s.enabled ? '' : 'opacity:.55'}">
       <div class="flex" style="justify-content:space-between">
         <span class="name">◷ ${esc(s.title)}</span>
-        <span>${st ? `<span class="pill ${pill}">last: ${esc(st)}</span>` : ''}<span class="pill ${s.enabled ? 'neutral' : 'warn'}">${s.enabled ? esc(s.cadence) : 'paused'}</span></span>
+        <span>${statusChip}${stateChip}</span>
       </div>
       <div class="pex">${esc(s.prompt.slice(0, 160))}</div>
       <div class="flex" style="margin-top:8px">
         <span class="muted" style="font-size:11px">${esc(meta)}</span>
         <span class="spacer" style="flex:1"></span>
-        ${s.lastRunId ? `<button class="ghost sOpen" data-run="${esc(s.lastRunId)}" style="padding:5px 11px;font-size:11px">last run</button>` : ''}
         <button class="ghost sNow" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">▶ run now</button>
         <button class="ghost sTog" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">${s.enabled ? '⏸ pause' : '▶ resume'}</button>
         <button class="danger sDel" data-id="${esc(s.id)}" aria-label="Delete schedule" style="padding:5px 11px;font-size:11px">✕</button>
@@ -140,7 +146,11 @@ async function refreshSchedules() {
     try { await post('/api/schedules/delete', b.dataset.id); } catch {}
     refreshSchedules();
   });
-  el.querySelectorAll('.sOpen').forEach(b => b.onclick = () => { goTab('run'); ensureRunUI(); openRun(b.dataset.run); });
+  el.querySelectorAll('.sOpen').forEach(b => {
+    const open = () => { goTab('run'); ensureRunUI(); openRun(b.dataset.run); };
+    b.onclick = open;
+    b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+  });
 }
 
 async function addTask() {

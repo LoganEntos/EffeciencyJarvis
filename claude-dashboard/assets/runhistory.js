@@ -70,10 +70,24 @@ function renderHistory() {
     if (m.stalled) return `<span class="pill err">stalled ${Math.round((m.idleMs || 0) / 1000)}s</span>`;
     return '<span class="pill live">◉ live</span>';
   };
+  // N4: make ULTRA CODE (max-effort) and Fable-5 god-prompt runs identifiable at
+  // a glance. effort/fable5 ride in each run's meta (annotate spreads it whole).
+  const EFFORT_TIERS = ['low', 'medium', 'high', 'xhigh', 'max'];
+  const runBadges = m => {
+    let h = '';
+    if (m.effort) {
+      const tier = EFFORT_TIERS.indexOf(m.effort) + 1;
+      h += m.effort === 'max'
+        ? '<span class="pill accent" style="font-size:10px" title="run at effort tier 5 — ULTRA CODE (deepest reasoning, longest turns)">⚡ ULTRA CODE</span>'
+        : `<span class="pill neutral" style="font-size:10px" title="run at effort tier ${tier}/5 (${esc(m.effort)})">▲ effort ${tier}/5</span>`;
+    }
+    if (m.fable5) h += '<span class="pill neutral" style="font-size:10px" title="opus-tier run steered by the Fable 5 god prompt">⟡ fable5</span>';
+    return h;
+  };
   el.innerHTML = rows.map(m => `
     <div class="row clickable runrow" data-id="${esc(m.id)}">
       <div class="flex" style="justify-content:space-between">
-        <span><span class="pill ${pill(m.status)}">${esc(m.status)}</span>${liveBadge(m)}${m.team ? `<span class="pill neutral" style="font-size:10px" title="agent team that ran this">⛬ ${esc(m.team)}</span>` : ''}
+        <span><span class="pill ${pill(m.status)}">${esc(m.status)}</span>${liveBadge(m)}${m.team ? `<span class="pill neutral" style="font-size:10px" title="agent team that ran this">⛬ ${esc(m.team)}</span>` : ''}${runBadges(m)}
           <span class="muted" style="font-size:11.5px">${new Date(m.startedAt || m.queuedAt || 0).toLocaleString()}</span></span>
         <span class="muted" style="font-size:11.5px">${m.engine === 'hermes' ? '⬡ hermes · ' : ''}${m.model ? esc(m.model) + (m.routedReason ? ' (auto)' : '') + ' · ' : ''}${m.durationMs ? (m.durationMs / 1000).toFixed(1) + 's' : ''}${m.tokensOut != null ? ' · ' + (m.tokensIn || 0) + '→' + m.tokensOut + ' tok' : ''}${m.resumedFrom ? ' · ⟲ resumed' : ''}${m.artifactCount ? ' · ◫ ' + m.artifactCount : ''}
           <button class="danger delRunBtn" data-id="${esc(m.id)}" title="delete this run from history" aria-label="Delete this run from history" style="padding:2px 9px;font-size:10.5px;margin-left:8px">✕</button></span>
