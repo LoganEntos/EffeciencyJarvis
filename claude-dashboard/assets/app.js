@@ -298,6 +298,21 @@ renderers.sessions = async function () {
 // but guard anyway so a stray char can't break the querySelector)
 const cssq = s => (s || '').replace(/["\\]/g, '\\$&');
 
+// R2: bucket a library item — agents by model tier, skills/commands by first letter.
+const AGENT_TIER_ORDER = { 'Haiku · cheap': 0, 'Sonnet · standard': 1, 'Opus · heavy': 2, 'Other': 3 };
+function libGroup(type, d) {
+  if (type === 'agents') {
+    const m = (d.model || '').toLowerCase();
+    if (/opus|fable/.test(m)) return 'Opus · heavy';
+    if (/sonnet/.test(m)) return 'Sonnet · standard';
+    if (/haiku|flash|cheap/.test(m)) return 'Haiku · cheap';
+    return 'Other';
+  }
+  const c = (d.name || '').trim()[0];
+  return c && /[a-z]/i.test(c) ? c.toUpperCase() : '#';
+}
+
+// Shared Agents/Skills/Commands view: one UI — live filter + collapsible groups + sort.
 async function listView(sel, title, endpoint, type, extraHtml = '') {
   const data = await api(endpoint);
   const el = $(sel);
@@ -305,22 +320,52 @@ async function listView(sel, title, endpoint, type, extraHtml = '') {
   el.innerHTML = `<h2>${title} <span class="muted" style="font-weight:400">(${data.length})</span></h2>
     ${LV_SUB[type] ? `<div class="muted" style="font-size:12px;margin:-4px 0 12px">${LV_SUB[type]}</div>` : ''}
     ${extraHtml}
-    <input class="search" placeholder="Filter ${title.toLowerCase()}… (click a row to view its definition)">
+    <div class="lib-toolbar">
+      <input class="search" placeholder="Filter ${title.toLowerCase()}… (click a row to view its definition)">
+      <button class="ghost libSort" title="toggle sort direction">A→Z</button>
+      <button class="ghost libFold" title="collapse or expand all groups">Collapse all</button>
+    </div>
     <div class="list"></div>`;
   const listEl = el.querySelector('.list');
+  const collapsed = new Set();
+  let dir = 1; // 1 = A→Z, -1 = Z→A
+  const groupKeys = [...new Set(data.map(d => libGroup(type, d)))];
+  const keyRank = k => (AGENT_TIER_ORDER[k] ?? (k === '#' ? 999 : k.charCodeAt(0)));
   const render = (q = '') => {
-    const f = data.filter(d => (d.name + ' ' + d.description).toLowerCase().includes(q.toLowerCase()));
-    listEl.innerHTML = f.map(d => `<div class="row clickable" data-i="${data.indexOf(d)}">
-      <div class="flex" style="justify-content:space-between"><span class="name mono">${esc(d.name)}</span>
-        ${d.model ? `<span class="pill ${/haiku|flash|cheap/i.test(d.model) ? 'ok' : /opus|fable/i.test(d.model) ? 'err' : 'neutral'}">${esc(d.model)}${type === 'agents' ? (/opus/i.test(d.model) ? ' · heavy' : /haiku/i.test(d.model) ? ' · cheap' : '') : ''}</span>` : ''}</div>
-      ${d.description ? `<div class="desc">${esc(d.description)}</div>` : ''}</div>`).join('') ||
-      '<div class="muted">No matches.</div>';
+    const ql = q.toLowerCase();
+    const f = data.filter(d => (d.name + ' ' + (d.description || '')).toLowerCase().includes(ql));
+    const groups = {};
+    for (const d of f) (groups[libGroup(type, d)] ||= []).push(d);
+    const keys = Object.keys(groups).sort((a, b) => (keyRank(a) - keyRank(b)) * dir || a.localeCompare(b) * dir);
+    listEl.innerHTML = keys.map(k => {
+      const open = !collapsed.has(k);
+      const items = groups[k].sort((a, b) => a.name.localeCompare(b.name) * dir);
+      return `<div class="lib-group"><button class="lib-ghead" data-g="${esc(k)}" aria-expanded="${open}">
+        <span class="fold">${open ? '▾' : '▸'}</span> ${esc(k)} <span class="muted">${items.length}</span></button>
+        <div class="lib-gbody"${open ? '' : ' hidden'}>${items.map(d => `<div class="row clickable" data-i="${data.indexOf(d)}">
+          <div class="flex" style="justify-content:space-between"><span class="name mono">${esc(d.name)}</span>
+            ${d.model ? `<span class="pill ${/haiku|flash|cheap/i.test(d.model) ? 'ok' : /opus|fable/i.test(d.model) ? 'err' : 'neutral'}">${esc(d.model)}${type === 'agents' ? (/opus/i.test(d.model) ? ' · heavy' : /haiku/i.test(d.model) ? ' · cheap' : '') : ''}</span>` : ''}</div>
+          ${d.description ? `<div class="desc">${esc(d.description)}</div>` : ''}</div>`).join('')}</div></div>`;
+    }).join('') || '<div class="muted">No matches.</div>';
     listEl.querySelectorAll('.row.clickable').forEach(r => r.onclick = () => {
       const d = data[+r.dataset.i];
       showDetail(type, d.file || d.dir || d.name, d.name);
     });
+    listEl.querySelectorAll('.lib-ghead').forEach(h => h.onclick = () => {
+      const k = h.dataset.g;
+      collapsed.has(k) ? collapsed.delete(k) : collapsed.add(k);
+      render(el.querySelector('.search').value);
+    });
   };
   el.querySelector('.search').oninput = e => render(e.target.value);
+  el.querySelector('.libSort').onclick = e => { dir = -dir; e.target.textContent = dir === 1 ? 'A→Z' : 'Z→A'; render(el.querySelector('.search').value); };
+  el.querySelector('.libFold').onclick = e => {
+    const allCollapsed = collapsed.size >= groupKeys.length;
+    collapsed.clear();
+    if (!allCollapsed) groupKeys.forEach(k => collapsed.add(k));
+    e.target.textContent = allCollapsed ? 'Collapse all' : 'Expand all';
+    render(el.querySelector('.search').value);
+  };
   render();
 }
 

@@ -75,3 +75,26 @@ full image (200 image/svg+xml), still blocks traversal (404) and non-images
 **Note for orchestrator.** R4 needed no server changes — the endpoint and guards
 already existed. Two temporary test SVGs were added to `data/inbox/` for the
 browser check and deleted afterward (inbox is back to the user's real files).
+
+---
+
+## R2 — Navigable libraries ✅ shipped
+
+**Commit:** `__R2_HASH__`
+
+**What shipped.** Agents, Skills, and Commands were already filterable but flat.
+All three share one function (`listView` in `assets/app.js`), so enhancing it
+once gives the "one consistent filter UI across the three" the item asked for.
+Now each tab has: a toolbar (live filter + A→Z/Z→A sort toggle + collapse/
+expand-all), and **collapsible groups** with per-group counts. Grouping is
+per-type via `libGroup`: Agents group by model tier (Haiku·cheap / Sonnet /
+Opus·heavy / Other — the list is already tier-colored), Skills and Commands by
+first letter (A–Z, non-alpha under `#`). Group order respects the sort
+direction; rows still click through to the definition. CSS added under a new
+`.lib-toolbar` / `.lib-group` / `.lib-ghead` block in `assets/style.css`.
+`app.js` landed at exactly 499 lines (under the 500 cap).
+
+**Verification.** Browser on 5759: Agents shows "HAIKU · CHEAP (7)" collapsible
+group with tier pills; Skills shows A/B/C letter groups with counts (api-design,
+backend-patterns…). Sort + collapse controls render, theme intact. Client-only
+change (no new endpoints); smoke green on 5759, 5757 untouched.
