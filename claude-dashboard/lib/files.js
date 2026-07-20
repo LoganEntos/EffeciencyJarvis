@@ -5,8 +5,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const zlib = require('zlib');
 const U = require('./util');
+const X = require('./xlsxcells'); // zero-dep xlsx reader (metadata + cell grid)
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const INBOX = path.join(DASH_DIR, 'data', 'inbox');
@@ -93,79 +93,21 @@ function inboxFile(name) {
   return { safe, full, exists: fs.existsSync(full) };
 }
 
-// ---- N6: zero-dep xlsx preview -------------------------------------------
-// An .xlsx is a ZIP; we read just the central directory + the two XML kinds
-// needed for a structural preview: workbook.xml (sheet names) and each
-// worksheet's <dimension> tag (grid size). No cell values are parsed.
-
-// ZIP central directory → [{ name, method, csize, usize, offset }]
-function zipEntries(buf) {
-  // EOCD signature 0x06054b50, scan the last 64KB
-  let eocd = -1;
-  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65558); i--) {
-    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  }
-  if (eocd < 0) return null;
-  const count = buf.readUInt16LE(eocd + 10);
-  let pos = buf.readUInt32LE(eocd + 16);
-  const out = [];
-  for (let i = 0; i < count && pos + 46 <= buf.length; i++) {
-    if (buf.readUInt32LE(pos) !== 0x02014b50) break;
-    const method = buf.readUInt16LE(pos + 10);
-    const csize = buf.readUInt32LE(pos + 20);
-    const usize = buf.readUInt32LE(pos + 24);
-    const nlen = buf.readUInt16LE(pos + 28), elen = buf.readUInt16LE(pos + 30), clen = buf.readUInt16LE(pos + 32);
-    const name = buf.slice(pos + 46, pos + 46 + nlen).toString('utf8');
-    out.push({ name, method, csize, usize, offset: buf.readUInt32LE(pos + 42) });
-    pos += 46 + nlen + elen + clen;
-  }
-  return out;
-}
-
-function zipRead(buf, entry) {
-  const p = entry.offset;
-  if (buf.readUInt32LE(p) !== 0x04034b50) return null;
-  const nlen = buf.readUInt16LE(p + 26), elen = buf.readUInt16LE(p + 28);
-  const data = buf.slice(p + 30 + nlen + elen, p + 30 + nlen + elen + entry.csize);
-  if (entry.method === 0) return data;
-  if (entry.method === 8) { try { return zlib.inflateRawSync(data); } catch { return null; } }
-  return null;
-}
-
-const colToNum = c => c.split('').reduce((a, ch) => a * 26 + (ch.charCodeAt(0) - 64), 0);
-
-function xlsxInfo(full) {
-  let buf; try { buf = fs.readFileSync(full); } catch { return { error: 'unreadable' }; }
-  const entries = zipEntries(buf);
-  if (!entries) return { error: 'not a valid xlsx (zip directory missing)' };
-  const wbEntry = entries.find(e => e.name === 'xl/workbook.xml');
-  if (!wbEntry) return { error: 'not an xlsx workbook (no xl/workbook.xml)' };
-  const wb = (zipRead(buf, wbEntry) || Buffer.alloc(0)).toString('utf8');
-  const names = [...wb.matchAll(/<sheet[^>]*\bname="([^"]*)"/g)].map(m => m[1]);
-  // worksheets in numeric order pair with workbook sheet order in the common case
-  const sheetEntries = entries.filter(e => /^xl\/worksheets\/sheet\d+\.xml$/.test(e.name))
-    .sort((a, b) => parseInt(a.name.match(/\d+/)[0], 10) - parseInt(b.name.match(/\d+/)[0], 10));
-  const sheets = sheetEntries.map((e, i) => {
-    const out = { name: names[i] || e.name.replace(/^xl\/worksheets\//, ''), rows: null, cols: null, ref: null };
-    if (e.usize > 40 * 1024 * 1024) { out.note = 'sheet too large to inspect'; return out; }
-    const xml = (zipRead(buf, e) || Buffer.alloc(0)).toString('utf8');
-    const dim = xml.match(/<dimension ref="([A-Z]+\d+(?::([A-Z]+)(\d+))?)"/);
-    if (dim) {
-      out.ref = dim[1];
-      if (dim[2]) { out.cols = colToNum(dim[2]); out.rows = parseInt(dim[3], 10); }
-      else { out.cols = 1; out.rows = 1; }
-    } else {
-      out.rows = (xml.match(/<row[ >]/g) || []).length; // fallback: count row tags
-    }
-    return out;
-  });
-  return { sheetCount: sheets.length, sheets };
-}
+// N6: zero-dep xlsx preview (metadata) + the cell-grid reader both live in
+// lib/xlsxcells.js — an .xlsx is a ZIP, read via central-directory walk +
+// raw-inflate, then regex/index-scanned. Kept out of this file to stay under
+// the 500-line rule. xlsxInfo(full) gives sheet names + dimensions.
+const xlsxInfo = X.xlsxInfo;
 
 // R4: inline image preview (thumbnails in the Files tab). Restricted to a
 // known-safe image allowlist and served WITHOUT Content-Disposition:attachment
 // so <img> can render it; <img> never executes scripts even for image/svg+xml.
 const IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' };
+
+// Text-like extensions the in-app document viewer will render (via /api/files/text).
+const TEXT_EXTS = new Set(['md', 'markdown', 'txt', 'text', 'csv', 'tsv', 'json', 'log',
+  'yml', 'yaml', 'xml', 'html', 'htm', 'ini', 'cfg', 'conf', 'toml', 'env', 'sql', 'rst',
+  'py', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'css', 'sh', 'ps1', 'bat']);
 
 async function handle(req, res, url) {
   if (url.pathname === '/api/files/view' && req.method === 'GET') {
@@ -186,6 +128,36 @@ async function handle(req, res, url) {
     if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
     if (!/\.(xlsx|xlsm|xltx)$/i.test(f.safe)) { U.sendJson(res, { error: 'not an Excel workbook' }, 400); return true; }
     U.sendJson(res, Object.assign({ name: f.safe }, xlsxInfo(f.full)));
+    return true;
+  }
+  // Cell-grid preview: capped (200 rows × 40 cols) grid of actual cell VALUES
+  // with resolved fill colours, so a workbook's verification colour-coding is
+  // visible without Excel. Same traversal guard + extension allowlist.
+  if (url.pathname === '/api/files/xlsx/cells' && req.method === 'GET') {
+    const f = inboxFile(url.searchParams.get('name') || '');
+    if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    if (!/\.(xlsx|xlsm|xltx)$/i.test(f.safe)) { U.sendJson(res, { error: 'not an Excel workbook' }, 400); return true; }
+    const sp = url.searchParams.get('sheet');
+    const sheet = /^\d+$/.test(sp || '') ? parseInt(sp, 10) : 0; // clamp handled in reader
+    const grid = X.xlsxSheetCells(f.full, sheet, 200, 40);
+    if (grid.error) { U.sendJson(res, grid, 400); return true; }
+    U.sendJson(res, Object.assign({ name: f.safe }, grid));
+    return true;
+  }
+  // In-app document viewer: return UTF-8 text for text-like files so the SPA can
+  // render markdown / show csv / show plaintext without a download round-trip.
+  // Hard-capped so a giant log can't blow up memory or the client.
+  if (url.pathname === '/api/files/text' && req.method === 'GET') {
+    const f = inboxFile(url.searchParams.get('name') || '');
+    if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    const ext = (f.safe.split('.').pop() || '').toLowerCase();
+    if (!TEXT_EXTS.has(ext)) { U.sendJson(res, { error: 'not a text-previewable file' }, 400); return true; }
+    const CAP = 800 * 1024;
+    let st; try { st = fs.statSync(f.full); } catch { U.sendJson(res, { error: 'unreadable' }, 500); return true; }
+    const fd = fs.openSync(f.full, 'r');
+    const buf = Buffer.alloc(Math.min(st.size, CAP));
+    try { fs.readSync(fd, buf, 0, buf.length, 0); } finally { fs.closeSync(fd); }
+    U.sendJson(res, { name: f.safe, ext, text: buf.toString('utf8'), truncated: st.size > CAP, bytes: st.size });
     return true;
   }
   const p = url.pathname;

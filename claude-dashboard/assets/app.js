@@ -28,7 +28,13 @@ async function api(p, opts = {}) {
   }
   try {
     const r = await fetch(p, { ...opts, signal: ctl.signal });
-    const j = await r.json();
+    // Read as text then parse, so a non-JSON body (e.g. a bare "not found" from
+    // a route this build's server predates) surfaces as a clean {error} instead
+    // of a cryptic "Unexpected token" JSON-parse throw in every caller.
+    const raw = await r.text();
+    let j;
+    try { j = raw ? JSON.parse(raw) : {}; }
+    catch { j = { error: r.ok ? raw : (raw || `HTTP ${r.status}`) }; }
     markServer(true);
     // A 403 "missing or bad X-Hub-Token" means THIS page's copy of the token is
     // stale — the hub rebooted (restart button, crash-recover, PWA tab left
