@@ -85,6 +85,9 @@ function launchOneshot(st, { HERMES_EXE, PROJECT_DIR, pushLine, finalize }) {
   child.stderr.on('data', d => { if (st.stderr.length < 20000) st.stderr += d; });
   child.on('error', e => { st.stderr += '\nspawn error: ' + e.message; });
   child.on('close', code => {
+    // flush a trailing partial line: if hermes' final output isn't newline-
+    // terminated, the while-loop above never emitted it — don't drop it.
+    if (buf.trim()) pushLine(st, JSON.stringify({ type: 'hermes_out', text: U.stripAnsi(buf.replace(/\r$/, '')) }));
     liveness.stopHermesTail(st);
     st.meta.exitCode = code;
     const u = U.safeJson(path.join(st.dir, 'usage.json')) || {};
