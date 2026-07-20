@@ -23,8 +23,21 @@ Server changes verified on throwaway port 5758, never by touching live 5757.
   after app.js. app.js → 310L.
 - **Verify:** node --check clean; smoke 100% green on 5758; code-reviewer: SHIP.
 
-## Next targets (queued)
-- `assets/voice.js` (474L) and `assets/jarvistab.js` (469L) — near the ceiling;
-  split before the next edit pushes either over.
-- Bug-hunt scout dispatched across lib/*.js + assets/*.js for high-confidence
-  correctness defects; findings dispatched to workers as they land.
+## Cycle 3 — hermes trailing-line drop (`505a405`)
+- **Found (via bug-hunt scout):** `lib/hermes.js` close handler never flushed a
+  trailing partial stdout line — if hermes' final output wasn't newline-
+  terminated, that last chunk was silently dropped from the chat. Deprecated
+  engine path, no crash.
+- **Fix:** flush the remaining buffer on close, guarded exactly like the read
+  loop. node --check clean; smoke green on 5758.
+
+## Scout verdict + loop status
+- Full bug-hunt sweep across server.js + all lib/*.js + assets/*.js: **no other
+  high-confidence correctness bugs.** Security invariants intact (token guard on
+  all non-GET, traversal guards, loopback-only voice, argv-array spawns). Every
+  file under 500 lines after cycles 1–2.
+- Remaining near-ceiling files — `assets/voice.js` (474L), `assets/jarvistab.js`
+  (469L) — are UNDER the limit; splitting them now would be speculative, so
+  they're left for the edit that actually pushes one over (per the cycle rule).
+- **Loop paused: out of high-confidence improvements.** Reusable continuation
+  prompt: `docs/handoffs/improvement-cycle.md`.
