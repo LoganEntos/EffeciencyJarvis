@@ -130,6 +130,7 @@ async function renderProjectDetail(id) {
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove('drag'); projUpload(p.slug, e.dataTransfer.files); };
   fin.onchange = () => { projUpload(p.slug, fin.files); fin.value = ''; };
   el.querySelectorAll('.projTile[data-img]').forEach(t => t.onclick = () => showProjImage(t.dataset.name));
+  el.querySelectorAll('.projTile[data-doc]').forEach(t => t.onclick = () => { if (typeof showDocViewer === 'function') showDocViewer(t.dataset.name); });
   el.querySelectorAll('.pDelFile').forEach(b => b.onclick = async (e) => {
     e.stopPropagation();
     if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'confirm?'; setTimeout(() => { if (b.dataset.armed === '1') { b.dataset.armed = ''; b.textContent = 'remove'; } }, 2600); return; }
@@ -228,9 +229,14 @@ function prettyBase(base) {
 }
 function projFileTile(f) {
   const isImg = P_IMG_RE.test(f.base);
+  // Text-like docs (md/csv/json/logs/code) open in the shared in-app document
+  // viewer (showDocViewer, files.js) — same traversal-guarded /text endpoint.
+  const isDoc = !isImg && typeof fileKind === 'function' && fileKind(f.base) === 'text';
   const pn = prettyBase(f.base);
   const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
-  return `<div style="${P_TILE}${isImg ? ';cursor:pointer' : ''}"${isImg ? ` class="projTile" data-img="1" data-name="${esc(f.name)}"` : ''}>
+  const openAttrs = isImg ? ` class="projTile" data-img="1" data-name="${esc(f.name)}"`
+    : isDoc ? ` class="projTile" data-doc="1" data-name="${esc(f.name)}"` : '';
+  return `<div style="${P_TILE}${isImg || isDoc ? ';cursor:pointer' : ''}"${openAttrs}>
     ${isImg ? `<img style="${P_THUMB}" src="/api/files/view?name=${encodeURIComponent(f.name)}" alt="" loading="lazy">`
             : `<div style="${P_THUMB_DOC}"><span class="mono">${esc(((pn ? pn.file : f.base).split('.').pop() || '?').toUpperCase()).slice(0, 4)}</span></div>`}
     <div style="padding:8px 10px">
