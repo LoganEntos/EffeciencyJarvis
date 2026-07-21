@@ -1,12 +1,19 @@
 # Handoff: chat stop control + attachment interaction + project editing fixes
 
-**Status: READY (user priority, 2026-07-21).** Model: Opus 4.8.
+**Status: IN PROGRESS (2026-07-21).** Model: Opus 4.8.
 Source audit: `docs/audit-2026-07-21-chat-attach-projects.md` (full specifics,
 line refs). This is the execution order. Do them top-to-bottom; each is small.
 
+**Done so far:** items 1, 2, 3, 6 shipped — stop button + newChat-cancels +
+double-send guard (`7263f68`, backend-verified running→cancelled on 5758),
+overwrite-retry upload bug + run-done double-fetch collapse (`185d2f6`).
+**Remaining:** items 4 (attachment/file click-to-open) and 5 (project editing
+safety). Item 5's instructions dirty-guard still needs a real browser to verify
+the navigate-away warning; item 4 reuses the Files-tab inline preview (`ba20015`).
+
 ## The work (in order)
 
-1. **Stop button — Jarvis chat + project chat (P1, biggest win).**
+1. ✅ **Stop button — Jarvis chat + project chat (P1, biggest win).**
    The server already has a working cancel: `POST /api/run/cancel` with `{id}`
    → taskkill of the whole CLI tree (`lib/runs.js` cancelRun, 291-314). The Run
    tab wires it (`run.js` #cancelBtn). Neither `jarvischat.js` nor
