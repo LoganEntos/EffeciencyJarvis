@@ -117,16 +117,30 @@
       <span class="pchat-htok">${tok}</span>
       <span class="pchat-hprompt">${esc((r.prompt || '').slice(0, 80))}</span></div>`;
   }
-  async function loadHistory() {
+  // preRuns lets a caller that already fetched the project feed the strip
+  // without a second round-trip (see refreshAfterRun).
+  async function loadHistory(preRuns) {
     const host = $('#pchatHist'); if (!host || !S.project) return;
-    let d;
-    try { d = await api('/api/projects/get?id=' + encodeURIComponent(S.project.id)); }
-    catch { host.innerHTML = ''; return; }
-    const runs = (d && d.runs) || [];
+    let runs = preRuns;
+    if (!runs) {
+      let d;
+      try { d = await api('/api/projects/get?id=' + encodeURIComponent(S.project.id)); }
+      catch { host.innerHTML = ''; return; }
+      runs = (d && d.runs) || [];
+    }
     const resuming = S.sessionId ? `<span class="pchat-resuming" title="Next message continues this thread"><span class="dim">↺ resuming</span> ${esc((S.runId || '').slice(0,8))}</span>` : '';
     host.innerHTML = (runs.length ? runs.slice(0, 8).map(histPill).join('')
       : '<span class="muted" style="font-size:11px">no runs yet — send the first message below</span>') + resuming;
     host.querySelectorAll('.pchat-hpill[data-id]').forEach(p => p.onclick = () => openThread(p.dataset.id));
+  }
+  // After a run ends: ONE /api/projects/get feeds both the history strip and
+  // the runs table (each used to fetch the full project payload separately).
+  async function refreshAfterRun() {
+    if (!S.project) return;
+    let d; try { d = await api('/api/projects/get?id=' + encodeURIComponent(S.project.id)); } catch { return; }
+    if (!d || d.error) return;
+    loadHistory(d.runs || []);
+    if (typeof refreshProjectRuns === 'function') refreshProjectRuns(S.project.id, d.runs || []);
   }
 
   // Load a past run into THIS panel: replay its transcript, set sessionId so
@@ -217,10 +231,9 @@
       if (meta.sessionId) S.sessionId = meta.sessionId;
       setBubble(S.buf || '(no reply)', false);
       setRunningUI(false);
-      loadHistory();
       // Refresh ONLY the runs table + history strip in place — a full
       // renderProjectDetail() reloads files/memory/sessions and jumps scroll.
-      if (typeof refreshProjectRuns === 'function' && S.project) refreshProjectRuns(S.project.id);
+      refreshAfterRun();
     });
     // jarvischat's known bug: onerror only reset the button when !S.running,
     // so a mid-stream drop left "send" disabled forever. Always reset here.
@@ -228,8 +241,7 @@
       if (S.es) { try { S.es.close(); } catch {} S.es = null; }
       if (S.running) { S.running = false; setBubble(S.buf || '✗ connection lost', false); }
       setRunningUI(false);
-      loadHistory();
-      if (typeof refreshProjectRuns === 'function' && S.project) refreshProjectRuns(S.project.id);
+      refreshAfterRun();
     };
   }
 

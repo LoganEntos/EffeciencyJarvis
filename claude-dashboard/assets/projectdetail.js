@@ -171,12 +171,16 @@ function runsSection(runs) {
 }
 // Fetch just this project's runs and swap the runs section in place, preserving
 // scroll. Called by projectchat.js on run done/error instead of the whole view.
-async function refreshProjectRuns(id) {
+async function refreshProjectRuns(id, preRuns) {
   const sec = $('#pRunsSection'); if (!sec) return;
-  let d;
-  try { d = await api('/api/projects/get?id=' + encodeURIComponent(id)); } catch { return; }
-  if (d.error) return;
-  sec.innerHTML = runsSection(d.runs || []);
+  let runs = preRuns;
+  if (!runs) {
+    let d;
+    try { d = await api('/api/projects/get?id=' + encodeURIComponent(id)); } catch { return; }
+    if (d.error) return;
+    runs = d.runs || [];
+  }
+  sec.innerHTML = runsSection(runs);
   wireRunRows(sec);
 }
 // Recent-runs rows → open the run in the Sessions/history view if available.
@@ -261,7 +265,10 @@ async function projUpload(slug, fileList, overwrite) {
   try { r = await api('/api/files?' + new URLSearchParams({ project: slug, ...(overwrite ? { overwrite: 1 } : {}) }), { method: 'POST', body: fd, timeoutMs: 120000 }); }
   catch (e) { if (st) st.innerHTML = `<span class="pill err">upload failed: ${esc(e.message || 'network error')}</span>`; return; }
   if ((r.conflicts && r.conflicts.length) && !(r.saved && r.saved.length)) {
-    if (confirm(`Already attached: ${(r.conflicts || []).join(', ')}\n\nOverwrite?`)) return projUpload(slug, fileList, true);
+    // Retry with the `files` snapshot, not the live `fileList` — the picker's
+    // input was cleared (fin.value='') right after the first call, so the
+    // original FileList is now empty and would silently upload nothing.
+    if (confirm(`Already attached: ${(r.conflicts || []).join(', ')}\n\nOverwrite?`)) return projUpload(slug, files, true);
   }
   if (r.error && r.error !== 'exists') { if (st) st.innerHTML = `<span class="pill err">${esc(r.error)}</span>`; return; }
   if (projSel) renderProjectDetail(projSel);
