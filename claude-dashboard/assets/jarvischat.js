@@ -10,7 +10,7 @@
    (pending file chips → images/files refs on the run payload). */
 'use strict';
 (function () {
-  const S = { es: null, running: false, runId: null, seen: -1, sessionId: null, bubble: null, buf: '', turnCount: 0 };
+  const S = { es: null, running: false, sending: false, runId: null, seen: -1, sessionId: null, bubble: null, buf: '', turnCount: 0 };
   const recallOn = () => { try { return localStorage.getItem('hub.recall') === '1'; } catch { return false; } };
   const timeOf = iso => { try { return new Date(iso).toLocaleTimeString(undefined, { hour12: false }); } catch { return ''; } };
 
@@ -86,8 +86,20 @@
   // (already running, an attachment still uploading, or nothing to send) —
   // callers (jarvistab.js runShaped, voiceconvo.js) use this to avoid a false
   // "sent" flash when the click/turn didn't actually go anywhere.
+  // Reflect running-state in the composer: swap send↔stop, block re-entry.
+  function setRunningUI(on) {
+    const send = $('#jchatSend'), stop = $('#jchatStop');
+    if (send) { send.disabled = on; send.classList.toggle('hidden', on); }
+    if (stop) stop.classList.toggle('hidden', !on);
+  }
+  // Cancel the in-flight run server-side (kills the CLI tree) — the stream's
+  // own 'done'/onerror does the local cleanup.
+  async function cancel() {
+    if (!S.runId) return;
+    try { await api('/api/run/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: S.runId }) }); } catch {}
+  }
   async function send(textArg) {
-    if (S.running) return false;
+    if (S.running || S.sending) return false;
     const ta = $('#jchatIn');
     let prompt = (typeof textArg === 'string' && textArg.trim()) || (ta ? ta.value.trim() : '');
     // Attachments: same inbox path as the Run tab (assets/jarvisattach.js).
@@ -124,15 +136,18 @@
     const think = window.jarvisThink ? jarvisThink.get() : false;
     if (window.jarvisThink) jarvisThink.clear();
     let r;
+    // Guard synchronously BEFORE the await so a second Enter can't slip through
+    // the S.running check (which only flips once the POST resolves).
+    S.sending = true;
     try {
       r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, engine: 'claude', model, permissionMode: perm, think,
           resume: S.sessionId || '', recall: recallOn(), images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
-    } catch (e) { setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); return false; }
-    if (r.error) { setBubble('✗ ' + r.error, false); return false; }
+    } catch (e) { S.sending = false; setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); return false; }
+    if (r.error) { S.sending = false; setBubble('✗ ' + r.error, false); return false; }
     if (window.jarvisAttach) jarvisAttach.clear();
-    S.running = true; S.runId = r.id; S.seen = -1;
-    const btn = $('#jchatSend'); if (btn) btn.disabled = true;
+    S.running = true; S.sending = false; S.runId = r.id; S.seen = -1;
+    setRunningUI(true);
     setBubble('', true);
     try { if (window.HubVoice && HubVoice.onRunStart) HubVoice.onRunStart(); } catch {}
     const es = new EventSource(`/api/run/stream?id=${encodeURIComponent(r.id)}`);
@@ -149,7 +164,7 @@
       if (meta.sessionId) S.sessionId = meta.sessionId;
       setBubble(S.buf || '(no reply)', false);
       try { if (window.HubVoice && HubVoice.onRunDone) HubVoice.onRunDone(S.buf); } catch {}
-      const b2 = $('#jchatSend'); if (b2) b2.disabled = false;
+      setRunningUI(false);
       renderSessBadge();
       if (window.jarvisHooks && window.jarvisHooks.renderHolding) window.jarvisHooks.renderHolding();
     });
@@ -162,20 +177,21 @@
         try { es.close(); } catch {}
         S.es = null;
         setBubble(S.buf || '✗ connection lost — see transcript', false);
-        const b3 = $('#jchatSend'); if (b3) b3.disabled = false;
+        setRunningUI(false);
       }
     };
     return true;
   }
   function newChat() {
+    if (S.running) cancel(); // don't orphan a live run when starting fresh
     if (S.es) { try { S.es.close(); } catch {} S.es = null; }
-    S.running = false; S.runId = null; S.seen = -1;
+    S.running = false; S.sending = false; S.runId = null; S.seen = -1;
     S.sessionId = null; S.bubble = null; S.buf = ''; S.turnCount = 0;
     const feed = $('#jconv'); if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">new conversation — the next prompt starts a fresh CLI session</div>';
     if (window.jarvisAttach) jarvisAttach.clear();
     if (window.jarvisTimeline) jarvisTimeline.render(0);
     renderSessBadge();
-    const btn = $('#jchatSend'); if (btn) btn.disabled = false;
+    setRunningUI(false);
   }
   function wire() {
     const ci = $('#jchatIn');
@@ -185,6 +201,7 @@
     }
     const sb = $('#jchatSend'); if (sb) sb.onclick = send;
     const nb = $('#jchatNew'); if (nb) nb.onclick = newChat;
+    const st = $('#jchatStop'); if (st) st.onclick = cancel;
     renderSessBadge();
   }
   // sendText = programmatic entry for the voice conversation engine

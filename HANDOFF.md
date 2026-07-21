@@ -224,6 +224,13 @@ the Lovable build — the other tabs' Lovable screens "need work", don't port
 them.
 
 **Next queue (execute top-to-bottom):**
+0. ⭐ `docs/handoffs/chat-stop-attach-project-fixes.md` — **NEW, TOP PRIORITY
+   (2026-07-21 audit).** Chat has no stop control (server cancel exists,
+   unwired in both chats — orphans a running turn, burns tokens); double-send
+   race; overwrite-retry uploads nothing; attachments/project files aren't
+   click-to-open; instructions discard silently on navigate-away; double heavy
+   fetch on run-done. Full specifics + line refs in
+   `docs/audit-2026-07-21-chat-attach-projects.md`.
 1. ~~`docs/handoffs/projects-tab-polish.md`~~ — ✅ SHIPPED in `f77ffff` (all six
    parts: per-project model select, thread-resume clarity, in-place run refresh,
    ✦ distiller toggle, runs-table `overflow-x:auto`, empty-state reorder). The

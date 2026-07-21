@@ -325,6 +325,7 @@
             <input type="file" id="jfileIn" multiple hidden>
             <button class="jp-ghost" id="jattachBtn" title="Attach files — paste, drop, or pick">📎</button>
             <button class="jp-ghost" id="jchatNew" title="Start a fresh CLI session">＋ new</button>
+            <button class="jp-ghost danger hidden" id="jchatStop" title="Stop this run">■ stop</button>
             <button class="jp-btn" id="jchatSend">↵ send</button>
           </div>
         </section>

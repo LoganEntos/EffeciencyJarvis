@@ -10,8 +10,18 @@
    wipe the transcript out from under the user right as the reply lands). */
 'use strict';
 (function () {
-  const S = { es: null, running: false, runId: null, seen: -1, sessionId: null,
+  const S = { es: null, running: false, sending: false, runId: null, seen: -1, sessionId: null,
     bubbleEntry: null, buf: '', project: null, log: [], model: 'auto', distill: false, distilling: false };
+  // Swap send↔stop in the composer while a run is live.
+  function setRunningUI(on) {
+    const send = $('#pchatSend'), stop = $('#pchatStop');
+    if (send) { send.disabled = on; send.classList.toggle('hidden', on); }
+    if (stop) stop.classList.toggle('hidden', !on);
+  }
+  async function cancel() {
+    if (!S.runId) return;
+    try { await api('/api/run/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: S.runId }) }); } catch {}
+  }
   const timeOf = iso => { try { return new Date(iso).toLocaleTimeString(undefined, { hour12: false }); } catch { return ''; } };
 
   // Per-project composer prefs live in localStorage under hub.proj.<id>.<key>.
@@ -154,7 +164,7 @@
   async function send() {
     const ta = $('#pchatIn'); if (!ta || !S.project) return;
     let prompt = ta.value.trim();
-    if (!prompt || S.running || S.distilling) return;
+    if (!prompt || S.running || S.sending || S.distilling) return;
     const btn = $('#pchatSend');
     // ✦ distiller: a long vibe-dump gets a Haiku pre-pass (the same gate the Run
     // tab uses); short prompts get only the instant local cleanup. The refined
@@ -182,13 +192,16 @@
     S.bubbleEntry = addAssistantBubble('thinking…');
     if (btn) btn.disabled = true;
     let r;
+    // Guard synchronously before the await — S.running only flips post-POST.
+    S.sending = true;
     try {
       r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, engine: 'claude', model: S.model || 'auto', permissionMode: 'bypassPermissions',
           resume: S.sessionId || '', projectId: S.project.id }) });
-    } catch (e) { setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); if (btn) btn.disabled = false; return; }
-    if (r.error) { setBubble('✗ ' + r.error, false); if (btn) btn.disabled = false; return; }
-    S.running = true; S.runId = r.id; S.seen = -1;
+    } catch (e) { S.sending = false; setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); if (btn) btn.disabled = false; return; }
+    if (r.error) { S.sending = false; setBubble('✗ ' + r.error, false); if (btn) btn.disabled = false; return; }
+    S.running = true; S.sending = false; S.runId = r.id; S.seen = -1;
+    setRunningUI(true);
     setBubble('', true);
     const es = new EventSource(`/api/run/stream?id=${encodeURIComponent(r.id)}`);
     S.es = es;
@@ -203,7 +216,7 @@
       let meta = {}; try { meta = JSON.parse(ev.data); } catch {}
       if (meta.sessionId) S.sessionId = meta.sessionId;
       setBubble(S.buf || '(no reply)', false);
-      const b2 = $('#pchatSend'); if (b2) b2.disabled = false;
+      setRunningUI(false);
       loadHistory();
       // Refresh ONLY the runs table + history strip in place — a full
       // renderProjectDetail() reloads files/memory/sessions and jumps scroll.
@@ -214,17 +227,18 @@
     es.onerror = () => {
       if (S.es) { try { S.es.close(); } catch {} S.es = null; }
       if (S.running) { S.running = false; setBubble(S.buf || '✗ connection lost', false); }
-      const b3 = $('#pchatSend'); if (b3) b3.disabled = false;
+      setRunningUI(false);
       loadHistory();
       if (typeof refreshProjectRuns === 'function' && S.project) refreshProjectRuns(S.project.id);
     };
   }
 
   function newChat() {
+    if (S.running) cancel(); // don't orphan a live run when starting fresh
     if (S.es) { try { S.es.close(); } catch {} S.es = null; }
-    S.running = false; S.runId = null; S.seen = -1; S.sessionId = null; S.bubbleEntry = null; S.buf = ''; S.log = [];
+    S.running = false; S.sending = false; S.runId = null; S.seen = -1; S.sessionId = null; S.bubbleEntry = null; S.buf = ''; S.log = [];
     const feed = $('#pchatConv'); if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">new conversation — the next message starts a fresh CLI session</div>';
-    const btn = $('#pchatSend'); if (btn) btn.disabled = false;
+    setRunningUI(false);
   }
 
   function wire() {
@@ -233,8 +247,10 @@
       ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
       ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
     }
-    const sb = $('#pchatSend'); if (sb) { sb.onclick = send; sb.disabled = S.running; }
+    const sb = $('#pchatSend'); if (sb) sb.onclick = send;
     const nb = $('#pchatNew'); if (nb) nb.onclick = newChat;
+    const st = $('#pchatStop'); if (st) st.onclick = cancel;
+    setRunningUI(S.running);
     const ms = $('#pchatModel');
     if (ms) { ms.value = S.model; ms.onchange = () => { S.model = MODELS.includes(ms.value) ? ms.value : 'auto'; savePref('model', S.model); }; }
     const dt = $('#pchatDistill');
@@ -260,6 +276,7 @@
           <option value="auto">auto</option><option value="opus">opus</option>
           <option value="sonnet">sonnet</option><option value="haiku">haiku</option></select>
         <button class="jp-ghost" id="pchatNew" title="Start a fresh CLI session">＋ new</button>
+        <button class="jp-ghost danger hidden" id="pchatStop" title="Stop this run">■ stop</button>
         <button class="jp-btn" id="pchatSend">▷ Run in project</button>
       </div></div>`;
     const feed = $('#pchatConv');
