@@ -25,25 +25,20 @@ Commit at each working, browser-verified stage.
    `HANDOFF.md` + `docs/roadmap.md` when the handoff closes; mark the handoff
    file DONE at the top rather than deleting it.
 
-## Current handoffs (execute READY ones top-to-bottom — order set by the user 2026-07-17)
+## Current handoffs (execute top-to-bottom — queue in `docs/roadmap.md`)
 
 | # | file | status | model |
 | --- | --- | --- | --- |
-| 1 | `projects-tab-polish.md` | ✅ DONE 07-18 (`f77ffff`, `5946b6b`) | — |
-| 2 | `jarvis-chat-parity.md` | ✅ DONE 07-19 (`b73ba5a`, `1c7ca98`) | — |
-| 3 | `voice-orb-live.md` | ✅ DONE 07-19 (`9421d61`, `8ae1c87`) | — |
-| 4 | `persona-manager-ui.md` | ✅ DONE 07-19 (`eeccf1a`, `272282f`) | — |
-| 5 | `schedules-verify.md` | ✅ R5 PROVEN 07-18 (`d7cb3c7` — live fire verified end-to-end); UI polish portion still open | Opus 4.8 |
-| 6 | `distill-latency.md` | ✅ DONE 07-19 (`20a43cd`, `477c1fc`) | — |
-| ✅ | `jarvis-tab-finalize.md` | DONE 07-16 (`fbc1fee`) — module split + 4 defects fixed | — |
-| ✅ | `jarvis-ui-port.md` | DONE 07-16 (`c30fa91`, postscript inside) — Lovable port shipped | — |
-| ✅ | `jarvis-error-hunt.md` | DONE 07-16 (`d212169`) — beacon works; only catch was the already-fixed `6c09bd7` crash | — |
-| ✅ | `skills-cleanup.md` | DONE 07-15 (`573212a`) — design suite 6→2, borderline three deleted | — |
+| 1 | `chat-stop-attach-project-fixes.md` | IN PROGRESS — items 1/2/3/6 shipped (`7263f68`, `185d2f6`); items 4–5 remain | Opus 4.8 |
+| 2 | `schedules-verify.md` | R5 fire test PROVEN 07-18 (`d7cb3c7`); UI polish portion still open | Opus 4.8 |
+| ∞ | `improvement-cycle.md` | repeatable — one improvement per run, fire on a loop anytime | Fable 5 |
 
-(User's spoken priority list, verbatim: "1. Projects tab 2. FAL-ish 3. Voice
-orb 4. Quality persona manager 5. UI schedule 6. Verify" — #2 interpreted as
-the file-attach/chat-parity work from the same Q&A; #5+#6 folded into
-`schedules-verify.md`. If #2 meant something else, re-order before running.)
+Completed work orders were moved verbatim to `docs/archive/handoffs/`
+(projects-tab-polish, jarvis-chat-parity, voice-orb-live, persona-manager-ui,
+distill-latency, jarvis-tab-finalize, jarvis-ui-port, jarvis-error-hunt,
+skills-cleanup, file-viewer-visual-preview, master-fable5-handoff). When a
+handoff closes: mark it DONE at the top, update `HANDOFF.md` +
+`docs/roadmap.md`, then `git mv` it into the archive.
 
 ⚠ Since 2026-07-15 the hub shows **no dollar figures anywhere** — tokens +
 completion/routing % are the metrics (`39e6ed6`). Any handoff that touches UI

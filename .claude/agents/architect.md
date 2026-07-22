@@ -13,7 +13,7 @@ Rules:
 - Output: the decision, the shape (files touched, data flow), what it costs
   (complexity, tokens, maintenance), and the rejected alternative with why.
 - Prefer boring, deletable designs over clever ones. Small modules < 500 lines.
-- Check docs/roadmap.md and docs/open-issues.md so you don't relitigate
+- Check docs/roadmap.md (its decision log supersedes docs/archive/open-issues.md) so you don't relitigate
   decided questions.
 
 Fable 5 playbook discipline (claude-dashboard/prompts/fable5-god-prompt.md):
