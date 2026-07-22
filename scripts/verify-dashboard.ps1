@@ -98,7 +98,11 @@ Check "GET /assets/sheetgrid.js" "$base/assets/sheetgrid.js"
 Check "GET /api/files/xlsx (bad name 404)" "$base/api/files/xlsx?name=nope.xlsx" 404
 Check "GET /api/files/xlsx/cells (bad name 404)" "$base/api/files/xlsx/cells?name=nope.xlsx" 404
 Check "GET /api/files/xlsx/cells (traversal 404)" "$base/api/files/xlsx/cells?name=..%2F..%2Fserver.js" 404
-Check "GET /api/files/xlsx/cells (non-xlsx 400)" "$base/api/files/xlsx/cells?name=evil.txt" 400
+# self-provisioned fixture: the endpoint must 400 on an inbox file that isn't an xlsx
+$fixture = Join-Path $PSScriptRoot '..\claude-dashboard\data\inbox\smoke-nonxlsx.txt'
+Set-Content -Path $fixture -Value 'smoke' -Encoding ascii
+Check "GET /api/files/xlsx/cells (non-xlsx 400)" "$base/api/files/xlsx/cells?name=smoke-nonxlsx.txt" 400
+Remove-Item $fixture -Force -ErrorAction SilentlyContinue
 Check "GET /api/run/transcript (bad id 404)" "$base/api/run/transcript?id=nope" 404
 Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2Fserver.js" 403
 CheckPost "POST /api/run w/o token (403)"        "$base/api/run"        '{"prompt":"x"}' 403
