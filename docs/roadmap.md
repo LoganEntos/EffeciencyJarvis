@@ -50,6 +50,11 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
    ergonomics, card wrapping, table overflow. Done when all tabs are usable
    one-handed (Tailscale PWA already live).
 4. **N8 iPhone polish** — builds on N2.
+5. **Size guard (found 2026-07-22):** `assets/style.css` is **614 lines — over
+   the 500 cap**; split it (e.g. base/tokens vs components) on the next UI
+   pass. Watchlist (within ~30 of the cap): `assets/run.js` 485,
+   `assets/voice.js` 474, `assets/jarvistab.js` 470 — next splits are already
+   sketched in the archive (soul editor → jarvissoul.js, etc.).
 
 ## 🙋 Needs the USER (interactive / system)
 
