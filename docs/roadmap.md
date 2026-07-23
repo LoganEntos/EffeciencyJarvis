@@ -39,6 +39,14 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
 
 ## 🔜 NOW — execute top-to-bottom
 
+0. **`docs/handoffs/fix-all-2026-07-23.md`** — ONE Opus 4.8 xhigh thread:
+   Phase A rebuilds the self-improvement loop per
+   `docs/audit-2026-07-23-self-improvement-loop.md` (scout schedule, task-queue
+   fallback, effort passthrough, overflow continuation, starvation badge),
+   Phase B executes the live hub task queue (which covers items 1–2 and 5
+   below plus the persona-pipeline fixes from
+   `docs/audit-2026-07-22-persona-pipeline.md`). Items below stand if the
+   sprint stalls.
 1. **Finish `docs/handoffs/chat-stop-attach-project-fixes.md`** (IN PROGRESS —
    items 1, 2, 3, 6 shipped `7263f68`/`185d2f6`; remaining: **item 4**
    attachments/project files click-to-open, **item 5** project instructions
