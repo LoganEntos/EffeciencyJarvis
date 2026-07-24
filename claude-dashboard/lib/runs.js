@@ -128,7 +128,25 @@ const { listRuns, routingStats, transcript, getRunMeta, statsToday } = createQue
 // launched here is tracked identically on both sides.
 const { launch, pushLine, broadcast, sseLine, writeMeta } = createEngine({
   active, queue, MAX_ACTIVE, runningCount, CLAUDE_EXE, PROJECT_DIR, HERMES_EXE,
+  continueRun,
 });
+
+// A5 — continuation on context-death. When a task/schedule/autopilot run dies
+// with `error` but left a resumable sessionId, the engine calls this to enqueue
+// ONE resumed run that reads the log/diff and finishes only the current item.
+// Capped (meta.continuations ≤ 2 per chain) so a genuinely broken item can't
+// resume forever; user-cancelled runs never reach here (status is 'cancelled').
+function continueRun(meta) {
+  const prompt = `[Continuation — the previous ${meta.source} run (${meta.id}) was cut off before finishing, most likely a context/length limit rather than a real failure.]
+
+Read that run's transcript and the current \`git status\`/\`git diff\` to see exactly where it stopped, then finish ONLY the single item it was working on — do NOT start new work or broaden scope. If the item was already completed and committed, verify that and stop. Commit any remaining change (no Co-Authored-By trailer) and give a one-line status.`;
+  return startRun({
+    prompt, model: meta.model || 'auto', permissionMode: meta.permissionMode,
+    resume: meta.sessionId, source: meta.source,
+    continuations: (meta.continuations || 0) + 1,
+    effort: meta.effort || '',
+  });
+}
 
 const INBOX_DIR = path.join(DASH_DIR, 'data', 'inbox');
 // Pasted/dropped images the browser uploaded to data/inbox/ before the run.
@@ -152,7 +170,7 @@ function resolveImages(images) {
   return out;
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think, effort }) {
+function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think, effort, source, continuations }) {
   engine = ENGINES.includes(engine) ? engine : 'claude';
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
@@ -268,6 +286,12 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     think: engine === 'claude' && !!think,
     effort: effApplied || null,
     fable5: engine === 'claude' && !!GOD_PROMPT && isOpusTier(model),
+    // Provenance for the autonomous loop: which primitive launched this run
+    // (task / schedule / autopilot / null=user). Drives continuation-on-death
+    // (finalizeRun) — only non-user runs are auto-resumed. continuations counts
+    // how many times this chain has already been auto-continued (cap in engine).
+    source: ['task', 'schedule', 'autopilot'].includes(source) ? source : null,
+    continuations: Number.isInteger(continuations) ? continuations : 0,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);
@@ -417,4 +441,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, startRun, getRunMeta, runningCount, listRuns, queueLength: () => queue.length };
+module.exports = { handle, startRun, getRunMeta, runningCount, listRuns, queueLength: () => queue.length, EFFORTS };

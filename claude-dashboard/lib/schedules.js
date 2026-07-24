@@ -66,7 +66,8 @@ const settled = st => !st || st === 'done' || st === 'error' || st === 'cancelle
 
 function fire(s) {
   const prompt = `[Scheduled run "${s.title}" — ${describe(s)}]\n\n${s.prompt}`;
-  const r = runs.startRun({ prompt, model: s.model || 'auto', permissionMode: 'bypassPermissions' });
+  const r = runs.startRun({ prompt, model: s.model || 'auto', permissionMode: 'bypassPermissions',
+    effort: s.effort || '', source: 'schedule' });
   if (r.error) { // engine busy — try again shortly without skipping the slot
     s.nextDue = new Date(Date.now() + DEFER_MS).toISOString();
     return null;
@@ -93,9 +94,40 @@ function tick() {
   if (changed) save(list);
 }
 
+// A3 — the standing scout. The self-improvement loop was fix-only and starved
+// once the backlog emptied; this is the replenishment stage. Seeded DISABLED so
+// it never runs until the user arms it with one toggle. Its only job is the FIND
+// step of docs/handoffs/improvement-cycle.md — discover work and WRITE it to a
+// queue (backlog rows per the format rule, or hub tasks), fixing nothing itself.
+const SCOUT_PROMPT = `[Scout run — replenishment stage of the self-improvement loop. You FIND work and record it; you do NOT fix anything this run.]
+
+Sweep the claude-hub repo for the single highest-value batch of concrete improvements (3-6 items). Look for: any lib/*.js or assets/*.js over the 500-line hard rule, real correctness bugs, dead/duplicated logic, accessibility or UX regressions, and security-invariant risks. You MAY also do one external pass for prior art — newer Claude CLI flags, voice/persona patterns, small-web-app UX — using the scraper or web-researcher agents (zero new deps).
+
+Record what you find so the fix loop can pick it up, then stop:
+- Append each item to docs/improvement-backlog.md as a 7-column table row exactly in the format the file's header rule specifies (| id | file:line | issue | fix | effort | risk | ⬜ |), giving each a fresh unique id. OR enqueue it as a hub task via the Tasks tab.
+- Do NOT implement any fix, do NOT batch unrelated edits, do NOT open styled HTML reports.
+- Commit the backlog additions (no Co-Authored-By trailer) and give a one-line spoken summary of what you queued.
+
+Ground rules override everything: zero-dep, localhost-only, <500-line files, security invariants, no dollar figures, no HTML-report artifacts.`;
+
+function seedDefaults() {
+  const list = load();
+  if (list.some(s => s.builtin === 'scout')) return; // already seeded — respect the user's on/off choice
+  const s = {
+    id: newId(), builtin: 'scout', kind: 'interval', minutes: 12 * 60,
+    title: 'Backlog scout (replenishment)', prompt: SCOUT_PROMPT,
+    model: 'claude-fable-5', enabled: false,
+    createdAt: new Date().toISOString(), lastRunId: null, lastRunAt: null, runCount: 0,
+    nextDue: null, // armed on enable (toggle re-computes nextDue from now)
+  };
+  list.push(s);
+  save(list);
+}
+
 let ticker = null;
 function startTicker() {
   if (ticker) return;
+  seedDefaults();
   ticker = setInterval(tick, TICK_MS);
   setTimeout(tick, 3000); // catch-up pass shortly after boot
 }
@@ -126,6 +158,7 @@ function parseSchedule(b) {
   // back to the CLI default rather than reaching the argv.
   const model = (U.SIMPLE_MODELS.includes(b.model) || /^claude-[a-z0-9.-]{1,40}$/.test(String(b.model || ''))) ? b.model : 'auto';
   const s = { kind, title: title || prompt.slice(0, 60), prompt, model };
+  if (runs.EFFORTS.includes(b.effort)) s.effort = b.effort; // optional utilization tier (A4)
   if (kind === 'interval') {
     const min = parseInt(b.minutes, 10);
     if (!Number.isFinite(min) || min < MIN_INTERVAL_MIN || min > 7 * 24 * 60) {

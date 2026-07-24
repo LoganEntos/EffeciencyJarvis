@@ -3,6 +3,20 @@
 > Plain-text backlog. **Rule (user, 2026-07-11):** never render reports as HTML
 > webpages/artifacts — findings live here as Markdown or as concise text in the
 > reply. Genuine dashboard UI work is exempt (that's the product).
+>
+> **Format rule (2026-07-23) — read before appending.** Autopilot
+> (`lib/autopilot.js parseBacklog()`) only reads open items written as a
+> **7-column table row**:
+>
+> ```
+> | id | file:line | issue | fix | effort | risk | ⬜ |
+> ```
+>
+> The `id` must match `^[A-Z]\d+$` (e.g. `C14`, `U14`), the status glyph is `⬜`
+> for open and `✅ <date>` for done, and the row must sit inside a Markdown table.
+> Bullet lists are **history/prose only — the parser is blind to them.** A scout
+> or audit adding new work MUST append table rows (or enqueue hub tasks); a fix
+> closes an item by flipping its glyph to `✅` in place.
 
 ## Self-improvement round — 2026-07-14 — ✅ CLOSED (Fable 5 pass, same day)
 

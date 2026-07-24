@@ -69,6 +69,10 @@ function parseBacklog() {
 }
 
 // ---------- picking the next item ----------
+// Returns {type:'backlog', item} | {type:'task', task} | null. Backlog rows come
+// first (the curated queue); when the backlog is dry we fall back to the hub
+// task queue (A2) so the Tasks tab is the one visible queue instead of a third
+// tracker autopilot ignores.
 function pickNext(state) {
   const items = parseBacklog();
   for (const it of items) {
@@ -77,7 +81,18 @@ function pickNext(state) {
     if (d && d.status === 'stuck') continue;               // parked, don't retry forever
     if (d && !['error', 'cancelled', 'gone'].includes(d.status)) continue; // still in flight or already done
     if (d && (d.attempts || 0) >= MAX_ATTEMPTS) continue;   // exhausted retries this session
-    return it;
+    return { type: 'backlog', item: it };
+  }
+  // A2 — backlog empty: dispatch the first never-run hub task. Skip tasks
+  // autopilot created itself (source:'autopilot') so it can't feed its own loop,
+  // and skip ones already parked stuck. A task gets a runId the moment it fires,
+  // so it won't be re-picked next tick.
+  for (const t of tasks.load()) {
+    if (t.runId || t.source === 'autopilot') continue;
+    const d = state.dispatched[t.id];
+    if (d && d.status === 'stuck') continue;
+    if (d && (d.attempts || 0) >= MAX_ATTEMPTS) continue;
+    return { type: 'task', task: t };
   }
   return null;
 }
@@ -127,7 +142,9 @@ When you are done:
 3. git add + commit the change (no Co-Authored-By trailer), a short message
    describing the fix.
 Keep the total change scoped to this one backlog item — do not bundle unrelated work.`;
-  const t = tasks.enqueue({ title: `autopilot: ${item.id} ${item.issue.slice(0, 60)}`, prompt, model: 'auto', source: 'autopilot' });
+  // Code fixes default to opus + high effort (A4): the god prompt only injects on
+  // opus-tier runs, and 'auto' would route these short prompts to sonnet/haiku.
+  const t = tasks.enqueue({ title: `autopilot: ${item.id} ${item.issue.slice(0, 60)}`, prompt, model: 'opus', effort: 'high', source: 'autopilot' });
   const r = tasks.runTask(t.id);
   const prev = state.dispatched[item.id] || { attempts: 0 };
   state.dispatched[item.id] = {
@@ -139,6 +156,21 @@ Keep the total change scoped to this one backlog item — do not bundle unrelate
   return r;
 }
 
+// Fire a never-run hub task (A2 fallback). Unlike backlog items we don't enqueue
+// a new task — we run the existing one — but we still track it in dispatched[]
+// (keyed by task id) so inflightCount() and the retry cap cover it too.
+function dispatchTask(state, task) {
+  const r = tasks.runTask(task.id);
+  const prev = state.dispatched[task.id] || { attempts: 0 };
+  state.dispatched[task.id] = {
+    taskId: task.id, runId: r.runId || null, status: r.error ? 'error' : 'running',
+    attempts: (prev.attempts || 0) + 1, at: new Date().toISOString(),
+    error: r.error || null, fromQueue: true,
+  };
+  state.lastPick = task.id;
+  return r;
+}
+
 function tick() {
   const state = loadState();
   state.lastTick = new Date().toISOString();
@@ -146,8 +178,15 @@ function tick() {
   refreshDispatched(state);
   if (inflightCount(state) >= MAX_INFLIGHT) { saveState(state); return; }
   if (runs.runningCount() + runs.queueLength() >= MAX_QUEUE_PRESSURE) { saveState(state); return; } // don't pile onto a busy engine
-  const item = pickNext(state);
-  if (item) dispatch(state, item);
+  const pick = pickNext(state);
+  if (pick) {
+    state.idle = false; state.idleSince = null;
+    pick.type === 'task' ? dispatchTask(state, pick.task) : dispatch(state, pick.item);
+  } else {
+    // A6 — enabled but nothing to do: surface it instead of idling silently.
+    state.idle = true;
+    if (!state.idleSince) state.idleSince = new Date().toISOString();
+  }
   saveState(state);
 }
 
@@ -164,9 +203,16 @@ function status() {
   const items = parseBacklog();
   const open = items.filter(i => !i.done);
   const stuck = Object.entries(state.dispatched).filter(([, d]) => d.status === 'stuck').map(([id]) => id);
+  // A2 — the task queue is now part of what autopilot can dispatch, so surface
+  // how many never-run non-autopilot tasks are waiting behind the backlog.
+  let queueOpen = 0;
+  try { queueOpen = tasks.load().filter(t => !t.runId && t.source !== 'autopilot').length; } catch {}
+  // A6 — "idle" means enabled but nothing to pick (backlog dry AND queue empty).
+  const idle = !!state.enabled && open.length === 0 && queueOpen === 0;
   return {
     enabled: state.enabled, lastTick: state.lastTick, lastPick: state.lastPick,
     backlogTotal: items.length, backlogOpen: open.length, backlogDone: items.length - open.length,
+    queueOpen, idle, idleSince: idle ? (state.idleSince || null) : null,
     inflight: inflightCount(state), stuck, dispatched: state.dispatched,
   };
 }

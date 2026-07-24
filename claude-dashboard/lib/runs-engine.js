@@ -16,7 +16,7 @@ const memory = require('./memory');
 const { diagnose } = require('./diagnose');
 const { countArtifacts } = require('./artifacts');
 
-function createEngine({ active, queue, MAX_ACTIVE, runningCount, CLAUDE_EXE, PROJECT_DIR, HERMES_EXE }) {
+function createEngine({ active, queue, MAX_ACTIVE, runningCount, CLAUDE_EXE, PROJECT_DIR, HERMES_EXE, continueRun }) {
   // Every line event carries `id:` = its index in the run, so EventSource
   // auto-reconnects (which send Last-Event-ID) never duplicate rendered lines.
   function sseLine(res, idx, line) { res.write(`event: line\nid: ${idx}\ndata: ${line}\n\n`); }
@@ -97,6 +97,14 @@ function createEngine({ active, queue, MAX_ACTIVE, runningCount, CLAUDE_EXE, PRO
     broadcast(st, 'done', JSON.stringify(st.meta));
     for (const res of st.listeners) { try { res.end(); } catch {} }
     st.listeners.clear();
+    // A5 — an autonomous run that died mid-item (error + resumable session) gets
+    // ONE auto-continuation so a context/length cutoff doesn't strand the work.
+    // Cap at 2 per chain; user-cancelled runs are status 'cancelled', not 'error'.
+    if (continueRun && st.meta.status === 'error' && st.meta.sessionId
+        && ['task', 'schedule', 'autopilot'].includes(st.meta.source)
+        && (st.meta.continuations || 0) < 2) {
+      try { continueRun(st.meta); } catch {}
+    }
     setTimeout(() => active.delete(st.meta.id), 30000); // grace for late SSE attach
     dequeueNext();
   }

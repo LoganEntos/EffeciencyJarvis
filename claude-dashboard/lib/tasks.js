@@ -52,7 +52,8 @@ function runTask(id) {
     const m = runs.getRunMeta(t.runId);
     if (m && !settled(m.status)) return { error: 'task already running' };
   }
-  const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions' });
+  const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions',
+    effort: t.effort || '', source: t.source === 'autopilot' ? 'autopilot' : 'task' });
   if (r.error) return r;
   t.runId = r.id;
   t.startedAt = new Date().toISOString();
@@ -69,7 +70,8 @@ function runAll() {
     const m = t.runId ? runs.getRunMeta(t.runId) : null;
     // run tasks that never ran, or that failed/cancelled (retry); leave done/active ones
     if (!t.runId || (m && settled(m.status) && m.status !== 'done')) {
-      const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions' });
+      const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions',
+        effort: t.effort || '', source: t.source === 'autopilot' ? 'autopilot' : 'task' });
       if (!r.error) { t.runId = r.id; t.startedAt = new Date().toISOString(); started++; }
     }
   }
@@ -81,11 +83,12 @@ function runAll() {
 // AND by the autopilot loop (lib/autopilot.js) to seed itself from the
 // improvement backlog. `source` marks autopilot-created tasks so the UI can
 // badge them distinctly from user-typed ones.
-function enqueue({ title, prompt, model, source }) {
+function enqueue({ title, prompt, model, source, effort }) {
   const list = load();
   const t = { id: newId(), title: title || prompt.slice(0, 60), prompt, model: model || 'auto',
     createdAt: new Date().toISOString(), runId: null, startedAt: null };
   if (source) t.source = source;
+  if (runs.EFFORTS.includes(effort)) t.effort = effort; // optional utilization tier (A4)
   list.unshift(t);
   save(list);
   return t;
@@ -104,7 +107,8 @@ async function handle(req, res, url) {
     const prompt = (b.prompt || '').toString().trim().slice(0, 20000);
     const model = U.SIMPLE_MODELS.includes(b.model) ? b.model : 'auto';
     if (!prompt) { U.sendJson(res, { error: 'prompt required' }, 400); return true; }
-    enqueue({ title, prompt, model });
+    const effort = runs.EFFORTS.includes(b.effort) ? b.effort : undefined;
+    enqueue({ title, prompt, model, effort });
     U.sendJson(res, { ok: true });
     return true;
   }

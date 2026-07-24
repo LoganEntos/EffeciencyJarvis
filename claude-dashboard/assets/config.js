@@ -125,14 +125,17 @@ async function renderAutopilot() {
   try { a = await api('/api/autopilot'); } catch { el.innerHTML = '<div class="note">Autopilot status unavailable.</div>'; return; }
   el.innerHTML = `
     <h2 style="font-size:12px">Autopilot <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— unattended self-improvement loop over docs/improvement-backlog.md</span></h2>
-    <div class="note" style="margin-bottom:10px">Every ${5} min, picks the next open (⬜) backlog item, queues it as a hub task with
-      auto model routing, and asks that same run to mark the item ✅ and commit when done. Caps: 2 items in flight,
-      2 attempts per item before it's parked as "stuck" (won't burn budget retrying a bad one forever).</div>
+    <div class="note" style="margin-bottom:10px">Every ${5} min, picks the next open (⬜) backlog item — or, when the backlog is dry, the next
+      never-run task from the Tasks tab — queues it as a hub task and asks that same run to close it and commit. Caps: 2 items in flight,
+      2 attempts per item before it's parked as "stuck" (won't burn budget retrying a bad one forever). Arm the <b>Backlog scout</b>
+      schedule (Tasks tab) to keep the backlog refilled.</div>
     <div class="flex" style="align-items:center;gap:10px;margin-bottom:10px">
       <label class="chk"><input type="checkbox" id="apToggle"${a.enabled ? ' checked' : ''}> Enabled</label>
       <span class="pill ${a.enabled ? 'ok' : 'neutral'}">${a.enabled ? 'running' : 'off'}</span>
       <span class="pill neutral">backlog: ${a.backlogDone}/${a.backlogTotal} done</span>
+      ${a.queueOpen ? `<span class="pill neutral">queue: ${a.queueOpen} waiting</span>` : ''}
       <span class="pill ${a.inflight ? 'warn' : 'neutral'}">${a.inflight} in flight</span>
+      ${a.idle ? `<span class="pill warn" title="enabled but the backlog is empty and no task is waiting — arm the Backlog scout to refill it${a.idleSince ? ' (idle since ' + rel(a.idleSince) + ')' : ''}">autopilot idle — queue empty</span>` : ''}
       ${a.stuck.length ? `<span class="pill err" title="exhausted retries — edit docs/improvement-backlog.md or clear data/autopilot.json to retry">${a.stuck.length} stuck: ${esc(a.stuck.join(', '))}</span>` : ''}
       <button class="ghost" id="apRunNow" style="padding:6px 12px;font-size:11.5px">▶ Check now</button>
     </div>
