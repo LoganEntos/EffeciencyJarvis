@@ -118,3 +118,21 @@ Two audits ran 2026-07-11 (code-reviewer + ui-designer subagents over
 - Kokoro-82M fast engine added (scripts/kokoro-server.py, generalized lib/voice.js
   ENGINES table, 3-way picker in Config). Needs `.kokoro/venv` install + browser test.
 - Wake-word gate ("Jarvis" — default flipped from "Suzy" 07-17) added to the call loop. Needs real-mic test.
+
+## Autonomy round — 2026-07-25 (desktop node, interactive Fable-5 session)
+
+Loop-hardening pass so autopilot can run unattended for hours. All fixed and
+smoke-verified same session.
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| C14 | lib/autopilot.js:90 | A2 task-queue fallback iterated load() raw (newest-first — enqueue unshifts), so old tasks starve | pickNext sorts queue oldest-first (FIFO by createdAt) | S | low | ✅ 2026-07-25 |
+| C15 | lib/autopilot.js:91 | Errored/gone tasks invisible to autopilot (skip on any runId) — a failed task was never retried | retry tasks whose run settled error/gone, capped by MAX_ATTEMPTS; cancelled stays human-final | S | low | ✅ 2026-07-25 |
+| C16 | lib/runs.js:139 | A5 continuation left the owning task pointing at the dead run — retry + continuation could double-dispatch the same item | continueRun relinks task.runId to the resumed run (tasks.relinkRun); refreshDispatched follows the relink | M | low | ✅ 2026-07-25 |
+| C17 | lib/runs.js:26 | CLAUDE_EXE hardcoded to the global-npm path — on desktop-app-only nodes every run fails "claude CLI not found" | findClaude(): HUB_CLAUDE_EXE env → npm global → newest %APPDATA%\Claude\claude-code\<ver>\claude.exe | S | low | ✅ 2026-07-25 |
+| C18 | lib/tasks.js:29 | No way to mark a task completed out-of-band — an interactive session working the queue left tasks looking never-run (autopilot would re-dispatch them) | done:true marker respected by enrich/runAll/pickNext/queueOpen | S | low | ✅ 2026-07-25 |
+
+**Blocker found on this node (needs USER, one-time):** the hub CLI is not
+authenticated here — desktop-app auth does not reach headless spawns, so every
+hub run ends `error: Not logged in`. Fix: open a terminal, run `claude` in any
+folder once and `/login`. Autopilot + the scout schedule stay OFF until then.

@@ -26,7 +26,9 @@ const newId = () => 't-' + crypto.randomBytes(4).toString('hex');
 // running/done/failed lives in the run engine, not a copy we'd have to sync).
 function enrich(list) {
   return list.map(t => {
-    if (!t.runId) return Object.assign({ runStatus: null }, t);
+    // done:true = completed out-of-band (e.g. by an interactive session working
+    // the queue directly) — no linked run, but it IS finished.
+    if (!t.runId) return Object.assign({ runStatus: t.done ? 'done' : null }, t);
     const m = runs.getRunMeta(t.runId);
     return Object.assign({}, t, {
       runStatus: m ? m.status : 'gone',
@@ -67,6 +69,7 @@ function runAll() {
   const list = load();
   let started = 0;
   for (const t of list) {
+    if (t.done) continue; // completed out-of-band — nothing to run
     const m = t.runId ? runs.getRunMeta(t.runId) : null;
     // run tasks that never ran, or that failed/cancelled (retry); leave done/active ones
     if (!t.runId || (m && settled(m.status) && m.status !== 'done')) {
@@ -92,6 +95,18 @@ function enqueue({ title, prompt, model, source, effort }) {
   list.unshift(t);
   save(list);
   return t;
+}
+
+// Continuation-on-death (runs.js continueRun) resumed a dead run as a new one:
+// point the owning task at the live run so the Tasks tab and autopilot follow
+// the chain instead of treating the dead original as this task's final word.
+function relinkRun(oldRunId, newRunId) {
+  const list = load();
+  const t = list.find(x => x.runId === oldRunId);
+  if (!t) return false;
+  t.runId = newRunId;
+  save(list);
+  return true;
 }
 
 async function handle(req, res, url) {
@@ -134,4 +149,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, enqueue, runTask, load };
+module.exports = { handle, enqueue, runTask, load, relinkRun };

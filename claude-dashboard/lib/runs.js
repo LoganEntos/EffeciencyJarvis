@@ -23,9 +23,26 @@ const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
 const RUNS_DIR = path.join(DASH_DIR, 'data', 'runs');
 // claude.cmd just execs this native binary — spawn it directly (no shell).
-const CLAUDE_EXE = process.env.HUB_CLAUDE_EXE || path.join(
-  process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming'),
-  'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+// Resolution: HUB_CLAUDE_EXE env → global npm install → newest CLI bundled by
+// the Claude desktop app (%APPDATA%\Claude\claude-code\<ver>\claude.exe), so a
+// synced node without the npm global (e.g. desktop-app-only machines) still runs.
+function findClaude() {
+  if (process.env.HUB_CLAUDE_EXE) return process.env.HUB_CLAUDE_EXE;
+  const roaming = process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming');
+  const npmExe = path.join(roaming, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+  if (fs.existsSync(npmExe)) return npmExe;
+  try {
+    const dir = path.join(roaming, 'Claude', 'claude-code');
+    const vers = fs.readdirSync(dir).filter(v => /^\d+(\.\d+)+$/.test(v))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    for (let i = vers.length - 1; i >= 0; i--) {
+      const exe = path.join(dir, vers[i], 'claude.exe');
+      if (fs.existsSync(exe)) return exe;
+    }
+  } catch {}
+  return npmExe; // nothing found — keep the classic default so the error message points somewhere sane
+}
+const CLAUDE_EXE = findClaude();
 // H4: second engine — hermes over ACP (hermes acp, JSON-RPC/stdio; see
 // lib/acp.js) for real per-step streaming. Hermes does its own model tiering +
 // tool approvals, so the hub's model/permission selectors are claude-only.
@@ -140,12 +157,19 @@ function continueRun(meta) {
   const prompt = `[Continuation — the previous ${meta.source} run (${meta.id}) was cut off before finishing, most likely a context/length limit rather than a real failure.]
 
 Read that run's transcript and the current \`git status\`/\`git diff\` to see exactly where it stopped, then finish ONLY the single item it was working on — do NOT start new work or broaden scope. If the item was already completed and committed, verify that and stop. Commit any remaining change (no Co-Authored-By trailer) and give a one-line status.`;
-  return startRun({
+  const r = startRun({
     prompt, model: meta.model || 'auto', permissionMode: meta.permissionMode,
     resume: meta.sessionId, source: meta.source,
     continuations: (meta.continuations || 0) + 1,
     effort: meta.effort || '',
   });
+  // Point the owning task (if any) at the continuation so the Tasks tab and
+  // autopilot follow the live chain, not the dead run. Lazy require — tasks.js
+  // requires this module at load time, so a top-level require would be circular.
+  if (!r.error && r.id) {
+    try { require('./tasks').relinkRun(meta.id, r.id); } catch {}
+  }
+  return r;
 }
 
 const INBOX_DIR = path.join(DASH_DIR, 'data', 'inbox');

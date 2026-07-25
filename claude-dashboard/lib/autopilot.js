@@ -83,12 +83,22 @@ function pickNext(state) {
     if (d && (d.attempts || 0) >= MAX_ATTEMPTS) continue;   // exhausted retries this session
     return { type: 'backlog', item: it };
   }
-  // A2 — backlog empty: dispatch the first never-run hub task. Skip tasks
-  // autopilot created itself (source:'autopilot') so it can't feed its own loop,
-  // and skip ones already parked stuck. A task gets a runId the moment it fires,
-  // so it won't be re-picked next tick.
-  for (const t of tasks.load()) {
-    if (t.runId || t.source === 'autopilot') continue;
+  // A2 — backlog empty: fall back to the hub task queue, OLDEST first (FIFO —
+  // enqueue() unshifts so load() is newest-first; iterating raw would let new
+  // tasks starve old ones forever). Skip tasks autopilot created itself
+  // (source:'autopilot') so it can't feed its own loop. A task is pickable if
+  // it never ran, or its run settled as error/gone (retry, capped by
+  // MAX_ATTEMPTS via dispatched[]); cancelled stays skipped — that was a human
+  // decision, not a failure.
+  const queue = tasks.load().slice()
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+  for (const t of queue) {
+    if (t.source === 'autopilot' || t.done) continue; // done = completed out-of-band
+    if (t.runId) {
+      const m = runs.getRunMeta(t.runId);
+      const st = m ? m.status : 'gone';
+      if (!['error', 'gone'].includes(st)) continue; // queued/running/done/cancelled
+    }
     const d = state.dispatched[t.id];
     if (d && d.status === 'stuck') continue;
     if (d && (d.attempts || 0) >= MAX_ATTEMPTS) continue;
@@ -112,9 +122,18 @@ function inflightCount(state) {
 // Re-sync dispatched[].status from the live run engine so pickNext() sees
 // fresh outcomes without autopilot having to be the one polling the SSE feed.
 function refreshDispatched(state) {
+  // Continuation-on-death (runs.js continueRun) relinks a task to its resumed
+  // run; follow the task's CURRENT runId so a dead original run doesn't read as
+  // "error" (and get re-dispatched) while its continuation is still working.
+  let taskById = null;
   for (const id in state.dispatched) {
     const d = state.dispatched[id];
     if (!d.runId) continue;
+    if (d.taskId) {
+      if (!taskById) { taskById = {}; try { for (const t of tasks.load()) taskById[t.id] = t; } catch {} }
+      const t = taskById[d.taskId];
+      if (t && t.runId && t.runId !== d.runId) d.runId = t.runId;
+    }
     const m = runs.getRunMeta(d.runId);
     if (m) d.status = m.status;
     if (m && m.status === 'error' && (d.attempts || 0) >= MAX_ATTEMPTS) d.status = 'stuck';
@@ -204,9 +223,17 @@ function status() {
   const open = items.filter(i => !i.done);
   const stuck = Object.entries(state.dispatched).filter(([, d]) => d.status === 'stuck').map(([id]) => id);
   // A2 — the task queue is now part of what autopilot can dispatch, so surface
-  // how many never-run non-autopilot tasks are waiting behind the backlog.
+  // how many non-autopilot tasks are pickable: never-run, or settled error/gone
+  // (retryable) — same eligibility pickNext() uses.
   let queueOpen = 0;
-  try { queueOpen = tasks.load().filter(t => !t.runId && t.source !== 'autopilot').length; } catch {}
+  try {
+    queueOpen = tasks.load().filter(t => {
+      if (t.source === 'autopilot' || t.done) return false;
+      if (!t.runId) return true;
+      const m = runs.getRunMeta(t.runId);
+      return ['error', 'gone'].includes(m ? m.status : 'gone');
+    }).length;
+  } catch {}
   // A6 — "idle" means enabled but nothing to pick (backlog dry AND queue empty).
   const idle = !!state.enabled && open.length === 0 && queueOpen === 0;
   return {
