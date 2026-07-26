@@ -323,6 +323,17 @@
     // Reroute off Sesame: anyone left on the retired CSM default from earlier
     // testing falls back to the instant browser engine (Kokoro stays opt-in).
     if (store.engine === 'csm') store.engine = 'browser';
+    // Fluency default (user 2026-07-26: "Jarvis does not speak fluently and
+    // quickly"): if no explicit engine choice is stored and the Kokoro sidecar
+    // is installed on this hub, adopt it — the fast natural engine is the whole
+    // reason the sidecar exists. Any stored choice is always respected.
+    try {
+      if (localStorage.getItem('hub.voice.engine') === null) {
+        fetch('/api/voice/status?engine=kokoro').then(r => r.json()).then(s => {
+          if (s && s.installed && localStorage.getItem('hub.voice.engine') === null) store.engine = 'kokoro';
+        }).catch(() => {});
+      }
+    } catch {}
     buildOrb();
     const orb = $('#voiceOrb');
     if (orb && !store.mic) orb.style.display = 'none';
