@@ -202,7 +202,7 @@ function distill() {
       changed = true;
     }
   }
-  if (changed) save(list);
+  if (changed) save(list.slice(0, 2000));
 }
 
 function addNote(type, title, text, tags, importance) {
@@ -215,7 +215,7 @@ function addNote(type, title, text, tags, importance) {
     importance: typeof importance === 'number' ? Math.max(0, Math.min(1, importance)) : 0.7,
     createdAt: new Date().toISOString(), sourceRunId: null, fields: {},
   });
-  save(list);
+  save(list.slice(0, 2000)); // cap notes like captureRun/reindexRuns so memory.json can't grow forever (C41)
   return { ok: true };
 }
 
