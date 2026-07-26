@@ -15,6 +15,13 @@ const P_PRESETS = [
   { label: 'Guardrails', text: 'Hard rules for this project:\n- Never touch files outside it.\n- Ask before any irreversible or outward-facing action.\n' },
 ];
 
+// Instructions dirty-tracking: the textarea only persists on the explicit Save,
+// so unsaved edits are autosaved when you leave the detail (back button / tab
+// switch — the section DOM is kept, so a fire-and-forget flush is enough) and
+// warned about on a full page unload (reload/close, where a fetch can't finish).
+let projInstrDirty = false;
+let projInstrFlush = null; // set per-render: async () => autosave the textarea if dirty
+
 // -------------------------------------------------------------- detail state
 async function renderProjectDetail(id) {
   const el = $('#projects');
@@ -87,26 +94,37 @@ async function renderProjectDetail(id) {
       <div class="flex" style="margin-top:8px"><input class="search" id="pNote" placeholder="Add a note to project memory…" style="max-width:520px;margin:0"><button id="pNoteAdd" class="ghost">Add note</button></div>
     </div>`;
 
-  $('#pBack').onclick = () => { if (window.projectChat && projectChat.destroy) projectChat.destroy(); projSel = null; renderers.projects(); };
+  $('#pBack').onclick = async () => { if (projInstrFlush) await projInstrFlush(); if (window.projectChat && projectChat.destroy) projectChat.destroy(); projSel = null; renderers.projects(); };
   wireDelete(p);
   const saveMeta = async (patch, note) => {
     const s = $('#pSaved'); if (s && note) s.textContent = 'saving…';
     try { await api('/api/projects/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: p.id }, patch)) }); if (s && note) s.textContent = note; }
     catch { if (s) s.textContent = 'save failed'; }
   };
-  $('#pName').onchange = e => { const v = e.target.value.trim(); if (v) saveMeta({ name: v }); };
-  $('#pDesc').onchange = e => saveMeta({ description: e.target.value });
+  // Name/description save on blur — surface a brief "saved ✓" so it's clear it stuck.
+  $('#pName').onchange = e => { const v = e.target.value.trim(); if (v) saveMeta({ name: v }, 'saved ✓'); };
+  $('#pDesc').onchange = e => saveMeta({ description: e.target.value }, 'saved ✓');
 
-  // instructions: live char count + preset chips + save
+  // instructions: live char count + preset chips + save + dirty tracking
   const instr = $('#pInstr'), saved = $('#pSaved');
   const count = () => { saved.textContent = `${instr.value.length} / 12000`; };
-  instr.oninput = count; count();
+  projInstrDirty = false;
+  projInstrFlush = async () => { if (!projInstrDirty) return; projInstrDirty = false; await saveMeta({ instructions: instr.value }, 'saved ✓'); };
+  instr.oninput = () => { projInstrDirty = true; count(); }; count();
   el.querySelectorAll('.presetchip').forEach(c => c.onclick = () => {
     const t = P_PRESETS[+c.dataset.preset].text;
     instr.value += (instr.value && !instr.value.endsWith('\n') ? '\n' : '') + t;
-    instr.focus(); count();
+    instr.focus(); projInstrDirty = true; count();
   });
-  $('#pSave').onclick = () => { saveMeta({ instructions: instr.value }, 'saved ✓'); };
+  $('#pSave').onclick = () => { projInstrDirty = false; saveMeta({ instructions: instr.value }, 'saved ✓'); };
+  // Navigate-away guards, registered once: a tab switch keeps this section's DOM,
+  // so a fire-and-forget autosave suffices; a full page unload can't await the
+  // fetch, so warn instead (browsers show their own "leave site?" prompt).
+  if (!window._projInstrGuards) {
+    window._projInstrGuards = true;
+    document.querySelectorAll('nav a').forEach(a => a.addEventListener('click', () => { if (projInstrFlush) projInstrFlush(); }));
+    window.addEventListener('beforeunload', e => { if (projInstrDirty) { e.preventDefault(); e.returnValue = ''; } });
+  }
   $('#pChat').onclick = () => { if (typeof bindRunProject === 'function') bindRunProject({ id: p.id, name: p.name }); if (typeof prefillRun === 'function') prefillRun(''); };
 
   // inline chat panel — instructions/files/memory above ride every message via projectSlug
@@ -130,7 +148,7 @@ async function renderProjectDetail(id) {
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove('drag'); projUpload(p.slug, e.dataTransfer.files); };
   fin.onchange = () => { projUpload(p.slug, fin.files); fin.value = ''; };
   el.querySelectorAll('.projTile[data-img]').forEach(t => t.onclick = () => showProjImage(t.dataset.name));
-  el.querySelectorAll('.projTile[data-doc]').forEach(t => t.onclick = () => { if (typeof showDocViewer === 'function') showDocViewer(t.dataset.name); });
+  el.querySelectorAll('.projTile[data-doc]').forEach(t => t.onclick = () => { if (typeof openFilePreview === 'function') openFilePreview(t.dataset.name); });
   el.querySelectorAll('.pDelFile').forEach(b => b.onclick = async (e) => {
     e.stopPropagation();
     if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'confirm?'; setTimeout(() => { if (b.dataset.armed === '1') { b.dataset.armed = ''; b.textContent = 'remove'; } }, 2600); return; }
@@ -143,6 +161,15 @@ async function renderProjectDetail(id) {
 
   // Claude sessions → open the transcript read-only
   el.querySelectorAll('.psession-row[data-sid]').forEach(row => row.onclick = () => showTranscript(p.id, row.dataset.sid, row.dataset.title));
+
+  // project memory: two-step delete (matches the file-remove pattern above) via
+  // the shared /api/memory/delete endpoint — items carry an engram id.
+  el.querySelectorAll('.pDelMem').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'confirm?'; setTimeout(() => { if (b.dataset.armed === '1') { b.dataset.armed = ''; b.textContent = 'remove'; } }, 2600); return; }
+    try { await api('/api/memory/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.dataset.id }) }); } catch {}
+    renderProjectDetail(id);
+  });
 
   // project memory note
   $('#pNoteAdd').onclick = async () => {
@@ -228,15 +255,18 @@ function prettyBase(base) {
   return { repo: p[0] + '/' + p[1], file: segs.slice(-take).join('.'), dir: segs.slice(0, -take).join('/') };
 }
 function projFileTile(f) {
-  const isImg = P_IMG_RE.test(f.base);
-  // Text-like docs (md/csv/json/logs/code) open in the shared in-app document
-  // viewer (showDocViewer, files.js) — same traversal-guarded /text endpoint.
-  const isDoc = !isImg && typeof fileKind === 'function' && fileKind(f.base) === 'text';
+  const kind = typeof fileKind === 'function' ? fileKind(f.base) : (P_IMG_RE.test(f.base) ? 'img' : 'other');
+  const isImg = kind === 'img';
+  // Non-image previewable files (text/csv/md/json/logs/code AND spreadsheets)
+  // open in the shared in-app preview (openFilePreview → doc viewer / sheet
+  // grid, files.js) — same traversal-guarded endpoints. 'other' stays
+  // download-only, matching the Files tab.
+  const canOpen = !isImg && kind !== 'other';
   const pn = prettyBase(f.base);
   const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
   const openAttrs = isImg ? ` class="projTile" data-img="1" data-name="${esc(f.name)}"`
-    : isDoc ? ` class="projTile" data-doc="1" data-name="${esc(f.name)}"` : '';
-  return `<div style="${P_TILE}${isImg || isDoc ? ';cursor:pointer' : ''}"${openAttrs}>
+    : canOpen ? ` class="projTile" data-doc="1" data-name="${esc(f.name)}"` : '';
+  return `<div style="${P_TILE}${isImg || canOpen ? ';cursor:pointer' : ''}"${openAttrs}>
     ${isImg ? `<img style="${P_THUMB}" src="/api/files/view?name=${encodeURIComponent(f.name)}" alt="" loading="lazy">`
             : `<div style="${P_THUMB_DOC}"><span class="mono">${esc(((pn ? pn.file : f.base).split('.').pop() || '?').toUpperCase()).slice(0, 4)}</span></div>`}
     <div style="padding:8px 10px">
@@ -252,8 +282,9 @@ function projFileTile(f) {
 }
 function memTile(m) {
   return `<div class="row" style="margin-bottom:8px;padding:10px 12px">
-    <div class="flex" style="justify-content:space-between"><span class="name" style="font-size:12.5px">${esc(m.title || '(untitled)')}</span>
-      <span class="pill neutral" style="font-size:10px">${esc(m.type)}</span></div>
+    <div class="flex" style="justify-content:space-between;align-items:center"><span class="name" style="font-size:12.5px">${esc(m.title || '(untitled)')}</span>
+      <span class="flex" style="gap:8px;align-items:center"><span class="pill neutral" style="font-size:10px">${esc(m.type)}</span>
+      ${m.id ? `<button class="pDelMem" data-id="${esc(m.id)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0">remove</button>` : ''}</span></div>
     <div class="muted" style="font-size:11.5px;margin-top:4px;white-space:normal">${esc((m.text || '').slice(0, 240))}</div>
   </div>`;
 }

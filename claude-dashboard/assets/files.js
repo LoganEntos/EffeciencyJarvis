@@ -180,10 +180,23 @@ function showImageLightbox(name) {
   ov.classList.add('show');
 }
 
+// Route a file to the right inline preview, shared by chat attachments and
+// project file tiles: images → lightbox; text/csv/md AND spreadsheets → the
+// doc-viewer modal; anything else has no inline view, so fall back to download.
+function openFilePreview(name) {
+  const kind = fileKind(name);
+  if (kind === 'img') return showImageLightbox(name);
+  if (kind === 'text' || kind === 'xlsx') return showDocViewer(name);
+  const a = document.createElement('a');
+  a.href = '/api/files/download?name=' + encodeURIComponent(name);
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
 // ---- In-app document viewer -----------------------------------------------
 // Reads a text-like file through the traversal-guarded /text endpoint and
 // renders it: markdown → formatted HTML (headings, tables, code, lists);
-// csv/tsv → a table; everything else → monospace plaintext.
+// csv/tsv → a table; everything else → monospace plaintext. Spreadsheets get
+// the sheet-tab cell grid (sheetgrid.js) inside the same modal shell.
 async function showDocViewer(name) {
   let ov = document.getElementById('docViewer');
   if (!ov) {
@@ -206,6 +219,7 @@ async function showDocViewer(name) {
   body.innerHTML = '<div class="muted" style="padding:24px">Loading…</div>';
   ov.classList.add('show');
   body.scrollTop = 0;
+  if (fileKind(name) === 'xlsx') { await renderXlsxPreview(body, name); return; }
   let r;
   try { r = await api('/api/files/text?name=' + encodeURIComponent(name)); }
   catch (e) { body.innerHTML = `<div class="pill err" style="margin:16px">couldn't open: ${esc(e.message || 'error')}</div>`; return; }

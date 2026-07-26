@@ -126,8 +126,12 @@
     const turnEl = jconvAppend(jmsgHtml('user', esc(prompt)), 'jmsg user');
     if (turnEl) turnEl.dataset.turn = String(S.turnCount);
     if (window.jarvisTimeline) jarvisTimeline.render(S.turnCount);
-    if (imgs.length) jconvAppend(imgs.map(c => `<img src="${esc(c.url)}" alt="attached image" class="jattach-img">`).join(''), 'jmsg attachimgs');
-    if (docs.length) jconvAppend(jmsgHtml('user', '📎 ' + esc(docs.map(c => c.name).join(', '))), 'jmsg user');
+    // Sent attachments are clickable: images open the lightbox, docs/sheets open
+    // the same inline preview the Files tab uses (delegated handler in wire()).
+    // Render images off the server view URL so they survive jarvisAttach.clear()
+    // revoking the local blob URLs.
+    if (imgs.length) jconvAppend(imgs.map(c => `<img src="/api/files/view?name=${encodeURIComponent(c.previewName || '')}" alt="attached image" class="jattach-img" data-preview="${esc(c.previewName || '')}" style="cursor:zoom-in">`).join(''), 'jmsg attachimgs');
+    if (docs.length) jconvAppend(jmsgHtml('user', docs.map(c => `<span class="jattach-doc" data-preview="${esc(c.previewName || '')}" style="cursor:pointer">📎 ${esc(c.name)}</span>`).join('<br>')), 'jmsg user');
     S.bubble = jconvAppend(jmsgHtml('assistant', '<span class="jshimmer">thinking…</span>'), 'jmsg assistant');
     const model = ($('#runModel') && $('#runModel').value) || 'auto';
     const perm = ($('#runPerm') && $('#runPerm').value) || 'bypassPermissions';
@@ -202,6 +206,12 @@
     const sb = $('#jchatSend'); if (sb) sb.onclick = send;
     const nb = $('#jchatNew'); if (nb) nb.onclick = newChat;
     const st = $('#jchatStop'); if (st) st.onclick = cancel;
+    // Delegated: click any sent attachment (image or 📎 doc row) to preview it.
+    const feed = $('#jconv');
+    if (feed) feed.onclick = e => {
+      const t = e.target.closest && e.target.closest('[data-preview]');
+      if (t && t.dataset.preview && typeof openFilePreview === 'function') openFilePreview(t.dataset.preview);
+    };
     renderSessBadge();
   }
   // sendText = programmatic entry for the voice conversation engine

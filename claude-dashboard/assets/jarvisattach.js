@@ -41,14 +41,17 @@
       const outName = isImage ? `paste-${stamp}.${ext}` : `${stamp}-${safe}`;
       const named = new File([file], outName, { type: file.type || 'application/octet-stream' });
       const fd = new FormData(); fd.append('file', named);
-      const chip = { name: file.name || outName, url: isImage ? URL.createObjectURL(file) : null, ref: null, pending: true, isImage };
+      const chip = { name: file.name || outName, url: isImage ? URL.createObjectURL(file) : null, ref: null, previewName: null, pending: true, isImage };
       pendingFiles.push(chip);
       renderStrip();
       try {
         const r = await api('/api/files?project=pasted&overwrite=1', { method: 'POST', body: fd, timeoutMs: 120000 });
         const saved = r && r.saved && r.saved[0];
         const ref = saved && (saved.path || saved.name);
-        if (ref) { chip.ref = ref; chip.pending = false; }
+        // previewName is the inbox-relative name (project/file) the /api/files
+        // preview endpoints want — distinct from `ref` (the absolute path the
+        // run payload passes to the CLI).
+        if (ref) { chip.ref = ref; chip.previewName = saved.name || saved.path; chip.pending = false; }
         else throw new Error((r && r.error) || 'upload failed');
       } catch (e) {
         pendingFiles = pendingFiles.filter(c => c !== chip);
