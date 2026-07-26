@@ -136,3 +136,14 @@ smoke-verified same session.
 authenticated here — desktop-app auth does not reach headless spawns, so every
 hub run ends `error: Not logged in`. Fix: open a terminal, run `claude` in any
 folder once and `/login`. Autopilot + the scout schedule stay OFF until then.
+
+## Autonomy round 2 — 2026-07-26
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| C19 | assets/run.js + lib/tasks.js | Chat item 4+5: attachments/project files click-to-open, project instructions discard on navigate | Implement file open handler + instruction cleanup on tab switch | M | low | ✅ 2026-07-25 |
+| C20 | assets/style.css:1-180 | style.css at 643 lines, over the 500-line hard rule | Split theme + core layout into style.css (176) + components.css (433) | M | low | ✅ 2026-07-25 |
+| C21 | lib/distill.js + lib/personas.js | Persona pipeline: system-layer injection, spoken/screen dual contracts, wit-cap scoping | Refactor persona layer (system injection) + output contracts per mode | M | med | ✅ 2026-07-25 |
+| C22 | assets/schedules.js + lib/autopilot.js | Schedules UI polish: fold recurring checks into autopilot loop, verify R5 fire test | Integrate schedule checks as native autopilot tasks, verify recurring behavior | S | low | ✅ 2026-07-25 |
+| C23 | assets/jarvistab.js | jarvistab.js at 445 lines, nearing the 500-line cap | Extract soul editor into jarvissoul.js, load before jarvistab.js | M | low | ✅ 2026-07-25 |
+| C24 | lib/runs.js:1-509 | runs.js at 509 lines, 9 over the hard 500-line rule — carryover from C1 (split read-side 2026-07-14 but C1 was only partial) | Complete split: extract artifact/transcript queries into runs-query.js; extract launch handler into runs-exec.js | M | med | ✅ 2026-07-26 (runs-route.js extracted, runs.js 419L) |

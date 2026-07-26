@@ -45,28 +45,22 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
    fallback, effort passthrough, overflow continuation, starvation badge),
    Phase B executes the live hub task queue (which covers items 1, 3, and 6
    below plus item 2, the persona-pipeline fixes from
-   `docs/audit-2026-07-22-persona-pipeline.md`). Items below stand if the
-   sprint stalls.
-1. **Finish `docs/handoffs/chat-stop-attach-project-fixes.md`** (IN PROGRESS —
-   items 1, 2, 3, 6 shipped `7263f68`/`185d2f6`; remaining: **item 4**
-   attachments/project files click-to-open, **item 5** project instructions
-   discard silently on navigate-away). Specifics + line refs:
-   `docs/audit-2026-07-21-chat-attach-projects.md`.
-2. **`docs/handoffs/persona-pipeline-fixes.md`** — system-layer persona
-   injection + spoken/screen dual contracts, wit-cap scoping, sonnet floor,
-   distiller scoping (from `docs/audit-2026-07-22-persona-pipeline.md`).
-   Slotted right after the chat-fix handoff: it lifts output quality of
-   every run.
-3. **`docs/handoffs/schedules-verify.md`** — schedules UI polish (R5 fire test
-   already proven `d7cb3c7`); fold recurring checks into the autopilot loop.
+   `docs/audit-2026-07-22-persona-pipeline.md`). Phase A shipped 2026-07-25
+   (`90c7b92`); Phase B cycles cover most tasks through this session.
+1. ✅ **Chat attachments/project fixes** — items 4–5 (click-to-open files, discard
+   on navigate) 2026-07-25 (`0ce6ed4`).
+2. ✅ **Persona pipeline fixes** — system-layer injection, dual contracts,
+   wit-cap scoping 2026-07-25 (`ac5b833`).
+3. ✅ **Schedules UI polish** — fold recurring checks into autopilot loop
+   2026-07-25 (`9a61682`).
 4. **N2 mobile ergonomic pass** — every tab at 375px: touch targets, composer
    ergonomics, card wrapping, table overflow. Done when all tabs are usable
    one-handed (Tailscale PWA already live).
 5. **N8 iPhone polish** — builds on N2.
-6. **Size guard:** ✅ style.css split 2026-07-25 (style.css 176 + components.css
-   433, both under cap). Watchlist (within ~50 of the cap): `assets/run.js` 464,
-   `assets/voice.js` 454, `assets/jarvistab.js` 445 — next splits are already
-   sketched in the archive (soul editor → jarvissoul.js, etc.).
+6. **Size guard:** style.css split ✅ 2026-07-25 (style.css 176 + components.css
+   433, both under cap). jarvistab.js split ✅ 2026-07-25 (`67c4004`). lib/runs.js
+   was split under the cap this session; watchlist: assets/run.js 489,
+   assets/voice.js 478 — both need splits next.
 
 ## 🙋 Needs the USER (interactive / system)
 

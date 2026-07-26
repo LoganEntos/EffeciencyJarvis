@@ -30,15 +30,14 @@ Commit at each working, browser-verified stage.
 | # | file | status | model |
 | --- | --- | --- | --- |
 | 0 | `fix-all-2026-07-23.md` | READY — loop rebuild (Phase A) + full task-queue sprint (Phase B); supersedes 1–2 while it runs | Opus 4.8 · xhigh |
-| 1 | `chat-stop-attach-project-fixes.md` | IN PROGRESS — items 1/2/3/6 shipped (`7263f68`, `185d2f6`); items 4–5 remain | Opus 4.8 |
-| 2 | `schedules-verify.md` | R5 fire test PROVEN 07-18 (`d7cb3c7`); UI polish portion still open | Opus 4.8 |
 | ∞ | `improvement-cycle.md` | repeatable — one improvement per run, fire on a loop anytime | Fable 5 |
 
 Completed work orders were moved verbatim to `docs/archive/handoffs/`
 (projects-tab-polish, jarvis-chat-parity, voice-orb-live, persona-manager-ui,
 distill-latency, jarvis-tab-finalize, jarvis-ui-port, jarvis-error-hunt,
-skills-cleanup, file-viewer-visual-preview, master-fable5-handoff). When a
-handoff closes: mark it DONE at the top, update `HANDOFF.md` +
+skills-cleanup, file-viewer-visual-preview, master-fable5-handoff,
+chat-stop-attach-project-fixes, persona-pipeline-fixes, schedules-verify).
+When a handoff closes: mark it DONE at the top, update `HANDOFF.md` +
 `docs/roadmap.md`, then `git mv` it into the archive.
 
 ⚠ Since 2026-07-15 the hub shows **no dollar figures anywhere** — tokens +

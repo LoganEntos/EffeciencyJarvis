@@ -90,12 +90,9 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
 
 ## Latest work shipped
 
-Chat-fix work order items 1–3 + 6 (stop button with server-side cancel,
-double-send guard, overwrite-retry upload fix, run-done fetch halved —
-`7263f68`/`185d2f6`/`d58534b`), Files-tab inline expand + real spreadsheet cell
-grid (`ba20015`), Projects text/markdown tile preview (`78c8e69`). Everything
-older is archived verbatim in `docs/archive/handoff-shipped-log-2026-07.md`
-and `docs/archive/roadmap-2026-07-19-full.md`.
+**2026-07-26 session:** chat items 4+5 (attachments/project click-open, discard on navigate — `0ce6ed4`), persona-pipeline fixes (system injection, dual contracts — `ac5b833`), schedules UI polish + autopilot integration (`9a61682`).
+Code quality: style.css split to 176 lines + components.css 433 (`156a920`), jarvistab.js split (`67c4004`), autopilot loop hardening C14–C18 (`90c7b92`).
+Everything older is archived verbatim in `docs/archive/handoff-shipped-log-2026-07.md` and `docs/archive/roadmap-2026-07-19-full.md`.
 
 ## What's next
 
