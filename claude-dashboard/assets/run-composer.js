@@ -90,20 +90,25 @@ async function sendPrompt() {
   // latency). The distilled/cleaned text is exactly what runs, so what you see is
   // what fires.
   let displayPrompt = prompt;
+  let optimisticEl = null; // L3: user's bubble shown BEFORE the distill await
   const jarvisToggle = $('#jarvisToggle');
   if (jarvisToggle && jarvisToggle.checked && engine === 'claude') {
     const wordCount = prompt.split(/\s+/).filter(Boolean).length;
     if (wordCount > DISTILL_MIN_WORDS) {
-      // Haiku pre-pass takes a couple seconds — show a status + block re-sends.
+      // Haiku pre-pass takes a beat — don't leave the chat empty. Show the user's
+      // words optimistically (feels sent) and update the bubble in place if the
+      // distiller rewrites it, instead of staring at a "Shaping…" button.
       const btn = $('#sendBtn'), label = btn ? btn.textContent : '';
       if (btn) { btn.disabled = true; btn.textContent = '✦ Shaping…'; }
+      optimisticEl = addMsg(prompt, 'user'); ta.value = '';
       chat.sending = true;
       const refined = await jarvisDistill(prompt);
       chat.sending = false;
       if (btn) { btn.disabled = false; btn.textContent = label; }
-      if (chat.running) return; // a run slipped in while we were distilling
+      if (chat.running) { if (optimisticEl) optimisticEl.remove(); ta.value = prompt; return; } // a run slipped in while we were distilling
       if (refined) { displayPrompt = prompt = refined; }
       else { const tr = jarvisTransform(prompt); if (tr) displayPrompt = prompt = tr.buffered; } // distill miss → local cleanup
+      if (optimisticEl) optimisticEl.textContent = displayPrompt; // reconcile to what actually runs
     } else {
       const tr = jarvisTransform(prompt); if (tr) displayPrompt = prompt = tr.buffered;
     }
@@ -126,7 +131,7 @@ async function sendPrompt() {
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
   if (r.error) { addMsg(r.error, 'errmsg'); return; }
   ta.value = '';
-  addMsg(displayPrompt, 'user');
+  if (!optimisticEl) addMsg(displayPrompt, 'user'); // else the optimistic bubble already shows it
   if (atts.length) {
     if (imgs.length) addEl(imgs.map(c => `<img src="${c.url}" alt="attached image">`).join(''), 'msg user attachimgs');
     if (docs.length) addMsg('📎 ' + docs.map(c => c.name).join(', '), 'sys');

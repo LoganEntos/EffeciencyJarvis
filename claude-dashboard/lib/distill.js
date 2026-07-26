@@ -64,7 +64,10 @@ function isBuildShaped(text) {
   return true;
 }
 
-function distill(text, timeoutMs = 20000) {
+// L2: 8s ceiling, not 20s. The distiller is a pre-pass BLOCKING the real run —
+// if Haiku hasn't shaped the prompt by 8s it isn't worth the added wall-clock;
+// the client falls back to instant local filler-cleanup and fires the run.
+function distill(text, timeoutMs = 8000) {
   return new Promise(resolve => {
     const input = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
     if (!input) return resolve({ prompt: '' });
