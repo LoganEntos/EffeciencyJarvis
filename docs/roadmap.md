@@ -77,7 +77,7 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
 |------|-------------------|
 | N10 Council mode | **Lowest priority — build last, if ever** (user call 07-15). `lib/council.js` + `assets/council.js` after run.js headroom exists. |
 | browser-use/browser-harness | INCLUDE (user 07-12) — run as a sibling tool or port the CDP-harness pattern as a skill; decide at build time. |
-| open-jarvis/OpenJarvis | Tracked in Sources (queued, Apache-2.0) — evaluate what it adds over the hub before porting anything. |
+| open-jarvis/OpenJarvis | **SKIP — port nothing** (2026-07-25, `docs/open-jarvis-evaluation.md`). Local-Ollama-first Python/Rust framework; its differentiator (local non-Claude inference) collides with the Claude-only north star, and every surface it offers the hub already has Claude-native. REVISIT-WHEN local/offline inference ever becomes a hub goal. |
 | Q2 markdownify-MCP | Only when document workflows are active (MCP taxes every run). |
 | Q3 task-master | CLI-only on demand if ever; never an always-on MCP. |
 | crawl4ai | SKIP — overlaps Scrapling; rationale in `docs/archive/crawl4ai-evaluation.md`. |

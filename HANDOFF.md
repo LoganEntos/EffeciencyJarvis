@@ -90,8 +90,12 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
 
 ## Latest work shipped
 
-**2026-07-26 session:** chat items 4+5 (attachments/project click-open, discard on navigate — `0ce6ed4`), persona-pipeline fixes (system injection, dual contracts — `ac5b833`), schedules UI polish + autopilot integration (`9a61682`).
-Code quality: style.css split to 176 lines + components.css 433 (`156a920`), jarvistab.js split (`67c4004`), autopilot loop hardening C14–C18 (`90c7b92`).
+**2026-07-25/26 marathon (21 commits, full log: `docs/archive/autonomy-log-2026-07-26.md`):**
+loop hardening C14–C18 (`90c7b92`) → chat items 4+5, persona system-layer,
+schedules polish, five size-guard splits → adversarial review fixes C25–C27
+(`cba2e9e`) → scout rounds found + fixed C28–C33/U14–U17 (`00ebbe0`,`80f3157`),
+incl. two crash-class stream guards and the schedule-continuation stacking fix.
+Backlog fully burned; size guard clear; smoke 100-check green.
 Everything older is archived verbatim in `docs/archive/handoff-shipped-log-2026-07.md` and `docs/archive/roadmap-2026-07-19-full.md`.
 
 ## What's next
