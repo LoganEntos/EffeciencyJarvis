@@ -18,6 +18,7 @@ const projects = require('./projects');
 const { listArtifacts, serveArtifact } = require('./artifacts');
 const { createQueries } = require('./runs-query');
 const { createEngine } = require('./runs-engine');
+const { createRouter } = require('./runs-route');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
@@ -52,76 +53,7 @@ const HERMES_EXE = process.env.HUB_HERMES_EXE || path.join(
 const ENGINES = ['claude', 'hermes'];
 const MAX_ACTIVE = 2;
 const MAX_QUEUE = 5;
-// Selectable models: the shared tier aliases ('auto', '', opus/sonnet/haiku —
-// see U.SIMPLE_MODELS, the one canonical copy) plus explicit version IDs so a
-// run can be pinned to a specific Claude. Passed to the CLI as a plain argv
-// element (no shell), and membership-checked before use. Add a new pinned
-// version to PINNED_MODELS and it becomes selectable here; add a new tier to
-// U.SIMPLE_MODELS and it propagates to runs/tasks/schedules at once.
-const PINNED_MODELS = [
-  'claude-fable-5',
-  'claude-opus-4-8', 'claude-opus-4-7',
-  'claude-sonnet-5', 'claude-sonnet-4-6',
-  'claude-haiku-4-5',
-];
-const MODELS = [...U.SIMPLE_MODELS, ...PINNED_MODELS];
 const PERM_MODES = ['default', 'acceptEdits', 'bypassPermissions', 'plan'];
-
-// Fable 5 "god prompt": Anthropic's official Fable-5 prompting playbook
-// (prompts/fable5-god-prompt.md), appended to the SYSTEM prompt of every
-// opus-tier run via --append-system-prompt — so Opus threads get the same
-// discipline (act-when-ready, evidence-backed claims, scope control) without
-// touching the user's prompt.txt. Fable-5 runs don't need it: the CLI already
-// ships these behaviors natively for that model. Read once at boot.
-const GOD_PROMPT_FILE = path.join(DASH_DIR, 'prompts', 'fable5-god-prompt.md');
-let GOD_PROMPT = '';
-try {
-  GOD_PROMPT = fs.readFileSync(GOD_PROMPT_FILE, 'utf8').replace(/^<!--[\s\S]*?-->\s*/, '').trim();
-} catch {}
-const isOpusTier = m => m === 'opus' || /^claude-opus/.test(m || '');
-
-// The five Fable-5-era utilization tiers (claude --effort). Tier 5 = 'max' is
-// "Ultra Code": deepest reasoning, longest turns. '' = let the CLI decide.
-const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
-
-// 'auto' model allocation — route each prompt to the cheapest model that can
-// handle it (3-tier: haiku ≈ $0.04/run for trivia vs opus ≈ $0.25+). Purely
-// lexical, zero-cost, instant; the decision is streamed to the chat so the
-// user always sees (and can override) what auto picked.
-const HEAVY_RE = /(architect|design\b|redesign|refactor|securit|review|audit|investigat|debug|diagnos|analy[sz]e|deliberat|strateg|migrat|optimi[sz]|multi-?file|across the (codebase|project)|root cause|deep|thorough|comprehensive)/;
-const CODE_RE = /(implement|build|create|write|add|fix|code|function|endpoint|component|feature|test|script|bug|error|refactor|api|server|render|parse|module|css|html|sql|dax)/;
-function routeModel(prompt) {
-  const p = prompt.toLowerCase();
-  if (HEAVY_RE.test(p) || prompt.length > 1200) return { model: 'opus', reason: 'complex/architectural task' };
-  if (CODE_RE.test(p) || prompt.length > 300) return { model: 'sonnet', reason: 'standard coding task' };
-  return { model: 'haiku', reason: 'short/simple task' };
-}
-// Conversational = short and not build-/analysis-shaped (banter, acks, quick
-// questions) — the most persona-dependent turns, which routeModel lands on
-// haiku. When a persona is active we floor those at sonnet. Mirrors routeModel's
-// haiku bucket.
-function isConversational(prompt) {
-  const p = prompt.toLowerCase();
-  return prompt.length <= 300 && !HEAVY_RE.test(p) && !CODE_RE.test(p);
-}
-
-// A resumed conversation keeps the model it started with — switching models
-// mid-session wastes the prompt cache and changes the voice.
-function sessionModel(sessionId) {
-  // Live runs first (no disk), then history NEWEST-first with an early return —
-  // run ids are timestamps so a reverse name-sort walks newest first, and a
-  // resumed session is almost always recent. The old version stat-read every
-  // meta.json on disk per resume, O(all history) forever.
-  for (const live of active.values()) {
-    if (live.meta && live.meta.sessionId === sessionId && live.meta.model) return live.meta.model;
-  }
-  const dirs = U.listDir(RUNS_DIR).filter(e => e.isDirectory()).map(e => e.name).sort().reverse();
-  for (const name of dirs) {
-    const meta = U.safeJson(path.join(RUNS_DIR, name, 'meta.json'));
-    if (meta && meta.sessionId === sessionId && meta.model) return meta.model;
-  }
-  return null;
-}
 
 const active = new Map(); // id -> { child, lines, listeners, meta, stderr, cancelled, args, dir, out }
 const queue = [];         // ids waiting for a free slot, FIFO
@@ -156,6 +88,16 @@ const { launch, pushLine, broadcast, sseLine, writeMeta } = createEngine({
   continueRun,
 });
 
+// Model routing + prompt-assembly helpers (model/effort tables, the 'auto'
+// heuristic, the Fable-5 god prompt, resumed-session model lookup, and
+// inbox-confined attachment resolution) live in runs-route.js to keep this file
+// under the 500-line rule; createRouter binds the shared `active` Map so
+// sessionModel reads in-flight runs the same as finished ones.
+const {
+  routeModel, isConversational, sessionModel, resolveImages,
+  isOpusTier, GOD_PROMPT, MODELS, EFFORTS,
+} = createRouter({ active });
+
 // A5 — continuation on context-death. When a task/schedule/autopilot run dies
 // with `error` but left a resumable sessionId, the engine calls this to enqueue
 // ONE resumed run that reads the log/diff and finishes only the current item.
@@ -178,28 +120,6 @@ Read that run's transcript and the current \`git status\`/\`git diff\` to see ex
     try { require('./tasks').relinkRun(meta.id, r.id); } catch {}
   }
   return r;
-}
-
-const INBOX_DIR = path.join(DASH_DIR, 'data', 'inbox');
-// Pasted/dropped images the browser uploaded to data/inbox/ before the run.
-// Confine to the inbox (they arrive as our own /api/files response paths) and
-// keep only real files, so a stray client path can't make Claude read the disk.
-function resolveImages(images) {
-  if (!Array.isArray(images)) return [];
-  const out = [];
-  for (const ref of images.slice(0, 8)) {
-    try {
-      const s = String(ref || '');
-      // Accept an absolute path OR an inbox-relative name like "pasted/x.png"
-      // (older clients send the name). Either way it must land inside the inbox.
-      const abs = path.isAbsolute(s)
-        ? path.resolve(s)
-        : path.join(INBOX_DIR, ...s.split(/[/\\]/).map(seg => path.basename(seg)));
-      if (abs !== INBOX_DIR && !abs.startsWith(INBOX_DIR + path.sep)) continue;
-      if (fs.statSync(abs).isFile()) out.push(abs);
-    } catch {}
-  }
-  return out;
 }
 
 function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think, effort, source, continuations, channel }) {
