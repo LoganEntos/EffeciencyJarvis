@@ -270,7 +270,12 @@ function attachStream(id) {
     await showArtifacts(id);
     refreshHistory();
   });
-  es.onerror = () => { if (!chat.running && chat.es) { chat.es.close(); chat.es = null; } };
+  // Mirror projectchat's onerror: a mid-run drop (network blip, server restart)
+  // must still close es + finishRun() or the composer stays disabled forever.
+  es.onerror = () => {
+    if (chat.es) { try { chat.es.close(); } catch {} chat.es = null; }
+    if (chat.running) finishRun({ id: chat.runId, status: 'connection lost' });
+  };
 }
 
 function finishRun(meta) {
