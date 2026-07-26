@@ -202,3 +202,32 @@ Read-only sweep of the engine core (server.js, runs-engine/query/route.js, sched
 | id | file:line | issue | fix | effort | risk | status |
 |----|-----------|-------|-----|--------|------|--------|
 | C34 | lib/util.js:findClaude | Desktop-app CLI lives in MSIX-virtualized AppData — visible only to processes inside the package context; the autostart scheduled task (and any plain terminal) got ENOENT and every hub run failed "claude CLI not found" | findClaude probes %LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude-code too; CLAUDE_EXE resolution moved from load-time const to call-time claudeExe() in runs/runs-engine/distill/sessionsum so a stale path self-heals | M | low | ✅ 2026-07-26 |
+
+## Scout round 3 — 2026-07-26 (fix-diff review + least-covered modules + CLI prior art)
+
+Four-agent replenishment sweep: (a) diff review of the C28–C34 fix commits, (b) server
+modules prior rounds covered least (hermes/acp/tasks/teams/projects/distill/xlsxcells),
+(c) chat/project SPA modules, (d) external Claude CLI changelog pass. 6 queued rows below.
+
+Also verified but DEFERRED (prose only — promote to rows in a later round if wanted):
+runrender.js:37 module-scope `toolEls` map never cleared on newChat/openRun (detached-DOM
+leak over a long session); graph.js:277 C28's canvas-scoped `onmouseup` means releasing a
+node-drag outside the canvas leaves the node stuck to the cursor (`layout.drag` never
+cleared); lib/tasks.js:74 `runAll` silently skips tasks whose linked run was deleted
+(`getRunMeta` null fails both retry branches — per-task Run button works); lib/teams.js:85 +
+lib/projects.js:31 persist via plain `writeFileSync` instead of the atomic temp+rename
+pattern tasks.js uses; projectdetail.js:219 dead `showTab` fallback (function doesn't
+exist — rename leftover); the `!res.headersSent` JSON-500 branch in the C28/C29 stream
+guards is unreachable (writeHead is synchronous) — crash guard still works, branch is dead
+code. Ruled out: no XSS (all render helpers route through esc()), distill.js + xlsxcells.js
+clean, scheduleId/relink chain + hub_status flush + findClaude call-time resolution all
+verified correct.
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| U18 | assets/run.js:273 | SSE `es.onerror` only cleans up when `!chat.running` — a stream drop MID-run (network blip, server restart) never closes `es` or calls `finishRun()`, so the Run tab's composer stays disabled and Cancel stays up forever; only "New chat" (discarding the transcript) recovers. The exact bug was already diagnosed and fixed in jarvischat.js:175 and projectchat.js:240 — the primary Run tab never got the same fix | mirror projectchat's onerror: unconditionally close `es`, and if `chat.running` was true reset it + `finishRun()` so the composer re-enables | S | low | ⬜ |
+| C35 | server.js:119 | The C28/C29 crash-guard pass missed the `/vendor/` static route: `fs.createReadStream(full).pipe(res)` with no stream 'error' handler — a vendor file deleted/AV-locked mid-stream emits an unhandled 'error' and crashes the whole hub process (same class C28 fixed in files.js/artifacts.js) | attach the same `rs.on('error', () => res.destroy())` guard before piping | S | low | ⬜ |
+| C36 | lib/hermes.js:53 | Close handler uses truthy `else if (info.code)` — a hermes-acp child killed by signal (`code=null`) or exiting 0 abnormally falls through to `st.meta.status='done'`, recording a crashed/killed run as a successful completion in history/metrics (verified: `child.kill()` → close fires with code=null, signal='SIGTERM') | `else if (info.code != null)`, or treat close-without-stopReason as error (it IS the abnormal path); same truthy check paired at lib/acp.js:91 | S | low | ⬜ |
+| C37 | lib/acp.js:69 | Stall watchdog is armed only before `session/prompt` — a hermes process that hangs during `initialize` or `session/new`/`session/resume` has no timeout, the run sits status "running" forever, and liveness.js:37's orphan reaper explicitly skips anything still in the live `active` map, so nothing ever sweeps it | call `armWatchdog()` before the first request (initialize), not just before session/prompt | S | low | ⬜ |
+| U19 | assets/app.js CLICKABLE_SEL + projectdetail.js:216,150 + projectchat.js:134 | Three project-UI click targets are mouse-only: `.prun` recent-run rows, `.projTile` file/image tiles, and `.pchat-hpill` history pills carry no role/tabindex/keydown and none match app.js's CLICKABLE_SEL, so the MutationObserver auto-a11y pass never covers them — keyboard users can't open a project's runs, files, or past chat threads | add `.prun, .projTile[data-img], .projTile[data-doc], .pchat-hpill` to CLICKABLE_SEL (one-line fix; observer grants role/tabindex/keys for free) | S | low | ⬜ |
+| C38 | lib/runs-engine.js spawn args | Headless spawns have no runaway guardrails — confirmed current CLI (code.claude.com/docs/en/cli-reference) ships `--max-budget-usd <amt>` (hard spend cap, kills subagents at limit) and `--max-turns <n>` (turn cap), both print-mode which matches the hub's `-p` usage; unattended autopilot/scheduled runs currently have no ceiling on a runaway prompt | add both flags (values from settings.json with sane defaults) to the spawn argv; gate on CLI version or drop the flag if the spawned CLI errors on it. Prior art also confirmed for later rounds: `--json-schema` (validated structured output), `--fork-session` (branch a past session), `--agents '<json>'` (dynamic subagent defs), `--forward-subagent-text` (subagent text in stream-json for agentviz) | S | med | ⬜ |
