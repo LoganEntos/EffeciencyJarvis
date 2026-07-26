@@ -159,3 +159,31 @@ state, relink chain drift, security invariants, listener stacking, css cascade.
 | C25 | lib/autopilot.js:97 | 'gone' (user deleted run history) counted as retryable — autopilot would re-execute a FINISHED task's prompt unattended | retry only status 'error'; gone = settled unknown outcome (pickNext + queueOpen) | S | low | ✅ 2026-07-26 |
 | C26 | lib/tasks.js:19 | tasks.json whole-file writes race out-of-band writers (lost-update reverts runId/done marks) | atomic temp+rename save; new POST /api/tasks/done as the sanctioned out-of-band completion path (smoke-covered) | M | low | ✅ 2026-07-26 |
 | C27 | lib/distill.js:23 | C17 CLI auto-discovery fixed runs.js only — distill + sessionsum still hardcode the npm-global path (silent ENOENT on desktop-app-only nodes) | one shared U.findClaude() in util.js; all three spawn sites use it | S | low | ✅ 2026-07-26 |
+
+## Scout round — 2026-07-26 (server libs)
+
+Read-only sweep of the untouched server modules (core/sharepoint/memory/agentgraph/
+liveness/files/projects/sources/teams/admin/xlsxcells/hermes/acp/clientlog/usage/
+settings/diagnose/artifacts/sessionsum). 4 verified defects below. Ruled out — see
+final note.
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| C28 | lib/files.js:123,194 | `fs.createReadStream(f.full).pipe(res)` in /api/files/view + /api/files/download has NO stream 'error' handler. A read that fails mid-stream (file deleted while streaming to a slow/paused client, or a disk error) emits an unhandled 'error' on the ReadStream → uncaughtException → the whole hub process crashes. There is no process-level uncaughtException handler anywhere, and server.js's per-request try/catch cannot catch an error emitted on a later tick | attach `.on('error', e => { res.destroy(); })` (and 404/500 only if `!res.headersSent`) to each stream before piping | S | med | ⬜ |
+| C29 | lib/artifacts.js:70 | Same unguarded `fs.createReadStream(full).pipe(res)` in serveArtifact() — an artifact file deleted or erroring mid-stream crashes the server (same uncaught-'error' class as C28) | same stream 'error' guard on the ReadStream | S | med | ⬜ |
+| C30 | lib/sessionsum.js:86-108 | sweep() lost-update race: the 15-min background interval sweep and a client /api/session-summaries/build POST each `load()` their OWN cache copy, then `await summarizeOne()` (≤30s) BETWEEN the read and the `save()`. The later save writes its stale copy back, silently dropping summaries the other sweep just computed and cached (wasted Haiku tokens + missing entries). Same class C26 fixed for tasks.json, but here real awaits sit inside the critical section | serialize sweeps with an in-flight flag, or reload+merge the cache immediately before each `save()` (atomic temp+rename like C26) | M | low | ⬜ |
+| C31 | lib/core.js:126-151 | oneShotMemo Map grows unbounded. sessions() calls isInternalOneShot(id,size) for every transcript on every call and memoizes by `id:size`; the LIVE session file grows continuously, so every poll at a new size inserts a fresh key that is never evicted — a slow memory leak over a long-lived server that is polled by the activity tab + the summary sweeps | cap/evict the memo (simple LRU or clear when size > N), or don't memoize the newest/still-growing transcript | S | low | ⬜ |
+
+## Scout round — 2026-07-26 (SPA assets)
+
+Read-only sweep of the untouched SPA modules (app/lists/graph/agentviz/overview/
+memory/live/sheetgrid/sharepoint/sources/assetlib/clientlog/jarvisorb/jarvispersona/
+jarvistimeline/voicecfg/voiceconvo/voicetts/projects/projectsxfer/rungauge/runrender/
+runhistory). 4 verified defects below. Ruled out — see final note.
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| U14 | assets/graph.js:277 | `window.addEventListener('mouseup', …)` is registered fresh inside `drawGraphViz()` on EVERY Codebase-map render — each Modules⇄All-symbols view toggle and each Graph-tab re-render adds another permanent document-level mouseup listener that is never removed (the `.gtip` tooltips ARE cleaned at line 149, this handler is not). Stale closures keep firing on every mouseup for the rest of the session, each touching a disconnected canvas's `layout`/`inspector` | move the mouseup handler off `window` (attach to the canvas, which dies with the render) or register it once at module scope and read the live instance via a shared ref | S | low | ⬜ |
+| U15 | assets/sharepoint.js:184,97 | `spPollCrawl()` starts a new uncleared 2s `setInterval` with NO module-level guard (unlike `spSearchT`). `spRenderIndex()` calls it whenever `running` is true, and `spStatus()` re-runs on the header Refresh button (force reload) mid-crawl and from `spPollCrawl`'s own `else spStatus()` branch — so overlapping pollers stack and hammer `/api/sharepoint/index/status` in parallel for the crawl's duration | store the interval id in a module var and clear-before-start (or early-return if one is already live) | S | low | ⬜ |
+| U16 | assets/rungauge.js:12,32 vs 18 | `renderUsageGauge()` sets `el.style.display='none'` when `/api/usage` errors or returns no runs, but the SUCCESS path (line 18) only writes `innerHTML` and never restores `el.style.display=''`. run.js calls this on tab render and after every run, so a single transient `/api/usage` failure hides the Today gauge permanently for the session — later successful renders write content into a still-`display:none` element and stay invisible until page reload | set `el.style.display=''` at the top of the success branch before writing innerHTML | S | low | ⬜ |
+| U17 | assets/sharepoint.js:110-114 | `spDoSearch()` does `const r = await api('/api/sharepoint/index/search?q=…')` with NO try/catch (every other sharepoint fetch uses `.catch`). A network error/timeout from `api()` rejects unhandled (only the clientlog beacon sees it), and `#spHits` is left showing stale results with no error feedback — the search box silently stops responding | wrap in try/catch and render a `pill err` into `#spHits` on failure, mirroring `spDoSearch`'s own `r.error` branch | S | low | ⬜ |

@@ -39,28 +39,27 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
 
 ## 🔜 NOW — execute top-to-bottom
 
-0. **`docs/handoffs/fix-all-2026-07-23.md`** — ONE Opus 4.8 xhigh thread:
-   Phase A rebuilds the self-improvement loop per
-   `docs/audit-2026-07-23-self-improvement-loop.md` (scout schedule, task-queue
-   fallback, effort passthrough, overflow continuation, starvation badge),
-   Phase B executes the live hub task queue (which covers items 1, 3, and 6
-   below plus item 2, the persona-pipeline fixes from
-   `docs/audit-2026-07-22-persona-pipeline.md`). Phase A shipped 2026-07-25
-   (`90c7b92`); Phase B cycles cover most tasks through this session.
+0. ✅ **fix-all sprint COMPLETE** — Phase A loop rebuild `90c7b92` + review
+   hardening `cba2e9e` (C25-C27); Phase B covered by the 2026-07-25/26 session
+   cycles (items 1-3 + 6 below). Handoff archived. **Loop goes live the moment
+   the USER runs `claude` + `/login` once on this node and arms Autopilot + the
+   scout schedule in Config.**
 1. ✅ **Chat attachments/project fixes** — items 4–5 (click-to-open files, discard
    on navigate) 2026-07-25 (`0ce6ed4`).
 2. ✅ **Persona pipeline fixes** — system-layer injection, dual contracts,
    wit-cap scoping 2026-07-25 (`ac5b833`).
 3. ✅ **Schedules UI polish** — fold recurring checks into autopilot loop
    2026-07-25 (`9a61682`).
-4. **N2 mobile ergonomic pass** — every tab at 375px: touch targets, composer
-   ergonomics, card wrapping, table overflow. Done when all tabs are usable
-   one-handed (Tailscale PWA already live).
+4. **N2 mobile ergonomic pass** — programmatic 375px audit of all 18 tabs done
+   2026-07-26 (`a545f9f`): zero horizontal overflow anywhere, clipped selects
+   fixed, coarse-pointer targets already 36px. Remaining scope = subjective
+   one-handed feel on a real phone → folds into N8 (needs the user's device).
 5. **N8 iPhone polish** — builds on N2.
-6. **Size guard:** style.css split ✅ 2026-07-25 (style.css 176 + components.css
-   433, both under cap). jarvistab.js split ✅ 2026-07-25 (`67c4004`). lib/runs.js
-   was split under the cap this session; watchlist: assets/run.js 489,
-   assets/voice.js 478 — both need splits next.
+6. ✅ **Size guard CLEAR (2026-07-26):** every file under cap with headroom.
+   Splits this session: style.css (`156a920`), jarvistab.js (`67c4004`),
+   lib/runs.js (`6a9862e`), run.js + voice.js (`f465850`). Largest now:
+   components.css 448, jarvistab.js 410, sharepoint.js 396 — none within 50 of
+   the cap.
 
 ## 🙋 Needs the USER (interactive / system)
 
