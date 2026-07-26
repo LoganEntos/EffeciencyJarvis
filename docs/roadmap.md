@@ -43,8 +43,8 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
    Phase A rebuilds the self-improvement loop per
    `docs/audit-2026-07-23-self-improvement-loop.md` (scout schedule, task-queue
    fallback, effort passthrough, overflow continuation, starvation badge),
-   Phase B executes the live hub task queue (which covers items 1–2 and 5
-   below plus the persona-pipeline fixes from
+   Phase B executes the live hub task queue (which covers items 1, 3, and 6
+   below plus item 2, the persona-pipeline fixes from
    `docs/audit-2026-07-22-persona-pipeline.md`). Items below stand if the
    sprint stalls.
 1. **Finish `docs/handoffs/chat-stop-attach-project-fixes.md`** (IN PROGRESS —
@@ -52,16 +52,20 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
    attachments/project files click-to-open, **item 5** project instructions
    discard silently on navigate-away). Specifics + line refs:
    `docs/audit-2026-07-21-chat-attach-projects.md`.
-2. **`docs/handoffs/schedules-verify.md`** — schedules UI polish (R5 fire test
+2. **`docs/handoffs/persona-pipeline-fixes.md`** — system-layer persona
+   injection + spoken/screen dual contracts, wit-cap scoping, sonnet floor,
+   distiller scoping (from `docs/audit-2026-07-22-persona-pipeline.md`).
+   Slotted right after the chat-fix handoff: it lifts output quality of
+   every run.
+3. **`docs/handoffs/schedules-verify.md`** — schedules UI polish (R5 fire test
    already proven `d7cb3c7`); fold recurring checks into the autopilot loop.
-3. **N2 mobile ergonomic pass** — every tab at 375px: touch targets, composer
+4. **N2 mobile ergonomic pass** — every tab at 375px: touch targets, composer
    ergonomics, card wrapping, table overflow. Done when all tabs are usable
    one-handed (Tailscale PWA already live).
-4. **N8 iPhone polish** — builds on N2.
-5. **Size guard (found 2026-07-22):** `assets/style.css` is **614 lines — over
-   the 500 cap**; split it (e.g. base/tokens vs components) on the next UI
-   pass. Watchlist (within ~30 of the cap): `assets/run.js` 485,
-   `assets/voice.js` 474, `assets/jarvistab.js` 470 — next splits are already
+5. **N8 iPhone polish** — builds on N2.
+6. **Size guard:** ✅ style.css split 2026-07-25 (style.css 176 + components.css
+   433, both under cap). Watchlist (within ~50 of the cap): `assets/run.js` 464,
+   `assets/voice.js` 454, `assets/jarvistab.js` 445 — next splits are already
    sketched in the archive (soul editor → jarvissoul.js, etc.).
 
 ## 🙋 Needs the USER (interactive / system)

@@ -54,7 +54,20 @@ docs/handoffs/           live work orders for hub runs (resolved ones → docs/a
 ```
 Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Sources · Tools · Config (+ SharePoint).
 
-## Current truth (2026-07-22)
+## Current truth (2026-07-25)
+
+- **The self-improvement loop is code-complete and hardened** (C14–C18,
+  `90c7b92`): autopilot falls back to the hub task queue FIFO, retries
+  errored/gone tasks (capped), follows continuation-on-death relinks, and the
+  claude CLI is auto-discovered (npm global → desktop-app bundle). The scout
+  schedule is seeded but DISABLED, autopilot toggle OFF.
+- **Desktop node (Desktop\claudecodeproject\EffeciencyJarvis): hub runs are
+  blocked on auth** — the CLI here has never been logged in (desktop-app auth
+  doesn't reach headless spawns; every run ends "Not logged in"). One-time fix
+  by the USER: run `claude` in a terminal once and `/login`, then arm autopilot
+  + the scout schedule from Config. Everything else is verified working (95/95
+  smoke, run engine spawns the CLI fine).
+
 - **Engine = Claude ONLY.** The stack is Claude Code's own: auto model-routing +
   14 model-tiered subagents + agent teams (`lib/teams.js`). **hermes is DEPRECATED
   as too expensive** — not deleted, hidden behind `settings.hermesEnabled` (default

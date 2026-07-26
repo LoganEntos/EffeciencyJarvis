@@ -1,4 +1,4 @@
-# AGENTS.md — rules for any agent working in this repo (hermes, etc.)
+# AGENTS.md — rules for any agent working in this repo
 
 You are working in **Claude Code Hub** (`claude-dashboard/`): a zero-dependency
 local web app that is the user's front end for working with Claude — prompt runs
@@ -6,6 +6,12 @@ with automatic model allocation, live SSE streaming, run history, a file inbox,
 tasks, schedules, memory, and monitoring tabs. This repo is ONE thing. There is
 **no Power BI, no client data, no other product** here — never invent or
 reference such work.
+
+**hermes is deprecated and hidden** — too expensive for routine use; the
+engine is Claude-only (auto model-routing + model-tiered subagents + agent
+teams). hermes support is not deleted but sits behind
+`settings.hermesEnabled` (default off); real hermes work happens in Hermes
+Desktop, not here. ruflo/claude-flow are retired long ago.
 
 > Read `HANDOFF.md` first for current state, then `docs/roadmap.md` for the plan.
 > The full rules live in `CLAUDE.md`; this file is the short, binding version.
@@ -48,16 +54,38 @@ This repo is **also edited by Claude Code and by the hub's own run engine**.
 Before editing, check `git status` and reconcile — don't clobber concurrent work.
 Commit small, working stages so parallel agents can rebase cleanly.
 
-## Architecture (detail in `claude-dashboard/README.md`)
+## Architecture (detail in `claude-dashboard/README.md`, synced with `HANDOFF.md`)
 
 - `claude-dashboard/server.js` — boot + router + static + `/vendor/` + token guard
-- `claude-dashboard/lib/*.js` — server modules: `util` `core` `runs` `hermes`
-  `acp` `liveness` `artifacts` `files` `tasks` `schedules` `memory` `agentgraph`
-  `voice`
+- `claude-dashboard/lib/util.js` — shared helpers (fs, no-shell spawn, body
+  reader, MODELS allowlist)
+- `claude-dashboard/lib/core.js` — overview / library / assets / sessions /
+  graph endpoints
+- `claude-dashboard/lib/runs.js` `runs-engine.js` `runs-query.js` — run
+  engine: spawn claude CLI, SSE, auto-routing, history, artifacts
+- `claude-dashboard/lib/tasks.js` `schedules.js` — hub-native task queue +
+  cron → run engine (`data/*.json`)
+- `claude-dashboard/lib/agentgraph.js` `liveness.js` — run stream → persona
+  crew graph; orphan reaper + heartbeat
+- `claude-dashboard/lib/files.js` — upload inbox (vanilla multipart) +
+  zero-dep xlsx preview
+- `claude-dashboard/lib/voice.js` — TTS proxy `/api/voice/*` (loopback-only;
+  spawns CSM/Kokoro sidecar)
+- `claude-dashboard/lib/distill.js` — Jarvis prompt distiller
+  (`POST /api/jarvis/distill`, Haiku one-shot)
+- `claude-dashboard/lib/memory.js` — Engram semantic memory (typed records,
+  lexical recall, NO vectors)
+- `claude-dashboard/lib/sources.js` `sharepoint.js` `admin.js` `personas.js`
+  `teams.js` — Sources tab / SharePoint / Tools / personas / agent teams
+- `claude-dashboard/lib/hermes.js` `acp.js` — deprecated hermes engine +
+  ACP bridge, hidden behind `settings.hermesEnabled` (default off)
+- `claude-dashboard/lib/artifacts.js` — run artifact serving under CSP
+  sandbox
 - `claude-dashboard/assets/*.js` + `style.css` — the vanilla-JS SPA
 - `claude-dashboard/vendor/` — LOCAL asset library (fonts/icons/css); prefer
   `/vendor/` over CDNs in any generated UI (external CDNs are CSP-blocked)
-- `claude-dashboard/data/` — runtime state (gitignored)
+- `claude-dashboard/data/` — runtime state: `runs/`, `inbox/`, `tasks.json`,
+  `schedules.json`, `memory.json` (gitignored)
 
 ## Run + verify
 

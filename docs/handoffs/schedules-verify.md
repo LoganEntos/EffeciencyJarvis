@@ -1,28 +1,44 @@
-# Handoff: Stress-test schedules (O3 — the headless-verifiable part)
+# Handoff: schedules UI polish
 
-**Status: READY.** Model: Opus 4.8 (or Sonnet — this is mostly mechanical).
+**Status: READY.** Model: Opus 4.8 (or Sonnet — this is mostly UI, no
+protocol design needed).
 
-R5 schedules have shipped but have NEVER been proven to fire. Verify the
-whole loop against the live 5757 hub via its API (the per-boot token is in
-the served `index.html` — fetch `/`, extract, send as `X-Hub-Token`).
+The fire-test scope of this handoff is DONE — R5 schedules were proven to
+fire end-to-end against the live hub on 07-18 (`d7cb3c7`; recorded in
+`docs/handoffs/README.md` and `docs/roadmap.md`). What remains is the
+schedules half of the Tasks tab UI, which has had no polish pass since it
+shipped.
 
-1. `POST /api/schedules` — create a one-shot/near-future schedule (2–3 min
-   out) with a trivial haiku prompt like "reply with the word ok".
-2. Wait past the fire time (poll, don't spin), then assert: a new run
-   appears in `/api/runs` attributable to the schedule, status reaches
-   `done`, and the schedule's own record updates (lastRun/next).
-3. Edge: create a second schedule, delete it BEFORE it fires, assert it
-   never fires.
-4. Tear down everything you created (schedules AND the test runs via
-   `/api/run/delete`) — leave `data/` as you found it.
-5. Fix precisely whatever fails (`lib/schedules.js`); server-code changes
-   are verified on a throwaway port (5758+), NEVER by killing the 5757
-   listener; the fix goes live only via the supervised `POST /api/restart`
-   and only when `/api/runs` shows no active run.
+1. Review the schedules list rendered in `assets/tasks.js` against the
+   Tasks queue it sits alongside: schedule rows should read at a glance
+   (next-fire time, last-run outcome, cadence) with the same visual weight
+   the queue rows get, not as an afterthought below them.
+2. Consider the timeline reframe sketched in
+   `docs/archive/ui-roadmap.md` item 10: queue as queued → running → done,
+   schedules as a "next fire" strip — makes the autopilot loop's activity
+   legible at a glance instead of requiring a read of raw records.
+3. Fold recurring schedule health checks (does a schedule with a past
+   `next` time actually have a queued/running/done outcome, not silently
+   stalled) into the autopilot loop rather than treating verification as a
+   one-off manual pass.
+4. Any create/edit affordances for schedules (interval picker, model/effort
+   selection, delete/pause) should match the visual language of the rest of
+   the Tasks tab — no ad hoc controls.
 
 Left OUT of this handoff (needs an interactive session with the user):
 wake-word "Jarvis" real-mic test; Projects tab at 375px. Note them in your
 final reply as still-pending.
 
-Record the outcome in HANDOFF.md (O3b line) + `docs/roadmap.md`; review
+## Constraints
+Zero-dep; `assets/tasks.js` stays under 500 lines — check current line
+count before editing, split first if already close to the cap; no `$`
+figures anywhere; preserve `X-Hub-Token` + path-traversal guards (no
+`lib/schedules.js` protocol changes are in scope here — the fire mechanism
+is already proven). Review pipeline per `docs/handoffs/README.md`:
+browser-verify at 5757 (desktop AND 375px) + smoke green + code-reviewer
+agent over the diff before commit. Do NOT stop/restart the 5757 listener —
+verify any server-side change on a throwaway 5758 instance.
+
+When this ships, record the outcome in `docs/roadmap.md`'s NOW entry for
+this handoff (not `HANDOFF.md`) and mark this file DONE at the top; review
 pipeline per `docs/handoffs/README.md`.

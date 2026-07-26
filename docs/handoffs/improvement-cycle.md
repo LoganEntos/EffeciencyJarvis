@@ -44,5 +44,10 @@ HTML-report artifacts.
 
 ## Cycle log
 - 2026-07-20 (`723f243`): split run.js 619L → 485L; render layer extracted to
-  assets/runrender.js. Smoke green, reviewer clean. **Next target: app.js at
-  499 lines — the imminent next 500-line breach.**
+  assets/runrender.js. Smoke green, reviewer clean. app.js was ALSO split
+  that same day (`857eb...`), so the 499-line breach it would have chased
+  is already resolved — no cycle needed to pick it up.
+- **Current target: `assets/style.css` breach (614 lines, over the 500
+  cap) — being resolved this session.** Watchlist after that (within ~40 of
+  the cap): `assets/run.js` 464, `assets/voice.js` 454,
+  `assets/jarvistab.js` 445.
