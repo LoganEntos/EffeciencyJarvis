@@ -138,6 +138,23 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 /* ---- Run tab: chat ---- */
 .runbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .runbar select{margin:0}
+/* AUTONOMOUS LOOP override — top of the Run tab. Off = quiet outline; on = the
+   amber loop is armed (subtle breathing glow so unattended activity is visible). */
+.looprow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.loopbtn{display:inline-flex;align-items:center;gap:9px;background:transparent;color:var(--muted);
+  border:1px solid var(--line);border-radius:9px;padding:8px 15px;font-family:var(--font-mono);
+  font-size:11.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;transition:.18s}
+.loopbtn:hover{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-soft)}
+.loopbtn .loopdot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none;transition:.18s}
+.loopbtn.on{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);
+  box-shadow:0 0 0 1px var(--accent-dim),0 0 18px #e8a33d33}
+.loopbtn.on .loopdot{background:var(--accent);box-shadow:0 0 10px var(--accent);animation:looppulse 1.8s ease-in-out infinite}
+.loopmeta{font-size:11px;font-family:var(--font-mono)}
+@keyframes looppulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.loopbtn.on .loopdot{animation:none}}
+/* Mic dictation "listening" — non-green (U4 rule: green = success only). */
+#micBtn.listening{background:#e0525222;border:1px solid #e0525255;color:#f0908f;
+  animation:looppulse 1.3s ease-in-out infinite}
 .chatlog{display:flex;flex-direction:column;gap:10px;background:#0b0a08;border:1px solid var(--line);
   border-radius:var(--r);padding:18px;min-height:220px;max-height:56vh;overflow:auto;margin-bottom:12px}
 :root[data-theme="light"] .chatlog{background:#efe9dc}

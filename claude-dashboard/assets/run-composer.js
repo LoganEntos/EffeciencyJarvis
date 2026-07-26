@@ -137,7 +137,83 @@ async function sendPrompt() {
   if (window.HubVoice) HubVoice.onRunStart();
 }
 
+// ---- mic dictation -----------------------------------------------------------
+// A self-contained push-to-talk recognizer that fills #promptIn. Deliberately
+// NOT the HubVoice/voiceconvo call-mode recognizer (that owns its own SR
+// lifecycle for hands-free conversation) — this is a one-shot dictation that
+// only ever writes text into the composer, so the two never fight over the mic.
+let dict = null;         // active SpeechRecognition instance
+let dictBase = '';       // textarea content when dictation started (final commits append to it)
+function toggleDictation() {
+  const btn = $('#micBtn'), ta = $('#promptIn');
+  if (!btn || !ta) return;
+  if (dict) { try { dict.stop(); } catch {} return; } // second click stops
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { addMsg('This browser has no speech recognition — use Chrome or Edge. (Talk-back still works everywhere.)', 'sys'); return; }
+  // Don't fight an active hands-free call for the single mic.
+  try { if (window.HubVoice && !HubVoice._disabled && HubVoice._call && HubVoice._call()) { addMsg('End the voice call first — the mic is in use by call mode.', 'sys'); return; } } catch {}
+  const r = new SR();
+  r.lang = 'en-US'; r.continuous = true; r.interimResults = true;
+  dict = r;
+  dictBase = ta.value ? ta.value.replace(/\s*$/, '') + ' ' : '';
+  btn.classList.add('listening'); btn.textContent = '● Listening…'; btn.setAttribute('aria-pressed', 'true');
+  r.onresult = e => {
+    let finalTxt = '', interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalTxt += t; else interim += t;
+    }
+    if (finalTxt) dictBase += finalTxt.trim() + ' ';
+    ta.value = (dictBase + interim).replace(/\s+/g, ' ').replace(/^\s/, '');
+  };
+  r.onerror = ev => {
+    const why = ev.error === 'not-allowed' ? 'mic permission denied — allow it in the browser and retry'
+      : ev.error === 'no-speech' ? 'no speech heard' : ('mic error: ' + ev.error);
+    addMsg(why, 'sys');
+  };
+  r.onend = () => { dict = null; btn.classList.remove('listening'); btn.textContent = '🎤 Speak'; btn.setAttribute('aria-pressed', 'false'); ta.focus(); };
+  try { r.start(); } catch (e) { dict = null; btn.classList.remove('listening'); btn.textContent = '🎤 Speak'; }
+}
+
+// ---- AUTONOMOUS LOOP override (drives the hub autopilot from the Run tab) -----
+// Same backend as Config's autopilot panel (/api/autopilot[/toggle|/run-now]),
+// surfaced at the top of the Run tab so the loop can be armed without leaving it.
+let loopPoll = null;     // module-level so we clear-before-start (no stacked intervals)
+async function refreshLoop() {
+  const btn = $('#loopBtn'), state = $('#loopState'), meta = $('#loopMeta');
+  if (!btn) return;
+  let a;
+  try { a = await api('/api/autopilot'); } catch { if (state) { state.textContent = 'unavailable'; state.className = 'pill neutral'; } return; }
+  const on = !!a.enabled;
+  btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (state) {
+    const idle = on && a.idle, stuck = a.stuck && a.stuck.length;
+    state.textContent = !on ? 'off' : stuck ? (stuck + ' stuck') : idle ? 'idle — queue empty' : (a.inflight ? a.inflight + ' in flight' : 'running');
+    state.className = 'pill ' + (!on ? 'neutral' : stuck ? 'err' : idle ? 'warn' : 'ok');
+  }
+  if (meta) meta.textContent = on
+    ? `backlog ${a.backlogDone}/${a.backlogTotal} · ${a.queueOpen || 0} queued${a.lastPick ? ' · last: ' + a.lastPick : ''}`
+    : '';
+  // Poll while enabled so the state pill tracks the unattended loop live; stop
+  // polling when off. Clear-before-start guards against stacked intervals.
+  if (on && !loopPoll) loopPoll = setInterval(refreshLoop, 8000);
+  else if (!on && loopPoll) { clearInterval(loopPoll); loopPoll = null; }
+}
+async function toggleLoop() {
+  const btn = $('#loopBtn'); if (btn) btn.disabled = true;
+  try { await api('/api/autopilot/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); }
+  catch { addMsg('Could not toggle the autonomous loop.', 'errmsg'); }
+  if (btn) btn.disabled = false;
+  refreshLoop();
+}
+async function loopCheckNow() {
+  try { await api('/api/autopilot/run-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); }
+  catch { addMsg('Could not trigger a loop check.', 'errmsg'); }
+  setTimeout(refreshLoop, 600);
+}
+
 // Namespace mirror per the jarvissoul.js convention for guarded callers; the
 // bare globals above remain the canonical entry points (removeFile must stay
 // global for the attach-chip inline onclick).
-window.runComposer = { sendPrompt, attachFiles, removeFile, renderAttachStrip };
+window.runComposer = { sendPrompt, attachFiles, removeFile, renderAttachStrip,
+  toggleDictation, toggleLoop, loopCheckNow, refreshLoop };

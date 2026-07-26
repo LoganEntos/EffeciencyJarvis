@@ -10,6 +10,14 @@ function ensureRunUI() {
   if ($('#chatLog')) return;
   $('#run').innerHTML = `
     <h2>Run — work with Claude in this project</h2>
+    <div class="looprow" id="loopRow">
+      <button id="loopBtn" class="loopbtn" aria-pressed="false"
+        title="Arm the hub's unattended self-improvement loop — it picks the next open backlog item (or waiting task), runs it, and commits, checking every few minutes. Toggle it here without leaving the Run tab.">
+        <span class="loopdot"></span><span class="looptxt">AUTONOMOUS LOOP</span></button>
+      <span class="pill neutral" id="loopState">off</span>
+      <button class="ghost" id="loopNow" title="Run a loop check right now" style="padding:5px 11px;font-size:11px">▶ Check now</button>
+      <span class="loopmeta muted" id="loopMeta"></span>
+    </div>
     <div class="runbar">
       <select id="runEngine" title="engine — claude (this CLI, model+perms below). hermes is a deprecated paid second stack, hidden unless enabled in Config">
         <option value="claude">engine: claude</option>
@@ -64,6 +72,7 @@ function ensureRunUI() {
       <input type="file" id="fileIn" multiple hidden>
       <div class="btns">
         <button id="attachBtn" class="ghost" title="Attach files to this run">📎 Attach</button>
+        <button id="micBtn" class="ghost" title="Dictate your prompt — click, speak, click again to stop. Chrome/Edge only.">🎤 Speak</button>
         <button id="rereadBtn" class="ghost" title="Read the last reply aloud again">↻ Read again</button>
         <button id="sendBtn">Send ▷</button>
         <button id="cancelBtn" class="danger hidden">Cancel ✕</button>
@@ -83,6 +92,12 @@ function ensureRunUI() {
     if (window.HubVoice && HubVoice.speak) HubVoice.speak(t);
   };
   $('#newChatBtn').onclick = newChat;
+  // Mic dictation + the AUTONOMOUS LOOP override live in run-composer.js so this
+  // file stays under the 500-line cap.
+  $('#micBtn').onclick = () => runComposer.toggleDictation();
+  $('#loopBtn').onclick = () => runComposer.toggleLoop();
+  $('#loopNow').onclick = () => runComposer.loopCheckNow();
+  runComposer.refreshLoop();
   // Enter sends (the expectation on phones/low-end browsers where Ctrl/Cmd is
   // awkward or absent); Shift+Enter inserts a newline. Ctrl/Cmd+Enter kept as
   // an alias for muscle memory from the old binding.
