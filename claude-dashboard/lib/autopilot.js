@@ -123,6 +123,14 @@ function inflightCount(state) {
 
 // Re-sync dispatched[].status from the live run engine so pickNext() sees
 // fresh outcomes without autopilot having to be the one polling the SSE feed.
+// Failures that are the MACHINE's fault, not the item's: TLS interception
+// bursts, network drops, API overload. These must not consume the item's
+// retry budget (seen live 2026-07-26: a 9-minute cert-error burst parked two
+// perfectly good items as stuck), and dispatching during a burst just burns
+// 2-minute error runs — so one infra sighting also pauses dispatch briefly.
+const INFRA_RE = /UNKNOWN_CERTIFICATE|Unable to connect to API|ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|rate.?limit|overloaded|api_error_status.:5|529|503/i;
+const INFRA_BACKOFF_MS = 10 * 60 * 1000;
+
 function refreshDispatched(state) {
   // Continuation-on-death (runs.js continueRun) relinks a task to its resumed
   // run; follow the task's CURRENT runId so a dead original run doesn't read as
@@ -138,7 +146,15 @@ function refreshDispatched(state) {
     }
     const m = runs.getRunMeta(d.runId);
     if (m) d.status = m.status;
+    // Infra failure: refund the attempt (once per runId), un-park if it was
+    // parked for this, and start the global dispatch backoff.
+    if (m && m.status === 'error' && INFRA_RE.test(m.errorExcerpt || '') && d.infraCredited !== d.runId) {
+      d.infraCredited = d.runId;
+      d.attempts = Math.max(0, (d.attempts || 0) - 1);
+      state.lastInfraAt = new Date().toISOString();
+    }
     if (m && m.status === 'error' && (d.attempts || 0) >= MAX_ATTEMPTS) d.status = 'stuck';
+    else if (d.status === 'stuck' && (d.attempts || 0) < MAX_ATTEMPTS) d.status = 'error'; // un-park after refund
   }
 }
 
@@ -199,6 +215,9 @@ function tick() {
   refreshDispatched(state);
   if (inflightCount(state) >= MAX_INFLIGHT) { saveState(state); return; }
   if (runs.runningCount() + runs.queueLength() >= MAX_QUEUE_PRESSURE) { saveState(state); return; } // don't pile onto a busy engine
+  // Infra backoff: an API/TLS/network failure was just observed — dispatching
+  // now would only mint more 2-minute error runs. Sit out until the window passes.
+  if (state.lastInfraAt && (Date.now() - Date.parse(state.lastInfraAt)) < INFRA_BACKOFF_MS) { saveState(state); return; }
   const pick = pickNext(state);
   if (pick) {
     state.idle = false; state.idleSince = null;

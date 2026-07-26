@@ -76,7 +76,11 @@ function createEngine({ active, queue, MAX_ACTIVE, runningCount, claudeExe, PROJ
       pushLine(st, JSON.stringify({ type: 'hub_stderr', text: st.stderr.trim().slice(0, 4000) }));
     }
     if (st.meta.status === 'error' && !st.meta.errorExcerpt) {
-      let ex = st.stderr.trim().slice(0, 300);
+      // The CLI always prints a benign "no stdin data received" warning on our
+      // stdio-ignored spawns — strip it so it can't mask the REAL error (the
+      // result line), which infra-failure classification depends on.
+      const realErr = st.stderr.replace(/Warning: no stdin data received[^\n]*\n?/g, '').trim();
+      let ex = realErr.slice(0, 300);
       if (!ex) {
         try {
           const last = JSON.parse(st.lines[st.lines.length - 1] || '{}');
