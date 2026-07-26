@@ -57,6 +57,10 @@ function createEngine({ active, queue, MAX_ACTIVE, runningCount, CLAUDE_EXE, PRO
     st.lastLineAt = Date.now();
     writeMeta(st);
     st.out = fs.createWriteStream(path.join(st.dir, 'output.jsonl'), { flags: 'a' });
+    // C32: lines pushed BEFORE launch (route reason, recall/team/persona/queue
+    // banners) only reached st.lines — pushLine skips disk while st.out is
+    // absent. Flush them now so the history replay matches the live stream.
+    if (st.lines.length) st.out.write(st.lines.join('\n') + '\n');
     liveness.startHeartbeat(st, broadcast);
   }
 

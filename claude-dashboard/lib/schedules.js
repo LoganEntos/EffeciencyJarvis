@@ -67,7 +67,7 @@ const settled = st => !st || st === 'done' || st === 'error' || st === 'cancelle
 function fire(s) {
   const prompt = `[Scheduled run "${s.title}" — ${describe(s)}]\n\n${s.prompt}`;
   const r = runs.startRun({ prompt, model: s.model || 'auto', permissionMode: 'bypassPermissions',
-    effort: s.effort || '', source: 'schedule' });
+    effort: s.effort || '', source: 'schedule', scheduleId: s.id });
   if (r.error) { // engine busy — try again shortly without skipping the slot
     s.nextDue = new Date(Date.now() + DEFER_MS).toISOString();
     return null;
@@ -77,6 +77,20 @@ function fire(s) {
   s.runCount = (s.runCount || 0) + 1;
   s.nextDue = nextDue(s, Date.now());
   return r.id;
+}
+
+// C33 — continuation-on-death (runs.js continueRun) resumed a dead scheduled
+// run as a new one: repoint lastRunId at the live continuation so tick()'s
+// "prev still running → defer" guard sees it (instead of reading the dead
+// original as settled and stacking a fresh concurrent run), and so the
+// schedule's history follows the chain.
+function relinkRun(oldRunId, newRunId) {
+  const list = load();
+  const s = list.find(x => x.lastRunId === oldRunId);
+  if (!s) return false;
+  s.lastRunId = newRunId;
+  save(list);
+  return true;
 }
 
 function tick() {
@@ -232,4 +246,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, startTicker };
+module.exports = { handle, startTicker, relinkRun };

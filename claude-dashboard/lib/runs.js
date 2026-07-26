@@ -95,17 +95,21 @@ Read that run's transcript and the current \`git status\`/\`git diff\` to see ex
     resume: meta.sessionId, source: meta.source,
     continuations: (meta.continuations || 0) + 1,
     effort: meta.effort || '',
+    scheduleId: meta.scheduleId || undefined,
   });
-  // Point the owning task (if any) at the continuation so the Tasks tab and
-  // autopilot follow the live chain, not the dead run. Lazy require — tasks.js
-  // requires this module at load time, so a top-level require would be circular.
+  // Point the owning task or schedule (if any) at the continuation so the
+  // Tasks tab, autopilot, and the scheduler's still-running guard all follow
+  // the live chain, not the dead run (C33: without the schedule relink, tick()
+  // reads the dead original as settled and stacks a fresh concurrent run).
+  // Lazy requires — both modules require this one at load time (circular).
   if (!r.error && r.id) {
     try { require('./tasks').relinkRun(meta.id, r.id); } catch {}
+    if (meta.scheduleId) { try { require('./schedules').relinkRun(meta.id, r.id); } catch {} }
   }
   return r;
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think, effort, source, continuations, channel }) {
+function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think, effort, source, continuations, channel, scheduleId }) {
   engine = ENGINES.includes(engine) ? engine : 'claude';
   // Output-contract channel: 'spoken' (voice / Jarvis chat → TTS-shaped) vs
   // 'screen' (Run tab / project chat, and every headless source — tasks,
@@ -249,6 +253,9 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     // how many times this chain has already been auto-continued (cap in engine).
     source: ['task', 'schedule', 'autopilot'].includes(source) ? source : null,
     continuations: Number.isInteger(continuations) ? continuations : 0,
+    // C33: which schedule fired this run (schedule source only) — lets
+    // continueRun repoint that schedule's lastRunId at the continuation.
+    scheduleId: (source === 'schedule' && typeof scheduleId === 'string') ? scheduleId : null,
   };
   const st = { child: null, lines: [], listeners: new Set(), meta, stderr: '', cancelled: false, args, hermesCfg, dir, out: null };
   active.set(id, st);
