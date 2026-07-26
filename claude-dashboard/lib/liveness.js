@@ -131,6 +131,7 @@ function startHermesTail(st, hermesExe, pushLog, maxLines = 800) {
       pushLog(st, text.slice(0, 500));
     }
   });
+  child.stdout.on('error', () => {}); // broken-pipe/fd error on tail stdout must not crash the hub (cf. C28/C29/C35)
   child.on('error', () => {});
 }
 function stopHermesTail(st) {
