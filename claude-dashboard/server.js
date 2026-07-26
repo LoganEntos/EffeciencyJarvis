@@ -116,7 +116,9 @@ const server = http.createServer(async (req, res) => {
       if (!st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('not found'); }
       res.writeHead(200, { 'Content-Type': VENDOR_MIME[ext], 'Content-Length': st.size,
         'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
-      return fs.createReadStream(full).pipe(res);
+      const rs = fs.createReadStream(full);
+      rs.on('error', () => res.destroy()); // vendor file deleted/AV-locked mid-stream: kill the socket, don't crash the hub (C35)
+      return rs.pipe(res);
     }
 
     // PWA manifest — served from root so start_url/scope stay "/" (installs the
