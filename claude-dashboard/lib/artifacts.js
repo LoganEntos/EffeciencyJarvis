@@ -67,7 +67,9 @@ function serveArtifact(res, id, file) {
       + "style-src 'unsafe-inline' http://127.0.0.1:*/vendor/ http://localhost:*/vendor/; "
       + "img-src data: blob: http://127.0.0.1:*/vendor/ http://localhost:*/vendor/",
   });
-  fs.createReadStream(full).pipe(res);
+  const rs = fs.createReadStream(full);
+  rs.on('error', () => { if (!res.headersSent) U.sendJson(res, { error: 'read failed' }, 500); res.destroy(); });
+  rs.pipe(res);
 }
 
 module.exports = { countArtifacts, listArtifacts, serveArtifact };

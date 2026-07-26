@@ -135,6 +135,11 @@ function isInternalOneShot(file, id, size) {
     try { fs.readSync(fd, buf, 0, bytes, 0); } finally { fs.closeSync(fd); }
     hit = ONESHOT_RE.test(buf.toString('utf8'));
   } catch {}
+  // A growing (live) transcript changes size on every poll, so drop any prior
+  // entry for this id before inserting — keeps at most one key per session id
+  // instead of leaking a dead key per poll. Hard cap as a final backstop.
+  for (const k of oneShotMemo.keys()) { if (k.length > id.length && k[id.length] === ':' && k.startsWith(id)) oneShotMemo.delete(k); }
+  if (oneShotMemo.size > 4000) oneShotMemo.clear();
   oneShotMemo.set(key, hit);
   return hit;
 }

@@ -110,7 +110,9 @@ function spDebounceSearch() { clearTimeout(spSearchT); spSearchT = setTimeout(sp
 async function spDoSearch() {
   const q = $('#spSearch').value.trim(), box = $('#spHits');
   if (!q) { box.innerHTML = ''; return; }
-  const r = await api('/api/sharepoint/index/search?q=' + encodeURIComponent(q));
+  let r;
+  try { r = await api('/api/sharepoint/index/search?q=' + encodeURIComponent(q)); }
+  catch (e) { box.innerHTML = `<div class="pill err" style="margin-top:8px">${esc(e.message)}</div>`; return; }
   if (r.error) { box.innerHTML = `<div class="pill err" style="margin-top:8px">${esc(r.error)}</div>`; return; }
   box.innerHTML = (r.hits || []).slice(0, 50).map(h => `
     <div class="flex" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)">
@@ -181,12 +183,14 @@ async function brkOpen(btn) {
   window.open(r.webUrl, '_blank', 'noopener');
 }
 
+let spCrawlT = null;
 function spPollCrawl() {
-  const t = setInterval(async () => {
-    if (!$('#spIndex')) return clearInterval(t);
+  if (spCrawlT) clearInterval(spCrawlT);
+  spCrawlT = setInterval(async () => {
+    if (!$('#spIndex')) { clearInterval(spCrawlT); spCrawlT = null; return; }
     const st = await api('/api/sharepoint/index/status').catch(() => null);
     if (!st) return;
-    if (!st.crawl.running) { clearInterval(t); spStatus(); return; }
+    if (!st.crawl.running) { clearInterval(spCrawlT); spCrawlT = null; spStatus(); return; }
     const pill = $('#spIndex .pill.warn');
     if (pill) pill.textContent = `${st.crawl.phase} — ${st.crawl.files.toLocaleString()} files so far`;
     else spStatus();

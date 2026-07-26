@@ -274,12 +274,12 @@ function drawGraphViz(container, data) {
     if (changed) kick(); // redraw the highlight without spinning the sim
   };
   canvas.onmouseleave = () => { hover = null; tip.classList.add('hidden'); kick(); };
-  window.addEventListener('mouseup', e => {
+  canvas.onmouseup = e => {
     if (layout.drag && downAt && Math.abs(e.clientX - downAt.x) < 4 && Math.abs(e.clientY - downAt.y) < 4) {
       inspector.select(layout.drag);
     }
     layout.drag = null; downAt = null;
-  });
+  };
 
   return {
     find(q) {

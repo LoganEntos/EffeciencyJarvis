@@ -41,7 +41,14 @@ const SYS =
   + 'Output ONLY the summary.';
 
 function load() { return U.safeJson(CACHE_FILE) || {}; }
-function save(map) { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(CACHE_FILE, JSON.stringify(map, null, 2)); }
+// Atomic write (temp + rename, mirroring lib/tasks.js save()) so a concurrent
+// reader never sees a torn file and the reload+merge in runSweep() is coherent.
+function save(map) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = CACHE_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(map, null, 2));
+  fs.renameSync(tmp, CACHE_FILE);
+}
 
 // The hub's own headless one-shots (this summarizer + the distiller) each write
 // a transcript into the project session folder, so they show up as "sessions"
@@ -83,7 +90,18 @@ function summarizeOne(id, timeoutMs = 30000) {
 // cost/CPU predictable). `ids` targets a specific set (explicit client build);
 // otherwise sweep idle un-summarized sessions. A session is re-summarized only
 // when its size changed since the cached entry, so closed sessions stay put.
-async function sweep({ ids = null, max = 6, idleMs = 4 * 60 * 1000, force = false } = {}) {
+// Serialize all sweeps (background interval + client build POST) through one
+// in-flight chain so their load→summarize→save critical sections never
+// interleave and drop each other's freshly-computed summaries (lost-update
+// race). Callers still get their own resolved cache.
+let sweepChain = Promise.resolve();
+function sweep(opts) {
+  const next = sweepChain.then(() => runSweep(opts), () => runSweep(opts));
+  sweepChain = next.catch(() => {});
+  return next;
+}
+
+async function runSweep({ ids = null, max = 6, idleMs = 4 * 60 * 1000, force = false } = {}) {
   const cache = load();
   if (!fs.existsSync(CLAUDE_EXE)) return cache; // no CLI → nothing to build
   const all = core.sessions();
@@ -103,7 +121,15 @@ async function sweep({ ids = null, max = 6, idleMs = 4 * 60 * 1000, force = fals
   }
   for (const s of todo.slice(0, max)) {
     const r = await summarizeOne(s.id);
-    if (r.summary) { cache[s.id] = { summary: r.summary, size: s.sizeKb, at: new Date().toISOString() }; save(cache); }
+    if (r.summary) {
+      // Reload+merge immediately before each save: pick up any entry written to
+      // disk during the ≤30s summarizeOne() await, add ours, then atomic-save —
+      // so no computed summary is silently overwritten.
+      const disk = load();
+      disk[s.id] = { summary: r.summary, size: s.sizeKb, at: new Date().toISOString() };
+      save(disk);
+      Object.assign(cache, disk); // keep our returned view current
+    }
   }
   return cache;
 }

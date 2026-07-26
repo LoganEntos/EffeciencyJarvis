@@ -15,6 +15,7 @@ async function renderUsageGauge() {
     const pct = u.completionPct;
     const color = pct == null ? 'var(--dim)' : (pct >= 90 ? 'var(--accent)' : (pct >= 70 ? 'var(--amber)' : 'var(--red)'));
     const ringPct = pct == null ? 0 : pct;
+    el.style.display = '';
     el.innerHTML = `<div style="display:flex;gap:12px;align-items:center;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:16px">
       <div style="width:48px;height:48px;border-radius:50%;flex-shrink:0;background:conic-gradient(${color} ${ringPct * 3.6}deg, var(--line) 0deg);display:flex;align-items:center;justify-content:center">
         <div style="width:36px;height:36px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;flex-direction:column">

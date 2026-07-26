@@ -120,7 +120,9 @@ async function handle(req, res, url) {
     // SVG can carry inline <script>; on direct navigation (not <img>) it would
     // run in the hub's own origin. Sandbox it via CSP — harmless to <img> use.
     res.writeHead(200, { 'Content-Type': ctype, 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
-    fs.createReadStream(f.full).pipe(res);
+    const rs = fs.createReadStream(f.full);
+    rs.on('error', () => { if (!res.headersSent) U.sendJson(res, { error: 'read failed' }, 500); res.destroy(); });
+    rs.pipe(res);
     return true;
   }
   if (url.pathname === '/api/files/xlsx' && req.method === 'GET') {
@@ -191,7 +193,9 @@ async function handle(req, res, url) {
       'Content-Type': 'application/octet-stream', 'Content-Length': st.size,
       'Content-Disposition': `attachment; filename="${f.safe}"`, 'X-Content-Type-Options': 'nosniff',
     });
-    fs.createReadStream(f.full).pipe(res);
+    const rs = fs.createReadStream(f.full);
+    rs.on('error', () => { if (!res.headersSent) U.sendJson(res, { error: 'read failed' }, 500); res.destroy(); });
+    rs.pipe(res);
     return true;
   }
   if (p === '/api/files/delete' && req.method === 'POST') {
