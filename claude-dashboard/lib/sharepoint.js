@@ -110,19 +110,23 @@ async function startDeviceLogin() {
     client_id: c.clientId, scope: SCOPES,
   });
   if (!r.json.device_code) return { error: r.json.error_description || 'device-code request failed — check tenant/clientId in the config' };
-  device = {
+  // Capture per-flow state locally so a concurrent startDeviceLogin (double-click,
+  // no client-side disable) can't make this tick read/clear a sibling flow's timer.
+  const mine = device = {
     user_code: r.json.user_code, verification_uri: r.json.verification_uri || 'https://microsoft.com/devicelogin',
     expiresAt: Date.now() + (r.json.expires_in || 900) * 1000, error: null, timer: null,
   };
   const dc = r.json.device_code, interval = Math.max(r.json.interval || 5, 5) * 1000;
-  device.timer = setInterval(async () => {
-    if (Date.now() > device.expiresAt) { clearInterval(device.timer); device.error = 'code expired — start again'; return; }
+  const myTimer = mine.timer = setInterval(async () => {
+    if (device !== mine) { clearInterval(myTimer); return; } // superseded by a newer flow — stop polling
+    if (Date.now() > mine.expiresAt) { clearInterval(myTimer); mine.error = 'code expired — start again'; return; }
     try {
       const t = await postForm(`https://login.microsoftonline.com/${encodeURIComponent(c.tenant)}/oauth2/v2.0/token`, {
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: c.clientId, device_code: dc,
       });
+      if (device !== mine) { clearInterval(myTimer); return; } // await may have straddled a supersession
       if (t.json.access_token) {
-        clearInterval(device.timer);
+        clearInterval(myTimer);
         saveAuth({ access_token: t.json.access_token, refresh_token: t.json.refresh_token,
           expires_at: Date.now() + (t.json.expires_in || 3600) * 1000 - 60000, account: null });
         try {
@@ -131,13 +135,13 @@ async function startDeviceLogin() {
           auth.account = me.userPrincipalName || me.displayName || 'signed in';
           saveAuth(auth);
         } catch {}
-        device = null;
+        if (device === mine) device = null;
       } else if (t.json.error && t.json.error !== 'authorization_pending' && t.json.error !== 'slow_down') {
-        clearInterval(device.timer); device.error = t.json.error_description || t.json.error;
+        clearInterval(myTimer); mine.error = t.json.error_description || t.json.error;
       }
     } catch {}
   }, interval);
-  return { user_code: device.user_code, verification_uri: device.verification_uri };
+  return { user_code: mine.user_code, verification_uri: mine.verification_uri };
 }
 
 // ---- Graph calls ------------------------------------------------------------
