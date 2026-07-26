@@ -29,7 +29,11 @@
 
   // ---- personas --------------------------------------------------------------
   async function loadPersonas() {
-    const d = await api('/api/personas');
+    let d;
+    try { d = await api('/api/personas'); }
+    // A transient failure here must not throw out of renderers.jarvis (app.js
+    // would then replace the whole built tab with the bare error box).
+    catch { flash('✗ couldn\'t load personas', true); J.personas = []; renderCards(); return J.personas; }
     J.personas = d.personas || []; J.active = d.active;
     renderCards(); renderNameplate(); renderHolding(); applyAccent();
     const sel = $('#jpSel'); if (sel && window.jarvisSoul) jarvisSoul.fillEditorSelect(J.personas, sel.value);
@@ -56,7 +60,11 @@
     if (window.jarvisPersonaCards) window.jarvisPersonaCards.render(J.personas, J.active, PERSONA_CB);
   }
   async function switchPersona(id) {
-    const r = await api('/api/personas/active', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id === 'none' ? null : id }) });
+    let r;
+    // Activate is fired from persona cards with no .catch — swallow transient
+    // failures here so they surface as a flash, not an unhandled rejection.
+    try { r = await api('/api/personas/active', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id === 'none' ? null : id }) }); }
+    catch { flash('✗ couldn\'t switch persona', true); return; }
     if (r.error) { flash('✗ ' + r.error, true); return; }
     J.active = r.active; renderCards(); renderNameplate(); renderHolding(); applyAccent(); wsMeta();
     const p = J.personas.find(x => x.id === r.active);
