@@ -67,6 +67,16 @@ function isConversational(prompt) {
   const p = prompt.toLowerCase();
   return prompt.length <= 300 && !HEAVY_RE.test(p) && !CODE_RE.test(p);
 }
+// Trivial chit-chat = the whole turn is a greeting/ack/pleasantry with no task
+// ("hi", "thanks", "cool", "how are you"). haiku holds the persona fine on these
+// AND they're where a snappy reply matters most, so we DON'T floor them to sonnet
+// — the persona floor is reserved for conversational turns that do real work (a
+// substantive quick question). Matches only when the ENTIRE trimmed prompt is
+// banter, so anything carrying content still gets the floor.
+const TRIVIAL_RE = /^(hi|hey+|hello|yo|sup|hiya|howdy|gm|gn|good ?(morning|night|evening|afternoon)|thanks?|thank you|ty|thx|cheers|ok|okay|k|cool|nice|great|awesome|perfect|got ?it|sounds good|sure|yep|yeah|yes|nope|no|np|lol|haha+|hey there|how are you( doing)?|how'?s it going|what'?s up|wassup|bye|see ya|later|welcome|morning)[\s!.?]*$/;
+function isTrivialChat(prompt) {
+  return TRIVIAL_RE.test(prompt.trim().toLowerCase());
+}
 
 function createRouter({ active }) {
   // A resumed conversation keeps the model it started with — switching models
@@ -109,7 +119,7 @@ function createRouter({ active }) {
   }
 
   return {
-    routeModel, isConversational, sessionModel, resolveImages,
+    routeModel, isConversational, isTrivialChat, sessionModel, resolveImages,
     isOpusTier, GOD_PROMPT, MODELS, EFFORTS,
   };
 }

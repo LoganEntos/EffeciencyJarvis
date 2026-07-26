@@ -87,7 +87,7 @@ const { launch, pushLine, broadcast, sseLine, writeMeta } = createEngine({
 // under the 500-line rule; createRouter binds the shared `active` Map so
 // sessionModel reads in-flight runs the same as finished ones.
 const {
-  routeModel, isConversational, sessionModel, resolveImages,
+  routeModel, isConversational, isTrivialChat, sessionModel, resolveImages,
   isOpusTier, GOD_PROMPT, MODELS, EFFORTS,
 } = createRouter({ active });
 
@@ -149,12 +149,15 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     if (prior) { model = prior; routedReason = 'kept the conversation’s model'; }
     else {
       const r = routeModel(prompt); model = r.model; routedReason = r.reason;
-      // Persona floor: a conversational turn routed to haiku can't hold the
-      // persona's voice — floor at sonnet when a persona is active. Only for
-      // fresh auto routing (a pinned model or a resumed session is untouched).
+      // Persona floor: a conversational turn routed to haiku that does real work
+      // (a substantive quick question) can't hold the persona's voice — floor at
+      // sonnet when a persona is active. Trivial chit-chat (greetings/acks) is
+      // exempt: haiku holds the voice fine there and it's where a snappy reply
+      // matters most, so it stays on haiku. Only for fresh auto routing (a pinned
+      // model or a resumed session is untouched).
       let personaActive = false;
       try { personaActive = !!personas.getActiveId(); } catch {}
-      if (personaActive && model === 'haiku' && isConversational(prompt)) {
+      if (personaActive && model === 'haiku' && isConversational(prompt) && !isTrivialChat(prompt)) {
         model = 'sonnet'; routedReason = 'persona active — floored to sonnet for a conversational turn';
       }
     }
