@@ -50,9 +50,16 @@ function launchAcp(st, { HERMES_EXE, PROJECT_DIR, pushLine, finalize }) {
       if (st.cancelled || info.stopReason === 'cancelled') st.meta.status = 'cancelled';
       else if (info.stopReason) st.meta.status = 'done';
       else if (info.error) { st.meta.status = 'error'; st.meta.errorExcerpt = String(info.error).slice(0, 300); }
-      else if (info.code) { st.meta.status = 'error'; st.meta.errorExcerpt = `hermes acp exited (code ${info.code}) before completing`; }
-      else st.meta.status = 'done';
-      st.meta.exitCode = info.code ?? (info.error ? 1 : 0);
+      else {
+        // No stopReason means the process closed before the turn resolved — the
+        // abnormal path. code may be a number (incl. 0) or null (signal-killed,
+        // e.g. child.kill()→SIGTERM); either way it's a crash, not a completion.
+        st.meta.status = 'error';
+        st.meta.errorExcerpt = info.code != null
+          ? `hermes acp exited (code ${info.code}) before completing`
+          : 'hermes acp closed before completing';
+      }
+      st.meta.exitCode = info.code ?? (st.meta.status === 'error' ? 1 : 0);
       const tok = (st.meta.tokensIn || st.meta.tokensOut)
         ? ` · ${st.meta.tokensIn || 0}→${st.meta.tokensOut || 0} tok` : '';
       pushLine(st, JSON.stringify({ type: 'hub_status', text: `hermes done · ${st.meta.model || 'config default'}${tok}` }));
