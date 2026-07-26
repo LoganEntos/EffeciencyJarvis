@@ -71,6 +71,21 @@ function starLinks(nodes) {
   return nodes.filter(n => n.id !== 'run').map(n => ({ source: 'run', target: n.id }));
 }
 
+// C42: does the output carry genuine stream-json events (real assistant turns or
+// tool_use blocks), as opposed to text that merely mentions those strings? Parse
+// each line — a legacy -z hermes run is all hermes_out and returns false here.
+function hasStreamJson(raw) {
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    let o; try { o = JSON.parse(line); } catch { continue; }
+    if (o.type === 'assistant') return true;
+    if (o.type === 'user' && o.message) return true;
+    const content = o.message && o.message.content;
+    if (Array.isArray(content) && content.some(b => b && b.type === 'tool_use')) return true;
+  }
+  return false;
+}
+
 function buildGraph(id) {
   if (!okId(id)) return null;
   const meta = runs.getRunMeta(id);
@@ -80,7 +95,10 @@ function buildGraph(id) {
   // H4: hermes over ACP emits real stream-json tool telemetry, so it flows
   // through the claude builder below and shows a LIVE crew. Only legacy -z runs
   // (hermes_out, no tool events) fall back to the static Maestro+crew ring.
-  if (meta.engine === 'hermes' && !/"tool_use"|"type":"assistant"/.test(raw)) {
+  // C42: test parsed line types, not a whole-file substring — an answer whose
+  // TEXT contains "tool_use"/"type":"assistant" (e.g. asking about API message
+  // shapes) must not masquerade as a real stream-json run.
+  if (meta.engine === 'hermes' && !hasStreamJson(raw)) {
     return buildHermesGraph(meta, raw, running);
   }
 
