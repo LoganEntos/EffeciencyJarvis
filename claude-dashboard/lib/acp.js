@@ -171,6 +171,7 @@ function run(opts, cb) {
 
   (async () => {
     try {
+      armWatchdog(); // arm BEFORE the first request: a hang during initialize/session/new/resume must time out too (the orphan reaper skips live runs, so nothing else would ever sweep it)
       await request('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } });
       let sid = null;
       if (opts.resume) {
