@@ -353,6 +353,18 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .mem-backlink:last-child{border-bottom:none}
 .mem-backlink:hover span:first-child{color:var(--accent)}
 
+/* ---- Tasks tab: schedule rows (recurring runs) ---- */
+/* Schedule rows share the queue row's visual weight; these modifiers only
+   encode schedule-specific state. The seeded built-in scout gets an accent
+   inset rule so it reads as a standing fixture, not a user-created row. A
+   paused schedule swaps to a dashed edge instead of dimming the whole row —
+   the ⏸ pill + dashed border signal "inactive" while every word stays legible.
+   .pill.meta is a quiet chip (cadence, built-in tag) built from existing
+   tokens, so it recedes behind the coloured status/next-fire pills. */
+.row.sched.builtin{box-shadow:inset 2px 0 0 var(--accent)}
+.row.sched.paused{border-style:dashed}
+.pill.meta{background:var(--panel2);color:var(--muted);border:1px solid var(--line);font-weight:400}
+
 @media (max-width:760px){
   /* M1 mobile rebuild (2026-07-11): the old collapsed-rail + hamburger
      pattern went fully invisible if the JS toggle ever failed to stick —

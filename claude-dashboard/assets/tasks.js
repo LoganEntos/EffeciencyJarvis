@@ -58,6 +58,14 @@ function ensureTasksUI() {
           <option value="opus">opus</option>
           <option value="claude-fable-5">Fable 5</option>
         </select>
+        <select id="schEffort" style="margin:0" title="reasoning effort / utilization tier applied to each fired run">
+          <option value="">effort: auto</option>
+          <option value="low">effort: low</option>
+          <option value="medium">effort: medium</option>
+          <option value="high">effort: high</option>
+          <option value="xhigh">effort: xhigh</option>
+          <option value="max">effort: max</option>
+        </select>
         <button id="schAdd">＋ Schedule</button>
       </div>
     </div>
@@ -89,7 +97,7 @@ async function addSchedule() {
   if (!prompt) return;
   const kind = $('#schKind').value;
   const body = { title: $('#schTitle').value.trim(), prompt, model: $('#schModel').value, kind,
-    at: $('#schAt').value, dow: $('#schDow').value, minutes: $('#schMin').value };
+    effort: $('#schEffort').value, at: $('#schAt').value, dow: $('#schDow').value, minutes: $('#schMin').value };
   try {
     const r = await api('/api/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.error) { alert(r.error); return; }
@@ -115,23 +123,31 @@ async function refreshSchedules() {
     const stateChip = s.enabled
       ? `<span class="pill ok" title="next scheduled fire">◷ next ${relFuture(s.nextDue)}</span>`
       : '<span class="pill warn">⏸ paused</span>';
-    const meta = [s.cadence, s.runCount ? s.runCount + ' fired' : 'never fired',
+    // cadence + effort are the schedule-defining facts — lead the action row
+    // with them as their own chips so kind/frequency reads at a glance.
+    const cadenceChip = `<span class="pill meta" title="fire cadence">⟳ ${esc(s.cadence)}</span>`;
+    const effortChip = s.effort ? `<span class="pill neutral" title="reasoning effort / utilization tier">▲ ${esc(s.effort)}</span>` : '';
+    const builtinBadge = s.builtin ? '<span class="pill meta" title="seeded built-in schedule — replenishes the backlog; arm it with resume">⚙ built-in</span>' : '';
+    const meta = [s.model && s.model !== 'auto' ? esc(s.model) : 'auto model',
+      s.runCount ? s.runCount + ' fired' : 'never fired',
+      s.lastRunAt ? 'last ' + rel(s.lastRunAt) : '',
       s.lastRunTokensOut != null ? fmtTok((s.lastRunTokensIn || 0) + s.lastRunTokensOut) + ' tok' : ''].filter(Boolean).join(' · ');
-    return `<div class="row" style="${s.enabled ? '' : 'opacity:.55'}">
+    return `<div class="row sched${s.enabled ? '' : ' paused'}${s.builtin ? ' builtin' : ''}">
       <div class="flex" style="justify-content:space-between">
-        <span class="name">◷ ${esc(s.title)}</span>
+        <span class="name">◷ ${esc(s.title)} ${builtinBadge}</span>
         <span>${statusChip}${stateChip}</span>
       </div>
       <div class="pex">${esc(s.prompt.slice(0, 160))}</div>
       <div class="flex" style="margin-top:8px">
-        <span class="muted" style="font-size:11px">${esc(meta)}</span>
+        ${cadenceChip}${effortChip}
+        <span class="muted" style="font-size:11px">${meta}</span>
         <span class="spacer" style="flex:1"></span>
         <button class="ghost sNow" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">▶ run now</button>
         <button class="ghost sTog" data-id="${esc(s.id)}" style="padding:5px 11px;font-size:11px">${s.enabled ? '⏸ pause' : '▶ resume'}</button>
         <button class="danger sDel" data-id="${esc(s.id)}" aria-label="Delete schedule" style="padding:5px 11px;font-size:11px">✕</button>
       </div>
     </div>`;
-  }).join('') : '<div class="muted">No schedules yet — create one above (e.g. a Monday-morning report of last week\'s runs).</div>';
+  }).join('') : '<div class="row" style="text-align:center;color:var(--muted)">No scheduled runs yet. Add one above — a recurring prompt the hub fires on its own, e.g. a Monday-morning report of last week\'s runs, or an hourly error-log sweep.</div>';
   const post = (url, id) => api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
   el.querySelectorAll('.sNow').forEach(b => b.onclick = async () => {
     try { const r = await post('/api/schedules/run-now', b.dataset.id); if (r.error) alert(r.error); } catch {}
