@@ -1,0 +1,445 @@
+/* Claude Code Hub — component-level styles, split out of assets/style.css
+   (which had grown past the repo's 500-line cap). style.css keeps tokens,
+   theme variants, resets and the layout shell; this sheet holds components —
+   cards, rows, inputs, buttons, the segmented control, pills, the Run-tab
+   chat, the Assets/Files/Memory tabs, the spreadsheet grid, and the
+   responsive media queries. Loaded AFTER style.css in index.html, so any
+   same-specificity rule here keeps the cascade position it had originally. */
+
+/* ---- cards / rows ---- */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:26px}
+.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);
+  padding:18px 20px;transition:transform .15s,border-color .15s,box-shadow .15s}
+.card:hover{transform:translateY(-2px);border-color:var(--line2);box-shadow:var(--shadow)}
+.card.clickable{cursor:pointer}
+.card.clickable:hover{border-color:var(--accent-dim)}
+.card .n{font-size:34px;font-weight:800;color:var(--accent);line-height:1.1;text-shadow:0 0 24px #e8a33d33}
+.card .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.8px;margin-top:7px;
+  font-family:var(--font-mono);font-weight:400}
+.row{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px;margin-bottom:8px;
+  transition:border-color .12s,background .12s}
+.row .name{font-weight:600;color:var(--txt);font-size:13px}
+.row .desc{color:var(--muted);font-size:12.5px;margin-top:3px;line-height:1.55}
+.row.clickable{cursor:pointer}
+.row.clickable:hover{border-color:var(--accent-dim);background:var(--panel2)}
+
+/* ---- inputs / buttons ---- */
+input.search,select,textarea{width:100%;padding:10px 14px;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r);color:var(--txt);margin-bottom:16px;font-size:13px;outline:none;font-family:inherit;
+  transition:border-color .15s,box-shadow .15s}
+input.search:focus,select:focus,textarea:focus{border-color:var(--accent-dim);box-shadow:0 0 0 3px var(--accent-soft)}
+input.search::placeholder,textarea::placeholder{color:var(--dim)}
+/* R2: navigable-library toolbar + collapsible groups (Agents/Skills/Commands) */
+.lib-toolbar{display:flex;gap:8px;align-items:stretch;margin-bottom:14px;flex-wrap:wrap}
+.lib-toolbar .search{flex:1 1 220px;margin-bottom:0}
+.lib-toolbar .ghost{white-space:nowrap;font-size:12px;padding:8px 12px}
+.lib-group{margin-bottom:6px}
+.lib-ghead{width:100%;text-align:left;display:flex;align-items:center;gap:8px;background:transparent;border:none;
+  border-bottom:1px solid var(--line);color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:1.4px;
+  padding:12px 2px 6px;cursor:pointer;font-family:inherit;transition:color .12s}
+.lib-ghead:hover{color:var(--accent)}
+.lib-ghead .fold{font-size:9px;color:var(--accent)}
+.lib-ghead .muted{margin-left:auto;letter-spacing:0}
+.lib-gbody{padding-top:6px}
+/* U13: strip the OS chevron (appearance:none) and draw our own amber one so the
+   closed control reads as part of the theme, not a bare native widget. The popup
+   list itself is still the OS one — native keeps full a11y/keyboard for free —
+   but the resting affordance now matches the U3 segmented control's language. */
+select{width:auto;margin-bottom:0;appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:32px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23e8a33d' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:12px}
+select:hover{border-color:var(--line2)}
+select:disabled{cursor:default}
+/* runbar pickers wear the mono face like their sibling controls (usage gauge,
+   session pill) so the whole Run header reads as one typographic system */
+.runbar select{font-family:var(--font-mono);font-size:12px;letter-spacing:-.2px}
+pre{background:#0b0a08;border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;overflow:auto;
+  font-size:12.5px;line-height:1.55;color:#d8d2c4;white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono)}
+:root[data-theme="light"] pre{background:#efe9dc;color:#3a3428}
+button{background:var(--accent);color:#171204;border:none;border-radius:8px;padding:10px 18px;font-size:13px;
+  font-weight:600;cursor:pointer;transition:filter .12s,transform .1s,box-shadow .12s;font-family:inherit}
+button:hover{filter:brightness(1.1);box-shadow:var(--glow)}
+button:active{transform:scale(.98)}
+button:disabled{opacity:.45;cursor:default;filter:none;box-shadow:none}
+button.ghost{background:#ffffff0a;border:1px solid var(--line);color:var(--muted);box-shadow:none}
+button.ghost:hover{color:var(--txt);border-color:var(--line2);box-shadow:none}
+button.danger{background:#e0525222;border:1px solid #e0525255;color:#f0908f;box-shadow:none}
+button.danger:hover{background:#e0525233;box-shadow:none}
+:root[data-theme="light"] button.ghost{background:#00000006}
+:root[data-theme="light"] button.danger{color:#a83232}
+
+/* ---- segmented control (a prominent radio group; e.g. the TTS engine picker) ---- */
+.seg{display:inline-flex;gap:4px;padding:4px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:11px;flex-wrap:wrap;max-width:100%}
+.seg-opt{position:relative;display:flex;flex-direction:column;gap:2px;padding:8px 16px;border-radius:8px;
+  cursor:pointer;color:var(--muted);min-width:104px;transition:background .14s,color .14s,box-shadow .14s}
+.seg-opt input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.seg-t{font-size:13px;font-weight:700;letter-spacing:.01em}
+.seg-s{font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);font-family:var(--font-mono)}
+.seg-opt:hover{color:var(--txt);background:var(--accent-soft)}
+.seg-opt:has(input:checked){background:var(--accent);color:#171204;box-shadow:0 1px 8px #e8a33d40}
+.seg-opt:has(input:checked) .seg-s{color:#17120499}
+.seg-opt:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+:root[data-theme="light"] .seg-opt:has(input:checked){color:#fff}
+:root[data-theme="light"] .seg-opt:has(input:checked) .seg-s{color:#ffffffcc}
+
+/* ---- pills / misc ---- */
+.pill{display:inline-block;font-size:11px;padding:3px 10px;border-radius:20px;margin:2px 5px 2px 0;font-weight:500;
+  font-family:var(--font-mono)}
+.pill.ok{background:#4bc47a18;color:var(--green);border:1px solid #4bc47a45}
+.pill.warn{background:#e0a63f18;color:#e8bc6a;border:1px solid #e0a63f45}
+.navOverlay{display:none}
+.pill.err{background:#e0525218;color:#f0908f;border:1px solid #e0525245}
+.pill.neutral{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-dim)}
+.pill.accent{background:var(--accent);color:var(--bg);border:1px solid var(--accent);font-weight:600}
+/* live: a run confirmed alive by the server heartbeat — gently pulses so it
+   reads as "breathing", distinct from a static status badge */
+.pill.live{background:#4bc47a14;color:var(--green);border:1px solid #4bc47a40;animation:livepulse 1.8s ease-in-out infinite}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.pill.live{animation:none}}
+/* Live tab: a tall, scroll-following transcript feed (mobile-first) */
+.livefeed{height:calc(100dvh - 250px);min-height:340px;margin-top:4px}
+.livecursor{color:var(--accent);font-weight:700;animation:blink 1.1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.livecursor{animation:none}}
+/* header ● Live badge: green + pulsing dot when a Claude Code session is active */
+#liveBadge{cursor:pointer}
+#liveBadge .dot{background:var(--dim)}
+#liveBadge.liveon{color:var(--green);border-color:#4bc47a40}
+#liveBadge.liveon .dot{background:var(--green);animation:livepulse 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){#liveBadge.liveon .dot{animation:none}}
+:root[data-theme="light"] .pill.warn{color:#8a6414}
+:root[data-theme="light"] .pill.err{color:#a83232}
+.muted{color:var(--muted)} .mono{font-family:var(--font-mono)}
+.flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.note{background:var(--accent-soft);border:1px solid var(--accent-dim);border-radius:var(--r);padding:12px 16px;
+  margin-bottom:18px;font-size:12.5px;color:var(--muted);line-height:1.55}
+.hidden{display:none}
+a.link{color:var(--accent)}
+.skel{border-radius:var(--r);background:linear-gradient(90deg,var(--panel) 25%,var(--panel2) 50%,var(--panel) 75%);
+  background-size:200% 100%;animation:shimmer 1.2s infinite;border:1px solid var(--line)}
+@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+#overlay{position:fixed;inset:0;background:#080706dd;display:flex;align-items:center;justify-content:center;
+  z-index:50;animation:fadein .15s ease-out;backdrop-filter:blur(3px)}
+#overlay .panel{background:var(--panel);border:1px solid var(--line2);border-radius:14px;width:min(860px,92vw);
+  max-height:86vh;display:flex;flex-direction:column;box-shadow:0 24px 80px #000c;overflow:hidden}
+#overlay .panel header{border:none;background:var(--panel2);padding:14px 20px;height:auto;position:static;
+  display:flex;justify-content:space-between;align-items:center;backdrop-filter:none;animation:none}
+#overlay .panel header h3{margin:0;font-size:13.5px}
+#overlay .panel pre{margin:0;border:none;border-radius:0;overflow:auto}
+#overlay .close{background:#ffffff0d;border:1px solid var(--line);padding:6px 14px;color:var(--muted)}
+#overlay .close:hover{color:var(--txt)}
+label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12px;cursor:pointer;user-select:none}
+label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accent)}
+.gtip{position:fixed;z-index:60;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;
+  padding:8px 12px;font-size:12px;line-height:1.5;color:var(--txt);pointer-events:none;
+  box-shadow:0 8px 28px #000a;max-width:340px}
+
+/* ---- Run tab: chat ---- */
+.runbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.runbar select{margin:0}
+.chatlog{display:flex;flex-direction:column;gap:10px;background:#0b0a08;border:1px solid var(--line);
+  border-radius:var(--r);padding:18px;min-height:220px;max-height:56vh;overflow:auto;margin-bottom:12px}
+:root[data-theme="light"] .chatlog{background:#efe9dc}
+.msg{max-width:82%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;
+  white-space:pre-wrap;word-break:break-word}
+.msg.user{align-self:flex-end;background:var(--accent-soft);border:1px solid var(--accent-dim);
+  border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);
+  border-bottom-left-radius:4px}
+.msg.sys{align-self:center;background:transparent;border:none;color:var(--dim);font-size:11.5px;
+  padding:2px 8px;max-width:100%;font-family:var(--font-mono)}
+.msg.result{align-self:center;background:#4bc47a0d;border:1px solid #4bc47a33;color:var(--muted);
+  font-size:11.5px;max-width:100%;font-family:var(--font-mono)}
+.msg.errmsg{align-self:center;background:#e052520d;border:1px solid #e0525240;color:#f0908f;
+  font-size:12px;max-width:100%}
+:root[data-theme="light"] .msg.errmsg{color:#a83232}
+.errblk{align-self:stretch;max-width:100%;background:#e052520d;border:1px solid #e0525240;
+  border-radius:10px;padding:10px 14px;font-size:12.5px}
+.errblk .errhead{color:#f0908f;font-weight:600;margin-bottom:2px}
+.errblk details{margin-top:4px}
+.errblk summary{cursor:pointer;color:var(--dim);font-size:11px;font-family:var(--font-mono);user-select:none}
+.errblk pre{margin:8px 0 0;border-color:#e0525240;color:#e8b8b6;font-size:11.5px}
+:root[data-theme="light"] .errblk .errhead{color:#a83232}
+.toolblk{align-self:flex-start;max-width:82%;width:fit-content}
+.toolblk details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:0;overflow:hidden}
+.toolblk summary{cursor:pointer;padding:7px 12px;font-size:11.5px;color:var(--amber);
+  font-family:var(--font-mono);user-select:none;list-style:none}
+.toolblk summary::before{content:'▸ ';color:var(--dim)}
+.toolblk details[open] summary::before{content:'▾ '}
+.toolblk pre{margin:0;border:none;border-radius:0;border-top:1px solid var(--line);
+  max-height:260px;font-size:11.5px;padding:10px 14px}
+/* live activity tailed from hermes's own log (its -z mode streams no tool
+   events) — quiet, mono, indented so it reads as ambient telemetry not chat */
+.logline{align-self:flex-start;max-width:88%;font-family:var(--font-mono);font-size:11px;
+  color:var(--dim);line-height:1.5;padding:1px 0 1px 4px;word-break:break-word}
+.logline .logdot{color:var(--green);opacity:.7;margin-right:5px}
+.logline.thought{font-style:italic;opacity:.82}
+.planblk{font-family:var(--font-mono);font-size:11.5px;text-align:left;line-height:1.75;
+  background:var(--accent-soft);border:1px solid var(--accent-dim);border-radius:10px;padding:9px 13px;max-width:82%}
+/* markdown inside assistant bubbles */
+.msg.assistant pre{background:#0b0a08;border:1px solid var(--line);border-radius:8px;
+  padding:10px 12px;margin:8px 0;font-size:12px;overflow-x:auto;white-space:pre}
+.msg.assistant code{background:#ffffff10;border:1px solid var(--line);border-radius:4px;
+  padding:1px 5px;font-family:var(--font-mono);font-size:12px}
+.msg.assistant .mdh{display:block;margin:6px 0 2px;font-size:13.5px;color:var(--txt)}
+.composer{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;border-radius:12px;transition:box-shadow .15s}
+.composer.drag{box-shadow:0 0 0 2px var(--accent) inset;outline:none}
+.composer textarea{flex:1;margin:0;min-height:64px;max-height:220px;resize:vertical;
+  font-size:13.5px;line-height:1.5}
+.composer .btns{display:flex;flex-direction:column;gap:8px}
+.attachstrip{width:100%;display:flex;flex-wrap:wrap;gap:8px}
+.attachchip{position:relative;display:inline-flex;width:56px;height:56px;border-radius:8px;
+  overflow:hidden;border:1px solid var(--accent-dim);background:#0b0a08}
+.attachchip img{width:100%;height:100%;object-fit:cover;display:block}
+.attachchip.pending{opacity:.5;animation:attachpulse 1s ease-in-out infinite}
+@keyframes attachpulse{50%{opacity:.85}}
+.attachchip .x{position:absolute;top:2px;right:2px;width:16px;height:16px;padding:0;line-height:14px;
+  border:none;border-radius:50%;background:#000a;color:#fff;font-size:10px;cursor:pointer}
+/* Named (non-image) attachment: an auto-width pill instead of a 56px thumbnail. */
+.attachchip.file{width:auto;height:auto;max-width:220px;padding:6px 24px 6px 8px;gap:6px;
+  align-items:center;background:var(--accent-soft,#1a1712)}
+.attachchip.file .ficon{font-size:14px;line-height:1}
+.attachchip.file .fname{font:500 12px/1.3 var(--mono,monospace);color:var(--txt);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg.attachimgs{display:flex;flex-wrap:wrap;gap:6px;padding:6px;background:transparent;border:none}
+.msg.attachimgs img{max-width:180px;max-height:180px;border-radius:8px;border:1px solid var(--accent-dim)}
+.artifact{align-self:stretch;max-width:100%;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px}
+.artifact .ahead{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;
+  color:var(--muted);margin-bottom:8px;font-family:var(--font-mono)}
+.artifact iframe{width:100%;height:440px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.artifact img{max-width:100%;border-radius:8px;border:1px solid var(--line);background:#fff}
+.runrow .pex{color:var(--muted);font-size:12.5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.badgebar{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--dim);align-items:center}
+
+/* ---- Assets tab ---- */
+.iconGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.iconCell{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);color:var(--muted);
+  transition:border-color .12s,color .12s}
+.iconCell svg{stroke:currentColor;fill:none}
+.iconCell span{font-size:9.5px;font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:100%}
+.iconCell:hover{border-color:var(--accent-dim);color:var(--accent)}
+.copied{border-color:var(--green)!important;box-shadow:0 0 0 3px #4bc47a33!important}
+
+/* ---- Files tab ---- */
+.dropzone{border:2px dashed var(--line2);border-radius:var(--r);padding:34px;text-align:center;
+  color:var(--muted);margin-bottom:18px;transition:border-color .15s,background .15s;cursor:pointer}
+.dropzone.drag{border-color:var(--accent);background:var(--accent-soft);color:var(--txt)}
+/* R4: day-grouped uploads + image thumbnails, so >10 files stay orientable */
+.file-daygroup{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.6px;
+  margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.file-daygroup:first-child{margin-top:0}
+.file-thumb{width:44px;height:44px;object-fit:cover;border-radius:5px;border:1px solid var(--line);
+  margin-right:9px;flex-shrink:0;background:var(--panel2);cursor:zoom-in;transition:border-color .12s,transform .12s}
+.file-thumb:hover{border-color:var(--accent);transform:scale(1.04)}
+/* File cards — click the header to expand an inline preview of the document */
+.fcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  margin-bottom:8px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.fcard.open{border-color:var(--accent-dim);box-shadow:0 6px 22px -14px var(--accent)}
+.fcard-head{display:flex;align-items:center;gap:11px;padding:12px 15px}
+.fcard-head.can{cursor:pointer}
+.fcard-head.can:hover{background:var(--panel2)}
+.fcard-head.can:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:var(--r)}
+.fcard-ico{width:19px;height:19px;flex:none;color:var(--accent);opacity:.9}
+.fcard-name{font-weight:600;color:var(--txt);font-size:13px;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fcard-meta{margin-left:auto;flex:none;color:var(--muted);font-size:11.5px;white-space:nowrap}
+.fcard-chev{width:16px;height:16px;flex:none;color:var(--muted);transition:transform .2s,color .2s}
+.fcard.open .fcard-chev{transform:rotate(180deg);color:var(--accent)}
+.fcard-acts{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 15px 12px}
+.fcard-body{display:none;padding:0 16px;max-height:60vh;overflow:auto}
+.fcard.open .fcard-body{display:block;padding:14px 16px 18px;border-top:1px solid var(--line)}
+.fcard-body::-webkit-scrollbar{width:9px}
+.fcard-body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
+.fcard-img{max-width:100%;border-radius:6px;border:1px solid var(--line);display:block}
+/* R4: click a thumb to see the full image a run was given */
+#imgLightbox{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
+  padding:5vmin;background:#080706e6;backdrop-filter:blur(4px);animation:fadein .15s ease-out}
+#imgLightbox.show{display:flex}
+#imgLightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;
+  border:1px solid var(--line2);box-shadow:0 16px 56px rgba(0,0,0,.6);background:var(--panel2)}
+#imgLightbox .lb-close{position:absolute;top:18px;right:22px;background:var(--panel2);color:var(--txt);
+  border:1px solid var(--line2);border-radius:8px;padding:7px 13px;font-size:12px;cursor:pointer}
+#imgLightbox .lb-close:hover{border-color:var(--accent);color:var(--accent)}
+
+/* In-app document viewer: read markdown / csv / text without downloading. */
+#docViewer{position:fixed;inset:0;z-index:72;display:none;align-items:flex-start;justify-content:center;
+  padding:4vmin 4vmin 0;background:#080706ee;backdrop-filter:blur(5px);animation:fadein .15s ease-out}
+#docViewer.show{display:flex}
+#docViewer .dv-panel{display:flex;flex-direction:column;width:min(880px,100%);max-height:92vh;
+  background:linear-gradient(180deg,var(--panel) 0%,var(--bg) 100%);border:1px solid var(--line2);
+  border-radius:calc(var(--r) + 2px);box-shadow:0 18px 60px rgba(0,0,0,.62);overflow:hidden;
+  animation:dvRise .22s cubic-bezier(.2,.7,.3,1)}
+@keyframes dvRise{from{transform:translateY(14px);opacity:.4}to{transform:none;opacity:1}}
+#docViewer .dv-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:13px 18px;border-bottom:1px solid var(--line);background:var(--panel2)}
+#docViewer .dv-title{font-size:12.5px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#docViewer .dv-body{overflow:auto;padding:26px 30px 40px;line-height:1.62}
+#docViewer .dv-body::-webkit-scrollbar{width:10px}
+#docViewer .dv-body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
+.dv-md{font-family:var(--font-body);font-size:14.5px;color:var(--txt);max-width:70ch}
+.dv-md .dv-h{font-family:var(--font-serif,var(--font-mono));line-height:1.2;margin:1.4em 0 .5em;color:var(--txt)}
+.dv-md h1.dv-h{font-size:30px;font-weight:400;letter-spacing:-.01em;border-bottom:1px solid var(--line);padding-bottom:.28em}
+.dv-md h2.dv-h{font-size:22px;font-weight:400}
+.dv-md h3.dv-h{font-size:17px;font-weight:600;font-family:var(--font-body)}
+.dv-md h4.dv-h,.dv-md h5.dv-h,.dv-md h6.dv-h{font-size:14px;font-weight:600;font-family:var(--font-body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.dv-md .dv-p{margin:.55em 0}
+.dv-md .dv-list{margin:.5em 0;padding-left:1.5em}
+.dv-md .dv-list li{margin:.22em 0}
+.dv-md code{font-family:var(--font-mono);font-size:.86em;background:var(--accent-soft);color:var(--accent);
+  padding:1px 5px;border-radius:4px}
+.dv-md .dv-code,.dv-pre{font-family:var(--font-mono);font-size:12px;line-height:1.5;color:#d8d2c4;
+  background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;
+  overflow:auto;white-space:pre;margin:.9em 0}
+.dv-pre{margin:0;white-space:pre-wrap;word-break:break-word}
+.dv-md .dv-bq{margin:.8em 0;padding:.3em 0 .3em 14px;border-left:3px solid var(--accent-dim);
+  color:var(--muted);font-style:italic}
+.dv-md .dv-hr{border:0;border-top:1px solid var(--line);margin:1.5em 0}
+.dv-md strong{font-weight:700;color:var(--txt)}
+.dv-md a{word-break:break-word}
+.dv-tablewrap{overflow-x:auto;margin:1em 0;border:1px solid var(--line);border-radius:var(--r)}
+.dv-table{border-collapse:collapse;width:100%;font-size:12.5px;font-family:var(--font-mono)}
+.dv-table th{background:var(--panel2);color:var(--accent);text-align:left;font-weight:600;
+  padding:8px 12px;border-bottom:1px solid var(--line2);white-space:nowrap;position:sticky;top:0}
+.dv-table td{padding:7px 12px;border-bottom:1px solid var(--line);color:var(--txt);vertical-align:top}
+.dv-table tr:last-child td{border-bottom:0}
+.dv-table tbody tr:hover td,.dv-table tbody tr:hover td{background:var(--accent-soft)}
+
+/* ---- Files tab: spreadsheet cell-grid preview (sheetgrid.js) ---- */
+.sg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.sg-tab{font-family:var(--font-mono);font-size:11px;padding:5px 11px;border-radius:20px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+  transition:border-color .12s,color .12s,background .12s;max-width:220px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sg-tab:hover{border-color:var(--accent-dim);color:var(--accent)}
+.sg-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600}
+.sg-notice{margin:0 0 10px}
+.sheet-gridwrap{overflow:auto;max-height:48vh;border:1px solid var(--line);border-radius:var(--r)}
+.sheet-grid{border-collapse:collapse;font-size:12px;font-family:var(--font-mono);white-space:nowrap}
+.sheet-grid th,.sheet-grid td{border:1px solid var(--line);padding:4px 9px;text-align:left;
+  vertical-align:top;max-width:340px;overflow:hidden;text-overflow:ellipsis}
+.sheet-grid thead th{position:sticky;top:0;z-index:2;background:var(--panel2);color:var(--accent);
+  font-weight:600;text-align:center}
+.sheet-grid td{color:var(--txt)}
+.sheet-grid .sg-rn{position:sticky;left:0;z-index:1;background:var(--panel2);color:var(--muted);
+  text-align:right;font-weight:400;min-width:34px}
+.sheet-grid thead .sg-rn{z-index:3}
+.sheet-grid tbody tr:hover td:not([style]){background:var(--accent-soft)}
+.sheet-gridwrap::-webkit-scrollbar{width:9px;height:9px}
+.sheet-gridwrap::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
+
+/* ---- Memory tab: Obsidian-style vault (list + tag cloud | note + backlinks) ---- */
+.mem-tagcloud{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.tag-pill{font-family:var(--font-mono);font-size:10.5px;padding:3px 9px;border-radius:20px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line);color:var(--muted);transition:border-color .12s,color .12s}
+.tag-pill:hover{border-color:var(--accent-dim);color:var(--accent)}
+.tag-pill b{font-weight:600;color:var(--accent);margin-left:3px}
+.mem-wrap{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:16px;align-items:start}
+.mem-list{max-height:64vh;overflow:auto;padding-right:2px}
+.mem-item{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;
+  margin-bottom:6px;cursor:pointer;transition:border-color .12s,background .12s}
+.mem-item:hover{border-color:var(--line2);background:var(--panel2)}
+.mem-item.active{border-color:var(--accent-dim);background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.mem-snippet{font-size:11.5px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-detail{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;
+  min-height:120px;position:sticky;top:16px}
+.mem-backlinks{border-top:1px solid var(--line);padding-top:2px}
+.mem-backlink{display:flex;justify-content:space-between;gap:10px;padding:7px 0;cursor:pointer;
+  font-size:12px;color:var(--txt);border-bottom:1px solid var(--line)}
+.mem-backlink:last-child{border-bottom:none}
+.mem-backlink:hover span:first-child{color:var(--accent)}
+
+@media (max-width:760px){
+  /* M1 mobile rebuild (2026-07-11): the old collapsed-rail + hamburger
+     pattern went fully invisible if the JS toggle ever failed to stick —
+     that's the "can't see pages on the left" bug report. Replaced with a
+     bottom tab bar: it's the SAME <nav><a> markup restyled into a fixed
+     horizontal strip, so every tab is always visible and tappable with zero
+     dependency on toggle state or JS class juggling. #navToggle/.navOverlay
+     are hidden outright — desktop rules for them are untouched above. */
+  #navToggle,.navOverlay{display:none!important}
+  .wrap{min-height:calc(100dvh - 48px)}
+  /* Two-row grid, not a single scrolling strip: the tabs at 52px overflowed
+     375px into a hidden horizontal scroll, so the last tabs (Sources/Tools/
+     Config) fell off the right edge and were easy to miss. Wrapping to a fixed
+     8-per-row grid keeps EVERY tab on screen and tappable with zero JS — the
+     16 tabs fill two even rows of 8. */
+  nav{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;height:auto;flex-shrink:0;
+    display:flex;flex-direction:row;flex-wrap:wrap;align-items:stretch;justify-content:center;
+    gap:3px 2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));
+    border-right:none;border-top:1px solid var(--line);background:#151310f2;backdrop-filter:blur(8px);z-index:35}
+  :root[data-theme="light"] nav{background:#fbf8f1f2}
+  nav .navlabel{display:none}
+  nav a{flex:0 0 calc(12.5% - 4px);flex-direction:column;justify-content:center;align-items:center;gap:1px;
+    padding:5px 3px;margin:0;border-radius:8px;min-width:0}
+  nav a .ico{width:19px;height:19px;flex:0 0 auto;opacity:1}
+  nav a span.txt{display:block;font-size:10px;letter-spacing:0;white-space:nowrap;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  nav a kbd{display:none}
+  nav a.active{box-shadow:inset 0 2px 0 var(--accent)}
+  main{padding:16px 14px calc(112px + env(safe-area-inset-bottom,0px))}
+  /* header: single tight row, status+spend (the "usage" readout) always
+     visible and legible — this was the other half of the complaint.
+     safe-area-inset-top padding (added above, kept here as height base)
+     stops the phone's own status-bar clock/battery from drawing over the
+     hub title — that was the "8:02 overlapping CLAUDE CODE HUB" bug. */
+  header{padding:0 10px;height:48px;gap:8px;
+    padding-top:env(safe-area-inset-top,0px);height:calc(48px + env(safe-area-inset-top,0px))}
+  header h1{font-size:11px;letter-spacing:.3px}
+  header h1 .logo{width:16px;height:16px;margin-right:5px;vertical-align:-3px}
+  header .badge{display:none}
+  header #statusBadge{display:inline-flex;align-items:center;font-size:0;padding:6px;border-radius:50%;
+    max-width:none}
+  header #statusBadge .dot{margin-right:0}
+  header #spendBadge{display:inline-block;max-width:120px;padding:4px 10px;font-size:10.5px;font-weight:600;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* keep the ● Live badge visible on mobile (compact dot-only) — it's the
+     always-on "is Claude Code running right now" glance + tap-to-Live entry */
+  header #liveBadge{display:inline-flex;align-items:center;font-size:0;padding:6px;border-radius:50%;max-width:none}
+  header #liveBadge .dot{margin-right:0}
+  /* the live feed fills the screen above the bottom nav bar on phones */
+  .livefeed{height:calc(100dvh - 248px)}
+  header .iconbtn{width:36px;height:36px;font-size:16px}
+  .msg,.toolblk{max-width:96%}
+  .cards{grid-template-columns:repeat(2,1fr);gap:10px}
+  .card .n{font-size:28px}
+  /* Run-history stat row: on desktop this piles on per-model cost chips +
+     a routing-accuracy chip alongside the outcome counts — on a 375px
+     screen that reads as noise ("49 done" swimming next to six other
+     pills). Keep only the outcome chips (all/done/failed/cancelled);
+     hide the per-model + routing chips, they're desktop-density info. */
+  #histStats .pill:nth-child(n+5){display:none}
+  /* runbar: engine/model/perms selects + memory-recall checkbox used to wrap
+     into a cramped multi-line mess with a barely-visible checkbox icon.
+     Give each control full-width rows so every label + control is legible
+     and tappable without squinting (mobile "config area is cramped" report). */
+  .runbar{flex-direction:column;align-items:stretch;gap:8px}
+  .runbar select{width:100%}
+  .runbar label.chk{padding:8px 2px;font-size:13px}
+  .runbar #newChatBtn{width:100%}
+  /* delete/danger text buttons on Files/Memory/Sessions rows read as plain
+     dim text on dark backgrounds — give them a real button shape so they're
+     obviously tappable (matches button.danger elsewhere in the app). */
+  .row .danger{background:#e0525222;border:1px solid #e0525255;border-radius:6px;padding:7px 12px!important}
+  /* session/memory metadata (timestamps, sizes, scores) was low-contrast
+     var(--dim) text at 11px on a near-black background — bump legibility. */
+  .row .muted{color:var(--muted)}
+  /* Memory vault: the two-pane list+detail layout needs real width for the
+     side-by-side read; stack list above detail on phones instead. */
+  .mem-wrap{grid-template-columns:1fr}
+  .mem-list{max-height:40vh}
+  .mem-detail{position:static}
+}
+
+/* N2 mobile polish: on touch devices, small inline action buttons (run-history
+   ✕, row buttons) get a real finger-sized hit area; audited 375px 2026-07-11 —
+   no tab overflows horizontally, this was the one remaining offender. */
+@media (pointer:coarse){
+  .delRunBtn{padding:9px 14px!important;font-size:12px!important}
+  .runrow .pex{font-size:13px}
+  button,select{min-height:36px}
+}

@@ -33,6 +33,7 @@ function CheckPost($name, $url, $body, [int]$expect) {
 Write-Host "Smoke-testing hub at $base"
 Check "GET /"                  "$base/"
 Check "GET /assets/style.css"  "$base/assets/style.css"
+Check "GET /assets/components.css" "$base/assets/components.css"
 Check "GET /assets/app.js"     "$base/assets/app.js"
 Check "GET /assets/run.js"     "$base/assets/run.js"
 Check "GET /assets/files.js"   "$base/assets/files.js"
