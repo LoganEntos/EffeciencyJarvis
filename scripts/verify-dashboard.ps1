@@ -115,6 +115,7 @@ CheckPost "POST /api/clientlog w/o token (403)"  "$base/api/clientlog"  '{"msg":
 CheckPost "POST /api/projects/import w/o token (403)" "$base/api/projects/import" '{}' 403
 CheckPost "POST /api/projects/delete w/o token (403)" "$base/api/projects/delete" '{"id":"x"}' 403
 CheckPost "POST /api/tasks w/o token (403)"       "$base/api/tasks"       '{"prompt":"x"}' 403
+CheckPost "POST /api/tasks/done w/o token (403)"  "$base/api/tasks/done"  '{"id":"x"}' 403
 CheckPost "POST /api/memory w/o token (403)"      "$base/api/memory"      '{"text":"x"}' 403
 CheckPost "POST /api/schedules w/o token (403)"   "$base/api/schedules"   '{"prompt":"x","kind":"daily","at":"08:00"}' 403
 CheckPost "POST /api/voice/tts w/o token (403)"   "$base/api/voice/tts"   '{"text":"x"}' 403

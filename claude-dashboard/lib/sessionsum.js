@@ -29,9 +29,7 @@ const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
 const DATA_DIR = path.join(DASH_DIR, 'data');
 const CACHE_FILE = path.join(DATA_DIR, 'session-summaries.json');
-const CLAUDE_EXE = process.env.HUB_CLAUDE_EXE || path.join(
-  process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
-  'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+const CLAUDE_EXE = U.findClaude(); // shared resolver: env → npm global → desktop-app bundle
 
 const SYS =
   'You are debriefing a past Claude Code coding session for a developer scanning their history. '

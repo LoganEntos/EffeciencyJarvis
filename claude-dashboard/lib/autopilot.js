@@ -96,8 +96,10 @@ function pickNext(state) {
     if (t.source === 'autopilot' || t.done) continue; // done = completed out-of-band
     if (t.runId) {
       const m = runs.getRunMeta(t.runId);
-      const st = m ? m.status : 'gone';
-      if (!['error', 'gone'].includes(st)) continue; // queued/running/done/cancelled
+      // Only a real 'error' is retryable. A missing meta ('gone') means the user
+      // deleted the run from history — settled, unknown outcome — NOT a failure;
+      // retrying it would re-execute finished work unattended.
+      if (!m || m.status !== 'error') continue;
     }
     const d = state.dispatched[t.id];
     if (d && d.status === 'stuck') continue;
@@ -231,7 +233,7 @@ function status() {
       if (t.source === 'autopilot' || t.done) return false;
       if (!t.runId) return true;
       const m = runs.getRunMeta(t.runId);
-      return ['error', 'gone'].includes(m ? m.status : 'gone');
+      return !!m && m.status === 'error'; // gone = settled (user deleted history), not open
     }).length;
   } catch {}
   // A6 — "idle" means enabled but nothing to pick (backlog dry AND queue empty).

@@ -24,26 +24,9 @@ const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
 const RUNS_DIR = path.join(DASH_DIR, 'data', 'runs');
 // claude.cmd just execs this native binary — spawn it directly (no shell).
-// Resolution: HUB_CLAUDE_EXE env → global npm install → newest CLI bundled by
-// the Claude desktop app (%APPDATA%\Claude\claude-code\<ver>\claude.exe), so a
-// synced node without the npm global (e.g. desktop-app-only machines) still runs.
-function findClaude() {
-  if (process.env.HUB_CLAUDE_EXE) return process.env.HUB_CLAUDE_EXE;
-  const roaming = process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming');
-  const npmExe = path.join(roaming, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
-  if (fs.existsSync(npmExe)) return npmExe;
-  try {
-    const dir = path.join(roaming, 'Claude', 'claude-code');
-    const vers = fs.readdirSync(dir).filter(v => /^\d+(\.\d+)+$/.test(v))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-    for (let i = vers.length - 1; i >= 0; i--) {
-      const exe = path.join(dir, vers[i], 'claude.exe');
-      if (fs.existsSync(exe)) return exe;
-    }
-  } catch {}
-  return npmExe; // nothing found — keep the classic default so the error message points somewhere sane
-}
-const CLAUDE_EXE = findClaude();
+// Discovery lives in U.findClaude (shared with distill/sessionsum): env →
+// npm global → newest desktop-app-bundled CLI.
+const CLAUDE_EXE = U.findClaude();
 // H4: second engine — hermes over ACP (hermes acp, JSON-RPC/stdio; see
 // lib/acp.js) for real per-step streaming. Hermes does its own model tiering +
 // tool approvals, so the hub's model/permission selectors are claude-only.

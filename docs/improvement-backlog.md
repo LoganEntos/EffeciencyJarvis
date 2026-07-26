@@ -147,3 +147,15 @@ folder once and `/login`. Autopilot + the scout schedule stay OFF until then.
 | C22 | assets/schedules.js + lib/autopilot.js | Schedules UI polish: fold recurring checks into autopilot loop, verify R5 fire test | Integrate schedule checks as native autopilot tasks, verify recurring behavior | S | low | ✅ 2026-07-25 |
 | C23 | assets/jarvistab.js | jarvistab.js at 445 lines, nearing the 500-line cap | Extract soul editor into jarvissoul.js, load before jarvistab.js | M | low | ✅ 2026-07-25 |
 | C24 | lib/runs.js:1-509 | runs.js at 509 lines, 9 over the hard 500-line rule — carryover from C1 (split read-side 2026-07-14 but C1 was only partial) | Complete split: extract artifact/transcript queries into runs-query.js; extract launch handler into runs-exec.js | M | med | ✅ 2026-07-26 (runs-route.js extracted, runs.js 419L) |
+
+## Adversarial review round — 2026-07-26 (session diff 58ad57d..f465850)
+
+Opus reviewer verified 3 findings; all fixed same session. Ruled out: sonnet-floor
+edges, channel defaulting, --append-system-prompt escaping, runs-route factory
+state, relink chain drift, security invariants, listener stacking, css cascade.
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| C25 | lib/autopilot.js:97 | 'gone' (user deleted run history) counted as retryable — autopilot would re-execute a FINISHED task's prompt unattended | retry only status 'error'; gone = settled unknown outcome (pickNext + queueOpen) | S | low | ✅ 2026-07-26 |
+| C26 | lib/tasks.js:19 | tasks.json whole-file writes race out-of-band writers (lost-update reverts runId/done marks) | atomic temp+rename save; new POST /api/tasks/done as the sanctioned out-of-band completion path (smoke-covered) | M | low | ✅ 2026-07-26 |
+| C27 | lib/distill.js:23 | C17 CLI auto-discovery fixed runs.js only — distill + sessionsum still hardcode the npm-global path (silent ENOENT on desktop-app-only nodes) | one shared U.findClaude() in util.js; all three spawn sites use it | S | low | ✅ 2026-07-26 |

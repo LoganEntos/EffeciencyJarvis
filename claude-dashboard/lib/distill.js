@@ -20,9 +20,7 @@ const U = require('./util');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
-const CLAUDE_EXE = process.env.HUB_CLAUDE_EXE || path.join(
-  process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
-  'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+const CLAUDE_EXE = U.findClaude(); // shared resolver: env → npm global → desktop-app bundle
 
 // The distiller is a prompt engineer, NOT the agent: it rewrites, it never
 // answers or executes. Output is the bare prompt so the client can drop it

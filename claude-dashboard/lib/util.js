@@ -115,7 +115,29 @@ function runNpx(args, timeoutMs, cwd) {
   return run(process.platform === 'win32' ? 'npx.cmd' : 'npx', args, timeoutMs, true, cwd);
 }
 
+// Locate the claude CLI binary — the ONE shared resolver (runs, distill,
+// sessionsum all spawn it). Resolution: HUB_CLAUDE_EXE env → global npm
+// install → newest CLI bundled by the Claude desktop app
+// (%APPDATA%\Claude\claude-code\<ver>\claude.exe), so a synced node without
+// the npm global (desktop-app-only machines) still works everywhere.
+function findClaude() {
+  if (process.env.HUB_CLAUDE_EXE) return process.env.HUB_CLAUDE_EXE;
+  const roaming = process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming');
+  const npmExe = path.join(roaming, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+  if (fs.existsSync(npmExe)) return npmExe;
+  try {
+    const dir = path.join(roaming, 'Claude', 'claude-code');
+    const vers = fs.readdirSync(dir).filter(v => /^\d+(\.\d+)+$/.test(v))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    for (let i = vers.length - 1; i >= 0; i--) {
+      const exe = path.join(dir, vers[i], 'claude.exe');
+      if (fs.existsSync(exe)) return exe;
+    }
+  } catch {}
+  return npmExe; // nothing found — keep the classic default so error messages point somewhere sane
+}
+
 module.exports = {
   safeRead, safeJson, listDir, frontmatter, collectMd,
-  stripAnsi, sendJson, readBody, run, runNpx, SIMPLE_MODELS, buildRunHint,
+  stripAnsi, sendJson, readBody, run, runNpx, SIMPLE_MODELS, buildRunHint, findClaude,
 };

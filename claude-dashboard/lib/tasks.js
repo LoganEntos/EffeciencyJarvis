@@ -16,9 +16,15 @@ const DATA_DIR = path.join(DASH_DIR, 'data');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 
 function load() { return U.safeJson(TASKS_FILE) || []; }
+// Atomic write (temp + rename) so a reader — the server itself or an
+// out-of-band session working the queue — can never see a torn file. Whole-file
+// last-writer-wins still applies; out-of-band writers should prefer the
+// /api/tasks/done endpoint over editing the file directly.
 function save(list) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(TASKS_FILE, JSON.stringify(list, null, 2));
+  const tmp = TASKS_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(list, null, 2));
+  fs.renameSync(tmp, TASKS_FILE);
 }
 const newId = () => 't-' + crypto.randomBytes(4).toString('hex');
 
@@ -124,6 +130,22 @@ async function handle(req, res, url) {
     if (!prompt) { U.sendJson(res, { error: 'prompt required' }, 400); return true; }
     const effort = runs.EFFORTS.includes(b.effort) ? b.effort : undefined;
     enqueue({ title, prompt, model, effort });
+    U.sendJson(res, { ok: true });
+    return true;
+  }
+  // Mark a task completed out-of-band (no linked run) — the sanctioned path for
+  // interactive sessions working the queue, instead of editing tasks.json
+  // directly (whole-file writes race the server's own saves).
+  if (p === '/api/tasks/done' && req.method === 'POST') {
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
+    const list = load();
+    const t = list.find(x => x.id === b.id);
+    if (!t) { U.sendJson(res, { error: 'task not found' }, 404); return true; }
+    t.done = true;
+    t.doneAt = new Date().toISOString();
+    if (typeof b.note === 'string' && b.note.trim()) t.note = b.note.trim().slice(0, 500);
+    save(list);
     U.sendJson(res, { ok: true });
     return true;
   }
