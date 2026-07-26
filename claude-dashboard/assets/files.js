@@ -11,7 +11,7 @@ renderers.files = async function () {
         <span class="muted" style="font-size:11.5px">50 MB per upload · xlsx, csv, pdf, docs, anything</span></div>
       <input type="file" id="fileIn" multiple class="hidden">
       <div class="flex" style="margin:8px 0">
-        <input class="search" id="fileProject" placeholder="project folder (optional) — uploads and SharePoint pulls group under data/inbox/<project>/" style="max-width:420px"></div>
+        <input class="search" id="fileProject" placeholder="project folder (optional) — uploads and SharePoint pulls group under data/inbox/<project>/" style="max-width:min(420px,100%)"></div>
       <div id="upStatus" class="badgebar" style="margin-bottom:14px"></div>
       <div id="fileList"><div class="muted">Loading…</div></div>`;
     const dz = $('#dropzone'), fi = $('#fileIn');

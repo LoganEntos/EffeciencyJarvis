@@ -17,7 +17,7 @@ async function renderAgentViz(body) {
   stopAgentViz();
   body.innerHTML = `
     <div class="flex" style="margin-bottom:12px">
-      <select id="avRun" style="margin:0;max-width:420px"></select>
+      <select id="avRun" style="margin:0;max-width:min(420px,100%)"></select>
       <span id="avStatus"></span>
       <span class="muted" style="font-size:11px">updates live while a run is active · click the center to open the run</span>
     </div>

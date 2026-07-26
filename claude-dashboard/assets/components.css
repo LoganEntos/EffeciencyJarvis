@@ -445,6 +445,10 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
   .mem-wrap{grid-template-columns:1fr}
   .mem-list{max-height:40vh}
   .mem-detail{position:static}
+  /* N2 375px audit 2026-07-26: #avRun (Graph), #edFile (Tools), #personaSel
+     (Config) grow to their longest option's intrinsic width and clip past the
+     viewport — cap every select to its container on phones. */
+  main select{max-width:100%}
 }
 
 /* N2 mobile polish: on touch devices, small inline action buttons (run-history
