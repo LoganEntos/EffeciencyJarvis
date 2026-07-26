@@ -244,15 +244,19 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     // wins when both are set (it's an explicit this-turn escalation).
     effApplied = think ? 'max' : (EFFORTS.includes(effort) ? effort : '');
     if (effApplied) args.push('--effort', effApplied);
-    // C38 runaway guardrails: hard spend cap + turn cap so an unattended
-    // autopilot/scheduled run (or a runaway user prompt) can't bill/loop
-    // forever. Both are genuine print-mode CLI flags. Values come from
-    // settings.json (Config); either at 0 omits its flag. See lib/settings.js.
-    try {
-      const g = settings.load().runGuardrails || {};
-      if (g.maxBudgetUsd > 0) args.push('--max-budget-usd', String(g.maxBudgetUsd));
-      if (g.maxTurns > 0) args.push('--max-turns', String(Math.floor(g.maxTurns)));
-    } catch {}
+    // C38 runaway guardrails: hard spend cap + turn cap — UNATTENDED sources
+    // only (task/schedule/autopilot). User-commanded runs (Run tab, Jarvis,
+    // project chat) are deliberate and interactive — capping them at 80 turns
+    // killed long commanded threads mid-work ("the thread ends", user report
+    // 2026-07-26); the user can always hit Stop. Values from settings.json
+    // (Config); either at 0 omits its flag. See lib/settings.js.
+    if (['task', 'schedule', 'autopilot'].includes(source)) {
+      try {
+        const g = settings.load().runGuardrails || {};
+        if (g.maxBudgetUsd > 0) args.push('--max-budget-usd', String(g.maxBudgetUsd));
+        if (g.maxTurns > 0) args.push('--max-turns', String(Math.floor(g.maxTurns)));
+      } catch {}
+    }
   }
 
   const meta = {
