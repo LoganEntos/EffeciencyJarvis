@@ -92,8 +92,15 @@ function jarvisTransform(prompt) {
 // Word-count gate: short prompts have nothing to engineer, so they skip the
 // Haiku pre-pass (which costs ~a couple seconds + a fraction of a cent) and get
 // only the instant local cleanup. Above the gate, a real vibe-dump goes through
-// jarvisDistill. Tune this number as it's felt in use.
-const DISTILL_MIN_WORDS = 25;
+// jarvisDistill.
+// L1: the pre-pass is a BLOCKING `claude -p` cold-start that runs BEFORE the
+// real run's own cold-start — two serialized CLI boots of added wall-clock
+// before first token. That double boot only earns itself back on a genuinely
+// long, rambling dump, where a clearer prompt saves a much longer run from
+// wandering; on a short/medium ask it's pure latency for near-zero gain. So the
+// gate sits well above the old 25 — most turns now skip the extra boot entirely
+// and fire straight into the run. Tune this number as it's felt in use.
+const DISTILL_MIN_WORDS = 60;
 
 // Per-persona orb hue, clamped 28..44 so every persona stays amber-adjacent.
 // Shared by jarvistab.js (accent light) and jarvisorb.js (sphere render) — the
