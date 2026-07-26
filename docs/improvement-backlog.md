@@ -288,3 +288,13 @@ auto-adopt the GPU the moment a working EP exists, and never lands in a
 `kokoro-requirements.txt` documents the CUDA-vs-DirectML tradeoff and pins plain
 `onnxruntime` as the default. **Net on this box: still CPU (~1.1–1.8 s/sentence);
 the sub-0.5 s GPU win is blocked until the CUDA runtime is installed.**
+
+## Promotion round — 2026-07-26 (verified-deferred → fixed)
+
+Backlog was fully burned after C42; promoted two already-verified deferred items
+from Scout round 3 (atomic-write consistency) and fixed them.
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| C45 | lib/projects.js:31 | save() used plain writeFileSync — a concurrent reader can see a torn projects.json (same class C26 fixed for tasks.json) | atomic temp+rename mirroring lib/tasks.js save() | S | low | ✅ 2026-07-26 |
+| C46 | lib/teams.js:85 | saveState() used plain writeFileSync — same torn-read class as C45 | atomic temp+rename mirroring lib/tasks.js save() | S | low | ✅ 2026-07-26 |

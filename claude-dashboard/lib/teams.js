@@ -81,8 +81,15 @@ const okId = id => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id);
 function loadState() {
   return Object.assign({ active: 'lean', custom: [] }, U.safeJson(FILE) || {});
 }
+// Atomic write (temp + rename, mirroring lib/tasks.js) so a concurrent reader
+// never sees a torn teams state file.
 function saveState(s) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(s, null, 2)); } catch {}
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const tmp = FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(s, null, 2));
+    fs.renameSync(tmp, FILE);
+  } catch {}
   return s;
 }
 

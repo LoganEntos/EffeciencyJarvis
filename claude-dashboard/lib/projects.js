@@ -28,7 +28,14 @@ const INBOX = path.join(DATA_DIR, 'inbox');
 const CLAUDE_DIR = path.join(os.homedir(), '.claude', 'projects');
 
 function load() { return U.safeJson(FILE) || []; }
-function save(list) { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(list, null, 2)); }
+// Atomic write (temp + rename, mirroring lib/tasks.js) so a concurrent reader
+// never sees a torn projects.json.
+function save(list) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(list, null, 2));
+  fs.renameSync(tmp, FILE);
+}
 const newId = () => 'p-' + crypto.randomBytes(4).toString('hex');
 
 // A slug doubles as the inbox folder name, so it must survive files.js's
