@@ -298,3 +298,22 @@ from Scout round 3 (atomic-write consistency) and fixed them.
 |----|-----------|-------|-----|--------|------|--------|
 | C45 | lib/projects.js:31 | save() used plain writeFileSync — a concurrent reader can see a torn projects.json (same class C26 fixed for tasks.json) | atomic temp+rename mirroring lib/tasks.js save() | S | low | ✅ 2026-07-26 |
 | C46 | lib/teams.js:85 | saveState() used plain writeFileSync — same torn-read class as C45 | atomic temp+rename mirroring lib/tasks.js save() | S | low | ✅ 2026-07-26 |
+
+## Jarvis latency + communication round — 2026-07-26 (user-reported: "poor communication, slow response")
+
+Subagent root-cause analysis of the distill pre-pass, persona contracts, and the
+spoken/screen output channels. Highest-impact latency + comms fixes shipped this
+session (L2/L3/C1/C2/C3); the rest are queued rows for the autonomous loop.
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| L2 | lib/distill.js:67 | Distill blocking timeout was 20s — a hung Haiku pre-pass could add up to 20s of dead wait before the real run | cut default to 8s; falls back to instant local cleanup | S | low | ✅ 2026-07-26 |
+| L3 | assets/run-composer.js:96 | User's message bubble was only drawn AFTER distill+POST resolved — chat sat empty behind a "Shaping…" button, inflating perceived latency | render the user bubble optimistically before the await; reconcile in place to what runs | S | low | ✅ 2026-07-26 |
+| C1 | lib/personas.js:50 + personas/_guidelines.md:5 | Spoken contract's absolute ban on naming any variable/function/file/flag/config out loud forced every technical voice reply into vague paraphrase — the core "unclear" complaint | soften: prefer plain words but name the thing when that's the clearest answer; answer the question asked | S | low | ✅ 2026-07-26 |
+| C2 | personas/jarvis.md:20 | Persona hard-coded "two or three sentences is your home" even on the screen channel, clipping typed replies against the contract's "length scales to the deliverable" | make the length rule channel-aware; defer to the contract on screen | S | low | ✅ 2026-07-26 |
+| C3 | assets/jarvis.js:53 | bufferPrompt stripped meaning-bearing words (like/just/really/actually) globally, so "look like Stripe"→"look Stripe", "just the header"→"the header" — silently distorting intent AND showing the user words they didn't type | strip only true discourse markers; keep meaning-bearing words | S | low | ✅ 2026-07-26 |
+| L1 | assets/run-composer.js:96 + lib/distill.js:83 | Synchronous distill pre-pass spawns a whole extra `claude -p` cold-start that blocks before the real run's own cold-start — two serialized CLI boots of added wall-clock before first token | make distill non-blocking (fire the run on the raw prompt, use distill for display only) or raise DISTILL_MIN_WORDS well above 25 | M | med | ⬜ |
+| L4 | lib/runs.js:157 | Persona floor bumps every conversational auto-routed turn haiku→sonnet — slower model on the simplest turns purely to "hold the voice" | keep the floor only for turns that do real work; let trivial chit-chat stay on haiku | S | low | ⬜ |
+| L5 | assets/voicetts.js warmup | Spoken first-word latency: CSM ~4.5s fixed; Kokoro sidecar pays a cold warmup on first call | pre-warm the chosen sidecar at tab-open/run-start so the first chunk isn't also paying warmup | M | med | ⬜ |
+| C4 | lib/distill.js:93 | Distill appends the verbatim original under the rewrite, so the agent receives TWO versions of the ask and can act on the wrong one or hedge | send one prompt; if confidence in the rewrite is low, skip distill entirely rather than shipping both | S | low | ⬜ |
+| C5 | assets/voicetts.js:36 | Spoken replies hard-cap at 400 (CSM)/700 (Kokoro) chars + "The rest is on screen" — a substantive answer gets clipped mid-thought | raise the Kokoro cap and/or split long replies into queued ChunkPipeline chunks instead of truncating | S | low | ⬜ |

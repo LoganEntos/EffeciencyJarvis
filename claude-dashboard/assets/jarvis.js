@@ -48,9 +48,13 @@ function analyzePromptComplexity(text) {
 function bufferPrompt(text) {
   let cleaned = text.trim();
 
-  // Remove conversational filler words that add noise but no semantic value
+  // Remove conversational filler that adds noise but no semantic value. NOTE:
+  // only true discourse markers — words like "just" (="only": "just the header"),
+  // "like" (comparison: "look like Stripe"), "really"/"actually" (emphasis or
+  // correction) carry meaning and must NOT be stripped, or the buffered text
+  // silently changes the ask AND shows the user words they didn't type.
   const fillers = [
-    '\\b(ok so like|like|honestly|just|really|actually|obviously|basically|literally|yeah|um|uh|hmm)\\b\\s*',
+    '\\b(ok so like|honestly|obviously|basically|literally|yeah|um+|uh+|hmm+)\\b\\s*',
     '\\bcan you\\s+',
     '\\byou know\\s+',
     '\\bsort of\\s+',
