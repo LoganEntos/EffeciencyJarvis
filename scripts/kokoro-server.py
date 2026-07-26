@@ -70,6 +70,13 @@ def _download(url, dest):
     print(f"[kokoro] saved {dest} ({os.path.getsize(dest)//(1<<20)} MB)", flush=True)
 
 
+def _device_label(providers):
+    """Friendly /health device string from ORT's active provider order."""
+    p = providers[0] if providers else "CPUExecutionProvider"
+    return {"DmlExecutionProvider": "gpu (directml)",
+            "CUDAExecutionProvider": "gpu (cuda)"}.get(p, "cpu")
+
+
 def load_model():
     t0 = time.time()
     try:
@@ -78,22 +85,50 @@ def load_model():
         if not os.path.exists(VOICES_PATH):
             _download(VOICES_URL, VOICES_PATH)
 
-        import onnxruntime
-        providers = onnxruntime.get_available_providers()
-        STATE["device"] = "cuda" if "CUDAExecutionProvider" in providers else "cpu"
-
+        import onnxruntime as ort
         from kokoro_onnx import Kokoro
-        kokoro = Kokoro(MODEL_PATH, VOICES_PATH)
+
+        def _build(provs):
+            """Load Kokoro on `provs` and prove it by rendering a warmup line.
+            Returns (kokoro, active_providers). RAISES if this provider set can't
+            actually synthesize — a provider that *loads* but fails at inference
+            (e.g. DirectML on Kokoro's ConvTranspose) is caught here, not left to
+            500 every live request. Warmup also spares the first real call the
+            kernel-init cost."""
+            sess = ort.InferenceSession(MODEL_PATH, providers=provs)
+            try:
+                k = Kokoro.from_session(sess, VOICES_PATH)
+            except (AttributeError, TypeError):  # older kokoro-onnx: no from_session
+                os.environ.setdefault("ONNX_PROVIDER", provs[0])  # lib honours this
+                k = Kokoro(MODEL_PATH, VOICES_PATH)
+            k.create("Ready.", voice=VOICE_MAP[0], speed=1.0, lang=DEFAULT_LANG)
+            return k, sess.get_providers()
+
+        # Prefer a GPU execution provider, each paired with CPU as the per-op
+        # fallback, then plain CPU. We warmup-gate every GPU attempt so a broken
+        # GPU kernel demotes to CPU instead of poisoning the whole sidecar. CPU
+        # always serves. (C43 — DirectML is present but incompatible with this
+        # model's ConvTranspose as of ORT 1.24, so it fails the gate and we land
+        # on CPU here; CUDA is adopted automatically wherever its runtime exists.)
+        avail = ort.get_available_providers()
+        gpu = [p for p in ("DmlExecutionProvider", "CUDAExecutionProvider") if p in avail]
+        kokoro = active = None
+        for g in gpu:
+            try:
+                kokoro, active = _build([g, "CPUExecutionProvider"])
+                break
+            except Exception as e:
+                print(f"[kokoro] {g} unusable ({type(e).__name__}) — trying next", flush=True)
+        if kokoro is None:
+            kokoro, active = _build(["CPUExecutionProvider"])
+        STATE["device"] = _device_label(active)
+        STATE["providers"] = active
         BUNDLE["kokoro"] = kokoro
         BUNDLE["sample_rate"] = 24000
-        try:  # warmup so the first real request doesn't pay kernel init
-            synthesize("Ready.")
-        except Exception:
-            pass
         STATE["loaded_in_s"] = round(time.time() - t0, 1)
         STATE["status"] = "ready"
         print(f"[kokoro] ready on {STATE['device']} in {STATE['loaded_in_s']}s "
-              f"(providers={providers})", flush=True)
+              f"(providers={active})", flush=True)
     except Exception as e:  # surfaced via /health; hub shows it in Config
         STATE["status"] = "error"
         STATE["error"] = f"{type(e).__name__}: {e}"[:1000]

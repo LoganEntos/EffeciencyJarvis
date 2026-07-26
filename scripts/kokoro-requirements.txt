@@ -3,14 +3,25 @@
 #   %LOCALAPPDATA%\Programs\Python\Python311\python.exe -m venv .kokoro\venv
 #   .kokoro\venv\Scripts\python.exe -m pip install -r scripts\kokoro-requirements.txt
 #
-# No PyTorch / CUDA toolkit needed — Kokoro runs on onnxruntime. For the GPU
-# path use onnxruntime-gpu (below); on a machine with no CUDA, swap it for plain
-# `onnxruntime` and it still runs faster-than-realtime on CPU.
+# No PyTorch / CUDA toolkit needed — Kokoro runs on onnxruntime. plain
+# `onnxruntime` runs faster-than-realtime on CPU and is the default here.
+#
+# GPU (C43): the sidecar prefers a GPU execution provider and warmup-gates it,
+# so it auto-adopts the GPU the moment a WORKING one is installed and otherwise
+# stays on CPU. Two GPU wheels exist — install exactly ONE (they all provide the
+# `onnxruntime` module and clobber each other):
+#   • onnxruntime-gpu       — CUDAExecutionProvider. Needs the CUDA 12 + cuDNN 9
+#     runtime DLLs on PATH (not just an NVIDIA driver). This is the recommended
+#     GPU path for the RTX 30-series in this box.
+#   • onnxruntime-directml  — DmlExecutionProvider. DO NOT use for Kokoro: it
+#     loads but its ConvTranspose kernel fails at inference on Kokoro-82M
+#     ("Non-zero status ... ConvTranspose ... The parameter is incorrect") as of
+#     ORT 1.24, so it fails the warmup gate and demotes to CPU anyway.
 #
 # The ONNX model + voice pack (~310 MB + ~26 MB) are NOT pip deps — the sidecar
 # auto-downloads them into .kokoro/ from the kokoro-onnx GitHub release on first
 # run (or set KOKORO_MODEL / KOKORO_VOICES to local files).
 kokoro-onnx
-onnxruntime-gpu
+onnxruntime
 soundfile
 numpy

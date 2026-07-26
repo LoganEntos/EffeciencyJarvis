@@ -263,5 +263,28 @@ no unescaped innerHTML in jarvistab/voice/files.
 
 | id | file:line | issue | fix | effort | risk | status |
 |----|-----------|-------|-----|--------|------|--------|
-| C43 | scripts/kokoro-server.py:81 | Kokoro sidecar runs CPU-only (health reports device:cpu) — sentence render ~1.8s where the RTX 3060 would do ~0.1-0.3s | pip install onnxruntime-directml into .kokoro/venv and pass providers=['DmlExecutionProvider','CPUExecutionProvider'] (or kokoro-onnx's session override) so the GPU renders; verify /health reports a GPU device and TTS latency drops under 0.5s; keep CPU fallback | M | low | ⬜ |
+| C43 | scripts/kokoro-server.py:81 | Kokoro sidecar runs CPU-only (health reports device:cpu) — sentence render ~1.8s where the RTX 3060 would do ~0.1-0.3s | pip install onnxruntime-directml into .kokoro/venv and pass providers=['DmlExecutionProvider','CPUExecutionProvider'] (or kokoro-onnx's session override) so the GPU renders; verify /health reports a GPU device and TTS latency drops under 0.5s; keep CPU fallback | M | low | ⚠️ 2026-07-26 — see note |
 | C44 | lib/voice.js:143 | Kokoro boot warm-start raced the dying predecessor after the supervised /api/restart: health-probe saw the old sidecar still up, skipped spawning, then the orphan died — kokoro stayed offline until a manual start | after a supervised restart, re-probe health ~10s after boot (second chance) or have startSidecar kill/adopt an orphaned sidecar on port 8791 before spawning | S | low | ✅ 2026-07-26 |
+
+**C43 note (2026-07-26).** The suggested DirectML path does not work for Kokoro,
+and the box's premise was off. Findings:
+- The GPU here is an **RTX 3050 Ti Laptop** (not a 3060), driver 555.97, with **no
+  CUDA toolkit / cuDNN runtime** installed (`nvcc` absent; no `cudart64_12.dll` /
+  `cudnn64_9.dll` on PATH).
+- `onnxruntime-directml` installs and `DmlExecutionProvider` loads, but inference
+  crashes on Kokoro-82M's `/encoder/F0.1/pool/ConvTranspose` node
+  (`RUNTIME_EXCEPTION … The parameter is incorrect`, ORT 1.24) — reproduced with
+  and without `disable_metacommands`. So DirectML is a dead end for this model.
+- `onnxruntime-gpu` (CUDAExecutionProvider) *would* drive the 3050 Ti, but needs
+  the CUDA 12 + cuDNN 9 runtime DLLs installed first — a heavier, out-of-scope
+  system change for an unattended run.
+
+**What shipped instead** (`scripts/kokoro-server.py`): the loader now prefers a
+GPU execution provider (DML → CUDA), **warmup-gates each attempt with a real
+render**, and falls back to CPU if the GPU can't actually synthesize — so it will
+auto-adopt the GPU the moment a working EP exists, and never lands in a
+"health=ready but every /tts 500s" state. `/health` now reports the true device
+(`gpu (cuda)` / `gpu (directml)` / `cpu`) plus the `providers` list.
+`kokoro-requirements.txt` documents the CUDA-vs-DirectML tradeoff and pins plain
+`onnxruntime` as the default. **Net on this box: still CPU (~1.1–1.8 s/sentence);
+the sub-0.5 s GPU win is blocked until the CUDA runtime is installed.**
