@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Auto session summaries (R3). Sessions used to require a manual
  * "Summarize with Claude" click that prefilled a full run; now a cheap Haiku
  * one-shot writes a short debrief for each transcript that lacks one and caches
@@ -29,7 +29,13 @@ const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
 const DATA_DIR = path.join(DASH_DIR, 'data');
 const CACHE_FILE = path.join(DATA_DIR, 'session-summaries.json');
-const CLAUDE_EXE = U.findClaude(); // shared resolver: env → npm global → desktop-app bundle
+// Shared resolver (env → npm global → desktop-app bundle), re-resolved when
+// the cached path vanishes (app updates swap version dirs; boot contexts vary).
+let CLAUDE_EXE_CACHED = null;
+function claudeExe() {
+  if (!CLAUDE_EXE_CACHED || !fs.existsSync(CLAUDE_EXE_CACHED)) CLAUDE_EXE_CACHED = U.findClaude();
+  return CLAUDE_EXE_CACHED;
+}
 
 const SYS =
   'You are debriefing a past Claude Code coding session for a developer scanning their history. '
@@ -74,7 +80,7 @@ function summarizeOne(id, timeoutMs = 30000) {
     let out = '', err = '', done = false, child;
     const finish = r => { if (!done) { done = true; clearTimeout(t); resolve(r); } };
     const t = setTimeout(() => { try { child && child.kill(); } catch {} finish({ summary: '' }); }, timeoutMs);
-    try { child = spawn(CLAUDE_EXE, args, { cwd: PROJECT_DIR, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
+    try { child = spawn(claudeExe(), args, { cwd: PROJECT_DIR, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
     catch (e) { return finish({ summary: '' }); }
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
@@ -103,7 +109,7 @@ function sweep(opts) {
 
 async function runSweep({ ids = null, max = 6, idleMs = 4 * 60 * 1000, force = false } = {}) {
   const cache = load();
-  if (!fs.existsSync(CLAUDE_EXE)) return cache; // no CLI → nothing to build
+  if (!fs.existsSync(claudeExe())) return cache; // no CLI → nothing to build
   const all = core.sessions();
   const byId = Object.fromEntries(all.map(s => [s.id, s]));
   let todo;

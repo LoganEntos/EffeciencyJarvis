@@ -20,7 +20,14 @@ const U = require('./util');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(DASH_DIR, '..');
-const CLAUDE_EXE = U.findClaude(); // shared resolver: env → npm global → desktop-app bundle
+// Shared resolver (env → npm global → desktop-app bundle), re-resolved when
+// the cached path vanishes (app updates swap version dirs; boot contexts vary).
+let CLAUDE_EXE_CACHED = null;
+function claudeExe() {
+  const fs = require('fs');
+  if (!CLAUDE_EXE_CACHED || !fs.existsSync(CLAUDE_EXE_CACHED)) CLAUDE_EXE_CACHED = U.findClaude();
+  return CLAUDE_EXE_CACHED;
+}
 
 // The distiller is a prompt engineer, NOT the agent: it rewrites, it never
 // answers or executes. Output is the bare prompt so the client can drop it
@@ -73,7 +80,7 @@ function distill(text, timeoutMs = 20000) {
     // coming before it proceeds (see docs/handoffs/distill-latency.md) — that
     // alone was roughly half of the measured latency. -p already carries the
     // full prompt as an argv, so stdin is never read.
-    try { child = spawn(CLAUDE_EXE, args, { cwd: PROJECT_DIR, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
+    try { child = spawn(claudeExe(), args, { cwd: PROJECT_DIR, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
     catch (e) { return finish({ prompt: '', error: e.message }); }
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });

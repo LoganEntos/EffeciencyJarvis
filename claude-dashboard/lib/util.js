@@ -120,18 +120,36 @@ function runNpx(args, timeoutMs, cwd) {
 // install → newest CLI bundled by the Claude desktop app
 // (%APPDATA%\Claude\claude-code\<ver>\claude.exe), so a synced node without
 // the npm global (desktop-app-only machines) still works everywhere.
-function findClaude() {
-  if (process.env.HUB_CLAUDE_EXE) return process.env.HUB_CLAUDE_EXE;
-  const roaming = process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming');
-  const npmExe = path.join(roaming, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
-  if (fs.existsSync(npmExe)) return npmExe;
+function newestBundledClaude(dir) {
   try {
-    const dir = path.join(roaming, 'Claude', 'claude-code');
     const vers = fs.readdirSync(dir).filter(v => /^\d+(\.\d+)+$/.test(v))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     for (let i = vers.length - 1; i >= 0; i--) {
       const exe = path.join(dir, vers[i], 'claude.exe');
       if (fs.existsSync(exe)) return exe;
+    }
+  } catch {}
+  return null;
+}
+function findClaude() {
+  if (process.env.HUB_CLAUDE_EXE) return process.env.HUB_CLAUDE_EXE;
+  const home = require('os').homedir();
+  const roaming = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+  const npmExe = path.join(roaming, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+  if (fs.existsSync(npmExe)) return npmExe;
+  // Desktop-app bundle, direct view (only visible to processes INSIDE the MSIX
+  // package context — e.g. shells the app itself spawned).
+  const direct = newestBundledClaude(path.join(roaming, 'Claude', 'claude-code'));
+  if (direct) return direct;
+  // MSIX virtualized view: the Store-packaged desktop app's %APPDATA%\Claude
+  // writes really land under the package's LocalCache. Normal processes (the
+  // autostart scheduled task, a plain terminal) only see THIS path.
+  try {
+    const pkgs = path.join(home, 'AppData', 'Local', 'Packages');
+    for (const p of fs.readdirSync(pkgs)) {
+      if (!/^Claude_/.test(p)) continue;
+      const exe = newestBundledClaude(path.join(pkgs, p, 'LocalCache', 'Roaming', 'Claude', 'claude-code'));
+      if (exe) return exe;
     }
   } catch {}
   return npmExe; // nothing found — keep the classic default so error messages point somewhere sane

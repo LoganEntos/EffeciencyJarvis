@@ -16,7 +16,7 @@ const memory = require('./memory');
 const { diagnose } = require('./diagnose');
 const { countArtifacts } = require('./artifacts');
 
-function createEngine({ active, queue, MAX_ACTIVE, runningCount, CLAUDE_EXE, PROJECT_DIR, HERMES_EXE, continueRun }) {
+function createEngine({ active, queue, MAX_ACTIVE, runningCount, claudeExe, PROJECT_DIR, HERMES_EXE, continueRun }) {
   // Every line event carries `id:` = its index in the run, so EventSource
   // auto-reconnects (which send Last-Event-ID) never duplicate rendered lines.
   function sseLine(res, idx, line) { res.write(`event: line\nid: ${idx}\ndata: ${line}\n\n`); }
@@ -149,7 +149,7 @@ function createEngine({ active, queue, MAX_ACTIVE, runningCount, CLAUDE_EXE, PRO
   function launchClaude(st) {
     let child;
     try {
-      child = spawn(CLAUDE_EXE, st.args, { cwd: PROJECT_DIR, windowsHide: true });
+      child = spawn(claudeExe(), st.args, { cwd: PROJECT_DIR, windowsHide: true });
     } catch (e) {
       st.meta.status = 'error';
       st.meta.endedAt = new Date().toISOString();

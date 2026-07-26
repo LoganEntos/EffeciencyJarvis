@@ -25,8 +25,17 @@ const PROJECT_DIR = path.resolve(DASH_DIR, '..');
 const RUNS_DIR = path.join(DASH_DIR, 'data', 'runs');
 // claude.cmd just execs this native binary — spawn it directly (no shell).
 // Discovery lives in U.findClaude (shared with distill/sessionsum): env →
-// npm global → newest desktop-app-bundled CLI.
-const CLAUDE_EXE = U.findClaude();
+// npm global → newest desktop-app-bundled CLI. Resolved lazily and
+// re-resolved whenever the cached path stops existing — a one-shot const
+// resolved at module load went stale when the desktop app swapped version
+// dirs or when boot ran in a context that couldn't see the bundle (seen
+// live: the autostart scheduled task cached the npm fallback for its whole
+// lifetime and every run failed "claude CLI not found").
+let CLAUDE_EXE_CACHED = null;
+function claudeExe() {
+  if (!CLAUDE_EXE_CACHED || !fs.existsSync(CLAUDE_EXE_CACHED)) CLAUDE_EXE_CACHED = U.findClaude();
+  return CLAUDE_EXE_CACHED;
+}
 // H4: second engine — hermes over ACP (hermes acp, JSON-RPC/stdio; see
 // lib/acp.js) for real per-step streaming. Hermes does its own model tiering +
 // tool approvals, so the hub's model/permission selectors are claude-only.
@@ -67,7 +76,7 @@ const { listRuns, routingStats, transcript, getRunMeta, statsToday } = createQue
 // 500-line rule; it shares the live `active` Map + `queue` array so a run
 // launched here is tracked identically on both sides.
 const { launch, pushLine, broadcast, sseLine, writeMeta } = createEngine({
-  active, queue, MAX_ACTIVE, runningCount, CLAUDE_EXE, PROJECT_DIR, HERMES_EXE,
+  active, queue, MAX_ACTIVE, runningCount, claudeExe, PROJECT_DIR, HERMES_EXE,
   continueRun,
 });
 
@@ -120,7 +129,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   if (runningCount() >= MAX_ACTIVE && queue.length >= MAX_QUEUE) {
     return { error: `busy: ${MAX_ACTIVE} running + ${queue.length} queued — wait or cancel one` };
   }
-  if (engine === 'claude' && !fs.existsSync(CLAUDE_EXE)) return { error: 'claude CLI not found at ' + CLAUDE_EXE };
+  if (engine === 'claude' && !fs.existsSync(claudeExe())) return { error: 'claude CLI not found at ' + claudeExe() };
   if (engine === 'hermes' && !fs.existsSync(HERMES_EXE)) return { error: 'hermes not installed at ' + HERMES_EXE + ' — see docs/hermes-adoption.md' };
 
   const id = newId();
