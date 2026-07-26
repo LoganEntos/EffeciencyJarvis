@@ -7,7 +7,8 @@
    an AnalyserNode envelope. Per-persona hue drives --accent-live and an
    ambient radial light. In-tab chat streams to /api/run and renders directly
    into the transcript panel. Thread-timeline dots live in
-   assets/jarvistimeline.js. Styling in assets/jarvis.css. */
+   assets/jarvistimeline.js; the soul editor's fill/load/save logic lives in
+   assets/jarvissoul.js. Styling in assets/jarvis.css. */
 'use strict';
 (function () {
   const J = { txTimer: null, txSig: '', personas: [], active: null, shaped: '', thinkOn: false };
@@ -24,14 +25,15 @@
   // — distinct from assets/jarvispersona.js (the survey + output-contract
   // editor mounted in the customize foldout, see $('#jcustBtn') below). It
   // renders #jcards and calls back here for activate/flash/reload/new.
-  const PERSONA_CB = { activate: id => switchPersona(id), flash: (m, e) => flash(m, e), reload: () => loadPersonas(), openNew: () => openNewPersona() };
+  const PERSONA_CB = { activate: id => switchPersona(id), flash: (m, e) => flash(m, e), reload: () => loadPersonas(), openNew: () => { if (window.jarvisSoul) jarvisSoul.openNewPersona(J.personas); } };
 
   // ---- personas --------------------------------------------------------------
   async function loadPersonas() {
     const d = await api('/api/personas');
     J.personas = d.personas || []; J.active = d.active;
     renderCards(); renderNameplate(); renderHolding(); applyAccent();
-    const sel = $('#jpSel'); if (sel) fillEditorSelect(sel.value);
+    const sel = $('#jpSel'); if (sel && window.jarvisSoul) jarvisSoul.fillEditorSelect(J.personas, sel.value);
+    return J.personas;
   }
   // Let jarvispersona.js (survey activate) refresh the whole tab after it flips
   // the active persona out from under us.
@@ -235,52 +237,11 @@
   window.jarvisHooks = { renderHolding };
 
   // ---- customize (soul editor) ----------------------------------------------
-  // The "+" ghost card (jarvispersonacards.js) opens straight into new-persona
-  // mode instead of routing through the "customize" dropdown.
-  function openNewPersona() {
-    const p = $('#jcustPanel'); if (!p) return;
-    p.classList.remove('hidden');
-    fillEditorSelect();
-    const sel = $('#jpSel'); if (sel) sel.value = '__new';
-    loadEditor('__new');
-    if (window.jarvisPersona) window.jarvisPersona.mount(J.personas);
-    p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-  function fillEditorSelect(keep) {
-    const sel = $('#jpSel'); if (!sel) return;
-    sel.innerHTML = J.personas.map(p => `<option value="${esc(p.id)}">${esc(p.name)} (${esc(p.id)})</option>`).join('')
-      + '<option value="__new">＋ new persona…</option>';
-    if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
-  }
-  async function loadEditor(id) {
-    const isNew = id === '__new';
-    $('#jpId').disabled = !isNew;
-    if (isNew) {
-      $('#jpId').value = ''; $('#jpName').value = ''; $('#jpTagline').value = ''; $('#jpTone').value = ''; $('#jpAck').value = '';
-      $('#jpBody').value = 'You are <Name>, one of the hub\'s communication personas. Hold this bearing on every reply:\n\n- ';
-      $('#jpId').focus();
-      return;
-    }
-    try {
-      const p = await api('/api/personas/get?id=' + encodeURIComponent(id));
-      if (p.error) { flash('✗ ' + p.error, true); return; }
-      $('#jpId').value = p.id; $('#jpName').value = p.name;
-      $('#jpTagline').value = p.tagline; $('#jpTone').value = p.tone; $('#jpAck').value = p.ack || ''; $('#jpBody').value = p.body;
-    } catch (e) { flash('✗ ' + (e.message || 'load failed'), true); }
-  }
-  async function saveEditor() {
-    const body = {
-      id: ($('#jpId').value || '').trim().toLowerCase(),
-      name: $('#jpName').value, tagline: $('#jpTagline').value,
-      tone: $('#jpTone').value, ack: $('#jpAck').value, body: $('#jpBody').value,
-    };
-    const r = await api('/api/personas/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (r.error) { flash('✗ ' + r.error, true); return; }
-    flash('✓ saved ' + r.persona.name);
-    await loadPersonas();
-    fillEditorSelect(r.persona.id);
-    $('#jpId').disabled = true;
-  }
+  // The layer-2 personality panel (id/name/tagline/tone/ack/body fields +
+  // new-persona + save flow) lives in assets/jarvissoul.js as window.jarvisSoul
+  // — split out to keep both files under the 500-line cap. This tab still owns
+  // the panel markup (below) and the "+" ghost card wiring (PERSONA_CB.openNew
+  // above); jarvissoul.js just fills and saves it.
 
   // ---- render -----------------------------------------------------------------
   renderers.jarvis = async function () {
@@ -418,7 +379,11 @@
     $('#jrecall').onclick = toggleRecall;
     $('#jcustBtn').onclick = () => {
       const p = $('#jcustPanel'); p.classList.toggle('hidden');
-      if (!p.classList.contains('hidden')) { fillEditorSelect(); loadEditor($('#jpSel').value); if (window.jarvisPersona) window.jarvisPersona.mount(J.personas); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+      if (!p.classList.contains('hidden')) {
+        if (window.jarvisSoul) { jarvisSoul.fillEditorSelect(J.personas); jarvisSoul.loadEditor($('#jpSel').value); }
+        if (window.jarvisPersona) window.jarvisPersona.mount(J.personas);
+        p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     };
     renderRecall();
 
@@ -449,9 +414,9 @@
     $('#jwsRunTab').onclick = runInRunTab;
     wsMeta();
 
-    // soul editor
-    $('#jpSel') && ($('#jpSel').onchange = e => loadEditor(e.target.value));
-    $('#jpSave').onclick = saveEditor;
+    // soul editor (assets/jarvissoul.js)
+    $('#jpSel') && ($('#jpSel').onchange = e => { if (window.jarvisSoul) jarvisSoul.loadEditor(e.target.value); });
+    $('#jpSave').onclick = () => { if (window.jarvisSoul) jarvisSoul.saveEditor(); };
 
     // rtt readout (mirrors the header orb's round-trip if voice exposes it)
     const rtt = $('#jrtt');
