@@ -96,6 +96,14 @@ function routeModel(prompt) {
   if (CODE_RE.test(p) || prompt.length > 300) return { model: 'sonnet', reason: 'standard coding task' };
   return { model: 'haiku', reason: 'short/simple task' };
 }
+// Conversational = short and not build-/analysis-shaped (banter, acks, quick
+// questions) — the most persona-dependent turns, which routeModel lands on
+// haiku. When a persona is active we floor those at sonnet. Mirrors routeModel's
+// haiku bucket.
+function isConversational(prompt) {
+  const p = prompt.toLowerCase();
+  return prompt.length <= 300 && !HEAVY_RE.test(p) && !CODE_RE.test(p);
+}
 
 // A resumed conversation keeps the model it started with — switching models
 // mid-session wastes the prompt cache and changes the voice.
@@ -194,8 +202,12 @@ function resolveImages(images) {
   return out;
 }
 
-function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think, effort, source, continuations }) {
+function startRun({ prompt, model, permissionMode, resume, recall, engine, projectId, images, files, think, effort, source, continuations, channel }) {
   engine = ENGINES.includes(engine) ? engine : 'claude';
+  // Output-contract channel: 'spoken' (voice / Jarvis chat → TTS-shaped) vs
+  // 'screen' (Run tab / project chat, and every headless source — tasks,
+  // schedules, autopilot, continuations — since they never set it). Default screen.
+  channel = channel === 'spoken' ? 'spoken' : 'screen';
   if (!prompt || !prompt.trim()) return { error: 'prompt required' };
   if (prompt.length > 20000) return { error: 'prompt too long (20k max)' };
   if (runningCount() >= MAX_ACTIVE && queue.length >= MAX_QUEUE) {
@@ -218,7 +230,17 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   if (engine === 'claude' && model === 'auto') {
     const prior = resume ? sessionModel(resume) : null;
     if (prior) { model = prior; routedReason = 'kept the conversation’s model'; }
-    else { const r = routeModel(prompt); model = r.model; routedReason = r.reason; }
+    else {
+      const r = routeModel(prompt); model = r.model; routedReason = r.reason;
+      // Persona floor: a conversational turn routed to haiku can't hold the
+      // persona's voice — floor at sonnet when a persona is active. Only for
+      // fresh auto routing (a pinned model or a resumed session is untouched).
+      let personaActive = false;
+      try { personaActive = !!personas.getActiveId(); } catch {}
+      if (personaActive && model === 'haiku' && isConversational(prompt)) {
+        model = 'sonnet'; routedReason = 'persona active — floored to sonnet for a conversational turn';
+      }
+    }
   }
   // N3.5 opt-in memory recall: prepend top-k relevant Engram memories to the
   // CLI prompt (never to prompt.txt — that stays the user's words). Costs a
@@ -230,12 +252,14 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   let team = null, teamName = null;
   try { team = teams.activeHint(); } catch {}
   try { teamName = teams.activeTeam().name; } catch {} // recorded on every run (incl. Lean) so history/sessions/tasks show it
-  // Active persona (Jarvis etc.) — a system directive that LEADS the prompt so
-  // the bearing is set before anything else. Empty when no persona is active
-  // (plain Claude, token-neutral). Claude engine only; hermes has its own voice.
-  let persona = '', personaName = null;
+  // Active persona (Jarvis etc.) — the channel's output contract + persona body,
+  // injected as a TRUE system layer (--append-system-prompt below), NOT the user
+  // turn: this outranks the trailing hub-note boilerplate and stays out of
+  // resumed user-turn history so --resume never stacks a second copy. Empty when
+  // no persona is active. Claude engine only; hermes has its own voice.
+  let personaSys = '', personaName = null;
   if (engine === 'claude') {
-    try { persona = personas.activePrefix(); } catch {}
+    try { personaSys = personas.activePrefix(channel); } catch {}
     try { personaName = personas.activeName(); } catch {}
   }
   // Project binding (Projects tab): the project's standing instructions lead the
@@ -268,7 +292,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     ? `\n\nAttached file${filePaths.length > 1 ? 's' : ''} (read ${filePaths.length > 1 ? 'each' : 'it'} with the Read tool):\n`
       + filePaths.map(p => `- ${p}`).join('\n')
     : '';
-  const fullPrompt = persona + projectPrefix + (recalled ? recalled.block + '\n\n' : '')
+  const fullPrompt = projectPrefix + (recalled ? recalled.block + '\n\n' : '')
     + (projRecall ? projRecall.block + '\n\n' : '') + prompt + imgBlock + fileBlock + (team ? team.text : '') + hint;
   let args = null, hermesCfg = null, effApplied = '';
   // Default is bypassPermissions: hub runs are headless (`-p`), so there is no
@@ -286,7 +310,13 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   } else {
     args = ['-p', fullPrompt, '--output-format', 'stream-json', '--verbose'];
     if (MODELS.includes(model) && model && model !== 'auto') args.push('--model', model);
-    if (GOD_PROMPT && isOpusTier(model)) args.push('--append-system-prompt', GOD_PROMPT);
+    // True system layer: GOD_PROMPT first (opus-tier only), then the persona
+    // contract+character (every tier, when active) — god prompt is the outer
+    // discipline, persona shapes voice inside it. One --append-system-prompt.
+    const sysParts = [];
+    if (GOD_PROMPT && isOpusTier(model)) sysParts.push(GOD_PROMPT);
+    if (personaSys) sysParts.push(personaSys.trim());
+    if (sysParts.length) args.push('--append-system-prompt', sysParts.join('\n\n'));
     if (perm !== 'default') args.push('--permission-mode', perm);
     if (resume && /^[a-f0-9-]{8,}$/.test(resume)) args.push('--resume', resume);
     // Jarvis-tab ◐ think toggle: one-shot extended-thinking effort for THIS
@@ -304,7 +334,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     exitCode: null, sessionId: null, model: model || '', permissionMode: perm,
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),
     costUsd: null, durationMs: null, tokensIn: null, tokensOut: null,
-    team: teamName, persona: personaName, routedReason, recallCount: recalled ? recalled.count : 0,
+    team: teamName, persona: personaName, channel, routedReason, recallCount: recalled ? recalled.count : 0,
     imageCount: imgPaths.length,
     project: projectName, projectSlug: projectSlug || null,
     think: engine === 'claude' && !!think,
@@ -424,6 +454,7 @@ async function handle(req, res, url) {
       projectId: (b.projectId || '').toString(),
       think: b.think === true,
       effort: (b.effort || '').toString(),
+      channel: (b.channel || '').toString(),
       images: Array.isArray(b.images) ? b.images : [],
       files: Array.isArray(b.files) ? b.files : [],
     });

@@ -39,10 +39,33 @@ const SYS =
   + 'questions, do NOT answer or perform the task, do NOT add preamble or quotes. '
   + 'Output ONLY the rewritten prompt.';
 
+// Build-shaped = an imperative "do/change something in the repo" ask. ONLY
+// these are worth paraphrasing through Haiku: nuance a rewrite drops off a
+// rambling build request is recoverable from the repo, but a paraphrased
+// question or a precise/emotional turn loses meaning that can't be recovered.
+// Everything else skips the distill step (client falls back to local cleanup).
+const BUILD_RE = /\b(add|adjust|build|change|create|delete|edit|fix|generate|hook up|implement|make|migrate|move|patch|rebuild|redo|refactor|remove|rename|replace|rework|scaffold|set up|swap|tweak|update|wire|write)\b/i;
+// Polite do-requests ("can you add…", "please fix…") read as questions but are
+// really imperatives — keep them. A leading interrogative or a trailing '?'
+// (with no such request) marks a real question ("what did you change") — skip it
+// even though it contains a build verb.
+const REQUEST_RE = /\b(can|could|would|will|please)\b/i;
+const QUESTION_LEAD = /^(what|why|how|who|whom|whose|when|where|which|is|are|was|were|do|does|did|have|has|had|should)\b/i;
+function isBuildShaped(text) {
+  const t = String(text).trim();
+  if (!BUILD_RE.test(t)) return false;
+  if (REQUEST_RE.test(t)) return true;
+  if (QUESTION_LEAD.test(t) || /\?\s*$/.test(t)) return false;
+  return true;
+}
+
 function distill(text, timeoutMs = 20000) {
   return new Promise(resolve => {
     const input = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
     if (!input) return resolve({ prompt: '' });
+    // Skip non-build turns entirely — the client then uses the user's own words
+    // (local filler-cleanup), so a question is never answered as a paraphrase.
+    if (!isBuildShaped(input)) return resolve({ prompt: '', skipped: 'not build-shaped' });
     const args = ['-p', SYS + '\n\n--- Rough request ---\n' + input, '--model', 'haiku'];
     let out = '', err = '', done = false, child;
     const finish = r => { if (!done) { done = true; clearTimeout(t); resolve(r); } };
@@ -59,7 +82,13 @@ function distill(text, timeoutMs = 20000) {
     child.on('error', e => finish({ prompt: '', error: e.message }));
     child.on('close', code => {
       const cleaned = out.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
-      finish(cleaned ? { prompt: cleaned } : { prompt: '', error: err.trim() || ('exit ' + code) });
+      if (!cleaned) return finish({ prompt: '', error: err.trim() || ('exit ' + code) });
+      // Append the user's exact words below the rewrite so nothing Haiku dropped
+      // or reshaped is lost — the agent sees the engineered prompt AND the source.
+      const withOriginal = cleaned
+        + '\n\n--- User\'s original words (verbatim — defer to these if the rewrite lost anything) ---\n'
+        + input;
+      finish({ prompt: withOriginal });
     });
   });
 }

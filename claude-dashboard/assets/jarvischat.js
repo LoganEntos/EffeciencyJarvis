@@ -145,7 +145,7 @@
     S.sending = true;
     try {
       r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, engine: 'claude', model, permissionMode: perm, think,
+        body: JSON.stringify({ prompt, engine: 'claude', model, permissionMode: perm, think, channel: 'spoken',
           resume: S.sessionId || '', recall: recallOn(), images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
     } catch (e) { S.sending = false; setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); return false; }
     if (r.error) { S.sending = false; setBubble('✗ ' + r.error, false); return false; }

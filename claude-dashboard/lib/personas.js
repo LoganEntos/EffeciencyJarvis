@@ -30,11 +30,18 @@ const PERSONAS_DIR = path.join(DASH_DIR, 'personas');
 const STATE_FILE = path.join(DASH_DIR, 'data', 'personas.json');
 // Layer 1 — the shared output contract. This LEADS every persona injection and
 // overrides any character styling that would conflict, so switching persona
-// changes the voice but never the standard: plain language, no code dialect,
-// concise, progress-forward. Editable at personas/_guidelines.md (the leading
-// underscore keeps it out of okId, so it can never be selected/deleted as a
-// persona). The personality file (layer 2) only adds character on top.
+// changes the voice but never the standard. There are TWO contracts, one per
+// channel, because a spoken reply and a typed work order have opposite needs:
+//   spoken (personas/_guidelines.md)  — TTS-shaped: no code dialect, under a
+//                                        minute, no lists. Editable in the UI.
+//   screen (personas/_guidelines-screen.md) — typed technical work: names,
+//                                        tables, file paths allowed; length
+//                                        scales to the deliverable.
+// The leading underscore keeps both out of okId, so neither can be selected or
+// deleted as a persona. The personality file (layer 2) only adds character on
+// top of whichever contract the run's channel selects (see activePrefix).
 const GUIDELINES_FILE = path.join(PERSONAS_DIR, '_guidelines.md');
+const SCREEN_GUIDELINES_FILE = path.join(PERSONAS_DIR, '_guidelines-screen.md');
 const DEFAULT_GUIDELINES =
 `Every reply is spoken aloud to a person — casual, like talking to a friend, never a lecture. These rules outrank the persona's own styling wherever they conflict:
 
@@ -44,11 +51,24 @@ const DEFAULT_GUIDELINES =
 - **Lead with the result.** First sentence is the outcome or the recommendation. No restating the question, no "I went ahead and…", no warm-up.
 - **Updates only when they matter.** Give an update when something finished, broke, or needs a decision — and ask for next steps only when you genuinely need one. Otherwise keep working.
 - **Candid.** If the idea is weak, say so in a sentence and offer the better line.`;
+const DEFAULT_SCREEN_GUIDELINES =
+`Every reply is read on screen by a technical user driving real work through typed work orders. These rules outrank the persona's own styling wherever they conflict:
 
-// Layer 1 text — the file override if present and non-empty, else the built-in.
-function guidelines() {
-  try { const raw = fs.readFileSync(GUIDELINES_FILE, 'utf8').trim(); if (raw) return parse(raw).body || raw; } catch {}
-  return DEFAULT_GUIDELINES;
+- **Concise, but complete.** Say what matters and stop — no filler, no restating the question, no warm-up. Length scales to the deliverable: a one-line answer for a quick ask, a full table or list when the work order asks to see everything you touched. Never pad, and never truncate real substance to hit a word count.
+- **Names and structure are allowed — use them.** This is typed technical work, not speech: name the exact files, functions, flags, commands, and config keys you changed. Reach for short lists, tables, and code spans/blocks whenever they make the answer clearer or faster to scan.
+- **Lead with the result.** First line is the outcome, the answer, or the recommendation. Supporting detail follows.
+- **Updates only when they matter.** Report what finished, what broke, or what needs a decision. Ask for direction only when you genuinely need one; otherwise keep working.
+- **Candid.** If the idea is weak or the approach is wrong, say so plainly in a sentence and hand over the better line.`;
+
+// Layer 1 text for a channel — the file override if present and non-empty, else
+// the built-in. channel === 'spoken' picks the TTS contract; anything else
+// (incl. undefined) picks the screen contract, matching the server-side default.
+function guidelines(channel) {
+  const spoken = channel === 'spoken';
+  const file = spoken ? GUIDELINES_FILE : SCREEN_GUIDELINES_FILE;
+  const dflt = spoken ? DEFAULT_GUIDELINES : DEFAULT_SCREEN_GUIDELINES;
+  try { const raw = fs.readFileSync(file, 'utf8').trim(); if (raw) return parse(raw).body || raw; } catch {}
+  return dflt;
 }
 function saveGuidelines(body) {
   const text = String(body || '').trim();
@@ -243,16 +263,20 @@ function setOrder(ids) {
   return { ok: true, order: ids };
 }
 
-// Injectable block for lib/runs.js — the active persona's body as a system
-// directive, or '' when no persona is active (token-neutral plain Claude).
-function activePrefix() {
+// System-layer block for lib/runs.js — the channel's output contract + the
+// active persona's body, injected via --append-system-prompt (NOT the user
+// turn), or '' when no persona is active (token-neutral plain Claude). Because
+// this rides the system layer, it is never part of a resumed thread's user-turn
+// history, so --resume runs never stack a second persona copy. `channel` is
+// 'spoken' (voice/Jarvis chat) or 'screen' (Run tab / project chat, default).
+function activePrefix(channel) {
   const id = getActiveId();
   if (!id) return '';
   const p = load(id);
   if (!p || !p.body) return '';
   // Layer 1 (contract) leads, layer 2 (character) follows — the persona speaks
-  // in its own voice but always inside the shared standard.
-  return `<output-contract>\n${guidelines()}\n</output-contract>\n\n`
+  // in its own voice but always inside the shared standard for this channel.
+  return `<output-contract>\n${guidelines(channel)}\n</output-contract>\n\n`
     + `<persona name="${p.name}">\n${p.body}\n</persona>\n\n` + takeHandoff(id);
 }
 
@@ -265,7 +289,7 @@ function activeName() {
 
 async function handle(req, res, url) {
   if (url.pathname === '/api/personas' && req.method === 'GET') {
-    U.sendJson(res, { personas: list(), active: getActiveId(), guidelines: guidelines() });
+    U.sendJson(res, { personas: list(), active: getActiveId(), guidelines: guidelines('spoken') });
     return true;
   }
   // Layer-1 output contract editor (the two-layer interface's shared half).

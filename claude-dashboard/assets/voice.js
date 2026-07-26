@@ -451,6 +451,10 @@
   window.HubVoice = {
     init, onRunStart, onRunDone, onAssistantText, speak, beginCall, endCall,
     _state: () => V.state, _call: () => V.call,
+    // True while an in-flight run was voice-initiated (set by voiceconvo before
+    // routeSend, cleared on convo close). run.js reads it to send the 'spoken'
+    // output-contract channel when a voice turn is routed through the Run tab.
+    _voiceTurn: () => V.voiceTurn,
     // rolling last-3-turn avg, end-of-turn → first spoken audio; '' until a
     // voice turn has actually spoken once (jarvistab.js only shows the badge
     // when this returns something).

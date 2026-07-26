@@ -1,6 +1,13 @@
 # Handoff: persona pipeline fixes (system-layer injection, dual contracts, wit cap, routing floor, distill scoping)
 
-**Status: READY.** Model: Opus 4.8.
+**Status: IMPLEMENTED — code complete, browser-verify + commit still pending.** Model: Opus 4.8.
+Done: fixes #1+#2 (persona+contract moved to `--append-system-prompt`, composed
+GOD_PROMPT→contract→persona; dual `spoken`/`screen` contracts + `channel` on
+POST /api/run), #3 (wit-cap scoped to conversational turns), #5 (sonnet floor
+for conversational turns when a persona is active), #4 (distill only build-shaped
+spoken turns, original words appended verbatim). All edited `.js` pass
+`node --check`. Not done here (per execution constraints): browser-verify at
+5758, smoke, code-review, commit, and the DONE/roadmap/archive bookkeeping.
 Source audit: `docs/audit-2026-07-22-persona-pipeline.md` (full diagnosis,
 ranked problems list, line refs — `lib/personas.js`, `lib/runs.js` L155-280,
 `lib/distill.js`, `personas/*.md`). This is the execution order per the

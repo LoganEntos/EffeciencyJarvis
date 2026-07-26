@@ -211,7 +211,7 @@
     try {
       r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, engine: 'claude', model: S.model || 'auto', permissionMode: 'bypassPermissions',
-          resume: S.sessionId || '', projectId: S.project.id }) });
+          channel: 'screen', resume: S.sessionId || '', projectId: S.project.id }) });
     } catch (e) { S.sending = false; setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); if (btn) btn.disabled = false; return; }
     if (r.error) { S.sending = false; setBubble('✗ ' + r.error, false); if (btn) btn.disabled = false; return; }
     S.running = true; S.sending = false; S.runId = r.id; S.seen = -1;

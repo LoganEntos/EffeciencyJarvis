@@ -344,9 +344,13 @@ async function sendPrompt() {
 
   let r;
   try {
+    // Run tab is the 'screen' channel — EXCEPT when voiceconvo routed a voice
+    // turn through this send (reply will be spoken aloud), where the TTS-shaped
+    // 'spoken' contract applies instead.
+    const channel = (window.HubVoice && HubVoice._voiceTurn && HubVoice._voiceTurn()) ? 'spoken' : 'screen';
     r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, engine, model: $('#runModel').value, permissionMode: $('#runPerm').value,
-        effort: $('#runEffort').value,
+        effort: $('#runEffort').value, channel,
         resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked,
         projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
   } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
