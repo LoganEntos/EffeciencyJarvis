@@ -16,6 +16,12 @@ const FILE = path.join(DATA_DIR, 'settings.json');
 // by hand in Config, and Overview renders them. Defaults from the 2026-07 snapshot.
 const DEFAULTS = {
   hermesEnabled: false,
+  // C38 runaway guardrails for headless spawns: hard spend cap + turn cap
+  // passed to the claude CLI (--max-budget-usd / --max-turns, both print-mode).
+  // Unattended autopilot/scheduled runs otherwise have no ceiling on a runaway
+  // prompt. Generous by default (a safety net, not a tight leash); set either to
+  // 0 to omit that flag entirely if a spawned CLI ever errors on it.
+  runGuardrails: { maxBudgetUsd: 10, maxTurns: 80 },
   plan: {
     label: 'Max (5×)',
     sessionPct: 18, sessionResets: '3h 13m',
@@ -40,6 +46,15 @@ async function handle(req, res, url) {
     try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
     const patch = {};
     if (typeof b.hermesEnabled === 'boolean') patch.hermesEnabled = b.hermesEnabled;
+    if (b.runGuardrails && typeof b.runGuardrails === 'object') {
+      const g = load().runGuardrails, r = {};
+      // Clamp to sane, non-negative bounds; 0 disables the corresponding flag.
+      const budget = Number(b.runGuardrails.maxBudgetUsd);
+      const turns = Number(b.runGuardrails.maxTurns);
+      r.maxBudgetUsd = Number.isFinite(budget) && budget >= 0 ? Math.min(budget, 1000) : g.maxBudgetUsd;
+      r.maxTurns = Number.isFinite(turns) && turns >= 0 ? Math.min(Math.floor(turns), 10000) : g.maxTurns;
+      patch.runGuardrails = r;
+    }
     if (b.plan && typeof b.plan === 'object') patch.plan = Object.assign({}, load().plan, b.plan, { updatedAt: new Date().toISOString() });
     U.sendJson(res, save(patch));
     return true;

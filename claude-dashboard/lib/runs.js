@@ -15,6 +15,7 @@ const liveness = require('./liveness');
 const teams = require('./teams');
 const personas = require('./personas');
 const projects = require('./projects');
+const settings = require('./settings');
 const { listArtifacts, serveArtifact } = require('./artifacts');
 const { createQueries } = require('./runs-query');
 const { createEngine } = require('./runs-engine');
@@ -243,6 +244,15 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     // wins when both are set (it's an explicit this-turn escalation).
     effApplied = think ? 'max' : (EFFORTS.includes(effort) ? effort : '');
     if (effApplied) args.push('--effort', effApplied);
+    // C38 runaway guardrails: hard spend cap + turn cap so an unattended
+    // autopilot/scheduled run (or a runaway user prompt) can't bill/loop
+    // forever. Both are genuine print-mode CLI flags. Values come from
+    // settings.json (Config); either at 0 omits its flag. See lib/settings.js.
+    try {
+      const g = settings.load().runGuardrails || {};
+      if (g.maxBudgetUsd > 0) args.push('--max-budget-usd', String(g.maxBudgetUsd));
+      if (g.maxTurns > 0) args.push('--max-turns', String(Math.floor(g.maxTurns)));
+    } catch {}
   }
 
   const meta = {
