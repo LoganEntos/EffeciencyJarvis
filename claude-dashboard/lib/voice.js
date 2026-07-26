@@ -143,10 +143,22 @@ async function ensureUp(engine, target) {
 // Boot-time warm start: bring Kokoro up as soon as the hub is listening (when
 // installed), so the first spoken reply doesn't pay the model-load wait.
 // Fire-and-forget; CSM stays manual — it's slow, heavy, and opt-in.
+//
+// Race (C44): after a supervised /api/restart the first probe can catch the
+// PREVIOUS boot's orphaned sidecar still listening on 8791 — we'd skip spawning,
+// then the orphan dies and Kokoro stays offline until a manual start. So if the
+// live sidecar isn't a child we spawned, re-probe ~10 s later and spawn then if
+// the orphan has since died. `children.kokoro` is empty in this fresh process,
+// so "up but not ours" reliably identifies an inherited orphan.
 function autoStart() {
   const target = targetFor('kokoro');
   if (!target || !fs.existsSync(venvPy('kokoro'))) return;
-  health(target).then(h => { if (!isUp(h)) startSidecar('kokoro', target); });
+  const ours = () => !!(children.kokoro && children.kokoro.exitCode === null);
+  health(target).then(h => {
+    if (!isUp(h)) return startSidecar('kokoro', target);
+    if (ours()) return; // we own the live sidecar — nothing to guard against
+    setTimeout(() => { health(target).then(h2 => { if (!isUp(h2) && !ours()) startSidecar('kokoro', target); }); }, 10000);
+  });
 }
 
 // Stop an engine's sidecar: kill the child this hub spawned (if any), then clear
