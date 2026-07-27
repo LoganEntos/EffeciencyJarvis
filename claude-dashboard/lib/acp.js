@@ -87,6 +87,10 @@ function run(opts, cb) {
     }
   });
   child.stderr.on('data', d => { if (cb.onStderr) cb.onStderr(U.stripAnsi(d.toString())); });
+  // Swallow stream 'error' (broken pipe on cancel/killTree racing a mid-flight
+  // turn) — unhandled it becomes uncaughtException and downs the hub. (C69, mirrors sessionsum C58)
+  child.stdout.on('error', () => {});
+  child.stderr.on('error', () => {});
   child.on('error', e => finish({ error: e.message }));
   child.on('close', code => finish({ code }));
 

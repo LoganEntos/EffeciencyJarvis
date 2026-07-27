@@ -101,6 +101,10 @@ function run(cmd, args, timeoutMs, useShell, cwd) {
     const finish = (code) => { if (!done) { done = true; resolve({ code, out: out.trim() }); } };
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { out += d; });
+    // Swallow stream 'error' (timeout kill() racing a flushing pipe) — unhandled
+    // it becomes uncaughtException and downs the hub. (C69, mirrors sessionsum C58)
+    child.stdout.on('error', () => {});
+    child.stderr.on('error', () => {});
     child.on('error', e => { out += '\n' + e.message; finish(-1); });
     child.on('close', finish);
     const t = setTimeout(() => { try { child.kill(); } catch {} out += '\n[timed out]'; finish(-2); }, timeoutMs);

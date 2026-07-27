@@ -92,6 +92,10 @@ function distill(text, timeoutMs = 8000) {
     catch (e) { return finish({ prompt: '', error: e.message }); }
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
+    // Swallow stream 'error' (broken pipe / fd error) — unhandled it becomes
+    // uncaughtException and downs the hub. (C69, mirrors sessionsum C58)
+    child.stdout.on('error', () => {});
+    child.stderr.on('error', () => {});
     child.on('error', e => finish({ prompt: '', error: e.message }));
     child.on('close', code => {
       let raw = out.trim();
