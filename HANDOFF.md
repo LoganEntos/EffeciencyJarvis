@@ -91,6 +91,20 @@ again. Do not push.
   cancelled run stays resumable. Session ids are claimed from the `system/init`
   event and persisted per surface (`hub.sess.jarvis` / `hub.sess.run`). Verified
   live on :5758, smoke 98/98.
+- **The `ClaudeCodeHub` scheduled task had a rogue 5-minute repetition —
+  removed 2026-07-27.** `scripts/install-autostart.ps1` only ever creates an
+  `-AtLogOn` trigger; a `PT5M / P3650D` time trigger had been added outside the
+  script (most likely by an autonomous run). Every 5 minutes it launched a
+  second `node server.js`, which spent **10 seconds** retrying the bind
+  (`server.js` retries EADDRINUSE 40× at 250 ms) before exiting 1 — flashing a
+  console window each time, and, more damagingly, running a live second hub
+  whose boot-time `reapOrphans()` swept with an empty `active` map and rewrote
+  the real hub's in-flight runs to `error + orphaned`. That was the source of
+  the corrupted run history and the duplicate autopilot retries. The `hubPid`
+  guard in `b866cfa` neutralizes the damage; removing the trigger stops the
+  spawning. Task now fires at logon only; crash recovery still comes from its
+  own `RestartCount 3 / 1-min` setting. **If a 5-minute repetition ever
+  reappears on that task, an agent put it there — take it back off.**
 - **Known-good invariants as of today:** no file over 500 lines (largest:
   `components.css` 478), zero npm deps, `127.0.0.1` bind only, all 76 JS files
   parse, index.html script wiring is a 1:1 match with `assets/`.
