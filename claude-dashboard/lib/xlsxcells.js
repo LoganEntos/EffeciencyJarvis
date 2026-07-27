@@ -49,6 +49,58 @@ function zipRead(buf, entry) {
 const colToNum = c => c.split('').reduce((a, ch) => a * 26 + (ch.charCodeAt(0) - 64), 0);
 const MAX_USIZE = 40 * 1024 * 1024;
 
+// ---- workbook cache --------------------------------------------------------
+// Switching sheet tabs re-hit /api/files/xlsx(/cells) on the same file. Without
+// a cache each request re-reads the whole workbook (up to 40MB), re-walks the
+// zip, and re-inflates+re-parses sharedStrings/styles/theme — a synchronous
+// event-loop stall that starves any concurrent run's SSE stream. Cache the read
+// buffer + parsed zip entries per path, keyed on mtime+size so an edited file
+// is picked up, and memoize the shared/theme/style parses lazily (xlsxInfo
+// needs none of them). Bounded by count and total bytes; LRU by Map order.
+const WB_CACHE = new Map(); // full -> { mtimeMs, size, buf, entries, _shared, _theme, _themeDone, _xfFills }
+const WB_CACHE_MAX = 4;
+const WB_CACHE_MAX_BYTES = 96 * 1024 * 1024;
+
+function evictWorkbooks() {
+  let total = 0;
+  for (const v of WB_CACHE.values()) total += v.size;
+  while (WB_CACHE.size > WB_CACHE_MAX || (total > WB_CACHE_MAX_BYTES && WB_CACHE.size > 1)) {
+    const oldest = WB_CACHE.keys().next().value;
+    total -= WB_CACHE.get(oldest).size;
+    WB_CACHE.delete(oldest);
+  }
+}
+
+function loadWorkbook(full) {
+  let st; try { st = fs.statSync(full); } catch { return { error: 'unreadable' }; }
+  const hit = WB_CACHE.get(full);
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) {
+    WB_CACHE.delete(full); WB_CACHE.set(full, hit); // bump to most-recent
+    return hit;
+  }
+  let buf; try { buf = fs.readFileSync(full); } catch { return { error: 'unreadable' }; }
+  const entries = zipEntries(buf);
+  if (!entries) return { error: 'not a valid xlsx (zip directory missing)' };
+  const wb = { mtimeMs: st.mtimeMs, size: st.size, buf, entries,
+    _shared: null, _theme: null, _themeDone: false, _xfFills: null };
+  WB_CACHE.set(full, wb);
+  evictWorkbooks();
+  return wb;
+}
+
+function sharedOf(wb) {
+  if (wb._shared == null) wb._shared = parseSharedStrings(wb.buf, wb.entries);
+  return wb._shared;
+}
+function themeOf(wb) {
+  if (!wb._themeDone) { wb._theme = parseTheme(wb.buf, wb.entries); wb._themeDone = true; }
+  return wb._theme;
+}
+function xfFillsOf(wb) {
+  if (wb._xfFills == null) wb._xfFills = parseStyleFills(wb.buf, wb.entries, themeOf(wb));
+  return wb._xfFills;
+}
+
 // ---- metadata (moved verbatim from files.js) -------------------------------
 function sheetEntriesOf(entries) {
   return entries.filter(e => /^xl\/worksheets\/sheet\d+\.xml$/.test(e.name))
@@ -56,9 +108,9 @@ function sheetEntriesOf(entries) {
 }
 
 function xlsxInfo(full) {
-  let buf; try { buf = fs.readFileSync(full); } catch { return { error: 'unreadable' }; }
-  const entries = zipEntries(buf);
-  if (!entries) return { error: 'not a valid xlsx (zip directory missing)' };
+  const wb0 = loadWorkbook(full);
+  if (wb0.error) return { error: wb0.error };
+  const { buf, entries } = wb0;
   const wbEntry = entries.find(e => e.name === 'xl/workbook.xml');
   if (!wbEntry) return { error: 'not an xlsx workbook (no xl/workbook.xml)' };
   const wb = (zipRead(buf, wbEntry) || Buffer.alloc(0)).toString('utf8');
@@ -249,9 +301,9 @@ function parseRow(body, shared, xfFills, maxCols) {
 function xlsxSheetCells(full, sheetIndex, maxRows, maxCols) {
   maxRows = Math.max(1, Math.min(maxRows || 200, 500));
   maxCols = Math.max(1, Math.min(maxCols || 40, 100));
-  let buf; try { buf = fs.readFileSync(full); } catch { return { error: 'unreadable' }; }
-  const entries = zipEntries(buf);
-  if (!entries) return { error: 'not a valid xlsx (zip directory missing)' };
+  const wbc = loadWorkbook(full);
+  if (wbc.error) return { error: wbc.error };
+  const { buf, entries } = wbc;
   const wbEntry = entries.find(e => e.name === 'xl/workbook.xml');
   if (!wbEntry) return { error: 'not an xlsx workbook (no xl/workbook.xml)' };
   const wb = (zipRead(buf, wbEntry) || Buffer.alloc(0)).toString('utf8');
@@ -273,9 +325,8 @@ function xlsxSheetCells(full, sheetIndex, maxRows, maxCols) {
   if (dim && dim[1]) { totalCols = colToNum(dim[1]); totalRows = parseInt(dim[2], 10); }
 
   const conditional = /<conditionalFormatting\b/.test(xml);
-  const shared = parseSharedStrings(buf, entries);
-  const theme = parseTheme(buf, entries);
-  const xfFills = parseStyleFills(buf, entries, theme);
+  const shared = sharedOf(wbc);
+  const xfFills = xfFillsOf(wbc); // memoized; internally resolves theme
 
   // walk <row> elements in document order, stop once maxRows collected
   const rows = [];
