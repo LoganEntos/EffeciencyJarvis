@@ -331,6 +331,13 @@ async function handle(req, res, url) {
   if (p === '/api/projects/get' && req.method === 'GET') {
     const proj = get(url.searchParams.get('id') || '');
     if (!proj) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    // runsOnly: chat history strip + post-run refresh only need d.runs. Skip the
+    // per-transcript parse in projectSessions (and memory recall) so these hot,
+    // repeated calls don't block the event loop on a large claude workspace.
+    if (url.searchParams.get('runsOnly')) {
+      U.sendJson(res, { project: shape(proj, runStatsBySlug()[proj.slug]), runs: runsForSlug(proj.slug) });
+      return true;
+    }
     const q = url.searchParams.get('q') || (proj.instructions + ' ' + proj.description) || proj.name;
     let mem = { items: [] };
     try { mem = memory.recallForProject(proj.slug, q, { limit: 6 }); } catch {}

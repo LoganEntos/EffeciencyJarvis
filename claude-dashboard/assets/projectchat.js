@@ -124,7 +124,7 @@
     let runs = preRuns;
     if (!runs) {
       let d;
-      try { d = await api('/api/projects/get?id=' + encodeURIComponent(S.project.id)); }
+      try { d = await api('/api/projects/get?runsOnly=1&id=' + encodeURIComponent(S.project.id)); }
       catch { host.innerHTML = ''; return; }
       runs = (d && d.runs) || [];
     }
@@ -137,7 +137,7 @@
   // the runs table (each used to fetch the full project payload separately).
   async function refreshAfterRun() {
     if (!S.project) return;
-    let d; try { d = await api('/api/projects/get?id=' + encodeURIComponent(S.project.id)); } catch { return; }
+    let d; try { d = await api('/api/projects/get?runsOnly=1&id=' + encodeURIComponent(S.project.id)); } catch { return; }
     if (!d || d.error) return;
     loadHistory(d.runs || []);
     if (typeof refreshProjectRuns === 'function') refreshProjectRuns(S.project.id, d.runs || []);
