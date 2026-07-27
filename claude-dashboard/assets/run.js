@@ -329,6 +329,9 @@ function newChat() {
   $('#sendBtn').disabled = false;
   $('#cancelBtn').classList.add('hidden');
   $('#chatLog').innerHTML = '<div class="msg sys">New conversation — the next prompt starts a fresh CLI session.</div>';
+  // Drop tool_use→<pre> refs; #chatLog was just replaced, so keeping them
+  // pins detached DOM (unbounded leak over a long multi-run session). C67.
+  for (const k in toolEls) delete toolEls[k];
   $('#promptIn').focus();
 }
 
