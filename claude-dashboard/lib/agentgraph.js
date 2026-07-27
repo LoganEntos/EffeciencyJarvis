@@ -202,16 +202,22 @@ async function handle(req, res, url) {
   if (url.pathname !== '/api/agentgraph') return false;
   let id = url.searchParams.get('id') || '';
   if (!id) {
-    // pick newest running run, else newest run, from the runs dir
-    const rows = [];
-    for (const e of U.listDir(RUNS_DIR)) {
-      if (!e.isDirectory() || !okId(e.name)) continue;
-      const m = runs.getRunMeta(e.name);
-      if (m) rows.push(m);
+    // pick newest running run, else newest run. Bound the scan to the newest N
+    // run dirs (ids are ISO timestamps → reverse name-sort is newest-first) so
+    // an ever-growing data/runs can't turn this default 3s Graph-tab poll into
+    // an O(all history) readFileSync stall that blocks SSE. A running/queued run
+    // is always recent, so the cap covers the live case. Mirrors statsToday. (C76)
+    const dirs = U.listDir(RUNS_DIR)
+      .filter(e => e.isDirectory() && okId(e.name))
+      .map(e => e.name).sort().reverse().slice(0, 60);
+    let newest = null, live = null;
+    for (const name of dirs) {
+      const m = runs.getRunMeta(name);
+      if (!m) continue;
+      if (!newest) newest = m; // dirs are newest-first, so the first meta is newest
+      if (m.status === 'running' || m.status === 'queued') { live = m; break; }
     }
-    rows.sort((a, b) => (b.queuedAt || '').localeCompare(a.queuedAt || ''));
-    const live = rows.find(m => m.status === 'running' || m.status === 'queued');
-    id = (live || rows[0] || {}).id || '';
+    id = ((live || newest) || {}).id || '';
   }
   const g = id ? buildGraph(id) : null;
   g === null ? U.sendJson(res, { error: 'no runs yet' }, 404) : U.sendJson(res, g);

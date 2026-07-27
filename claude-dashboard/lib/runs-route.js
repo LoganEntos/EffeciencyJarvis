@@ -89,7 +89,9 @@ function createRouter({ active }) {
     for (const live of active.values()) {
       if (live.meta && live.meta.sessionId === sessionId && live.meta.model) return live.meta.model;
     }
-    const dirs = U.listDir(RUNS_DIR).filter(e => e.isDirectory()).map(e => e.name).sort().reverse();
+    // Bound to the newest N dirs: a no-match sessionId would otherwise walk all
+    // of history on every resume. A resumed session is almost always recent. (C76)
+    const dirs = U.listDir(RUNS_DIR).filter(e => e.isDirectory()).map(e => e.name).sort().reverse().slice(0, 60);
     for (const name of dirs) {
       const meta = U.safeJson(path.join(RUNS_DIR, name, 'meta.json'));
       if (meta && meta.sessionId === sessionId && meta.model) return meta.model;
