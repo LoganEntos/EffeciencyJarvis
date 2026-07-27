@@ -76,9 +76,21 @@ async function renderCodeGraph(body) {
   };
   $('#graphBtn').onclick = ask;
   $('#graphQ').onkeydown = e => { if (e.key === 'Enter') ask(); };
-  api('/api/graph/data').then(g => {
+  const loadGraph = async () => {
+    const viz = $('#graphViz');
+    viz.innerHTML = '<div class="muted">Loading graph…</div>';
+    let g;
+    try {
+      g = await api('/api/graph/data', { timeoutMs: 15000 });
+    } catch (e) {
+      const why = e.name === 'AbortError' ? 'timed out' : (e.message || 'network error');
+      viz.innerHTML = `<div class="muted">Couldn't load graph: ${esc(why)}. <a href="#" id="graphRetry" style="color:var(--accent)">Retry</a></div>`;
+      const r = $('#graphRetry');
+      if (r) r.onclick = ev => { ev.preventDefault(); loadGraph(); };
+      return;
+    }
     if (!(g && Array.isArray(g.nodes) && g.nodes.length)) {
-      $('#graphViz').innerHTML = '<div class="muted">graph data unavailable</div>';
+      viz.innerHTML = '<div class="muted">graph data unavailable</div>';
       return;
     }
     const show = (v) => {
@@ -87,16 +99,17 @@ async function renderCodeGraph(body) {
         c.className = 'pill viewChip ' + (c.dataset.v === v ? 'neutral' : '');
         c.style.cursor = 'pointer';
       });
-      const viz = drawGraphViz($('#graphViz'), v === 'modules' ? moduleGraph(g) : g);
+      const gv = drawGraphViz(viz, v === 'modules' ? moduleGraph(g) : g);
       const f = $('#graphFind');
-      f.oninput = () => viz.find(f.value.trim().toLowerCase());
-      f.onkeydown = e => { if (e.key === 'Enter') viz.selectFirst(); };
+      f.oninput = () => gv.find(f.value.trim().toLowerCase());
+      f.onkeydown = e => { if (e.key === 'Enter') gv.selectFirst(); };
     };
     document.querySelectorAll('.viewChip').forEach(c => c.onclick = () => show(c.dataset.v));
     let view = null;
     try { view = new URLSearchParams(location.search).get('codeview'); } catch {}
     show(view === 'symbols' || view === 'modules' ? view : (localStorage.getItem('hub.codeview') || 'modules'));
-  });
+  };
+  loadGraph();
 };
 
 // Collapse the symbol graph to one node per source file — the "satisfying
