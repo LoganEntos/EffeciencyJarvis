@@ -62,6 +62,16 @@ function buildRunHint(projectDir, artDir) {
     + `ONLY IF the task asks you to GENERATE A SEPARATE DELIVERABLE (a report, chart, SVG/PNG, or a standalone interactive page that is NOT the dashboard itself) should you save those files into this exact directory: ${artDir} — the dashboard renders every file there inline. For those, a LOCAL asset library is served at /vendor/ (relative URLs; external CDNs blocked by CSP): /vendor/css/fonts.css declares @font-face for JetBrains Mono, IBM Plex Sans, Fraunces, Newsreader, Source Serif 4, Space Mono, DM Mono, VT323, Archivo, Bricolage Grotesque, Hanken Grotesk, Instrument Serif; /vendor/css/modern-normalize.css is a reset; four icon sprites — /vendor/icons/lucide-sprite.svg (1700+, line), /vendor/icons/tabler-sprite.svg (5000+ ids "tabler-NAME", outline), /vendor/icons/bootstrap-sprite.svg (2000+, filled/line), /vendor/icons/pixelart-sprite.svg (877, retro pixel) — used via <svg><use href="/vendor/icons/SET-sprite.svg#NAME"/></svg>; /vendor/css/pattern.min.css provides decorative background patterns (.pattern-dots/grid/checks/diagonal-lines/triangles, sizes -sm/-md/-lg/-xl, tinted by currentColor). Avoid generic AI aesthetics: no Inter/Roboto/Arial/system fonts, no purple-gradient-on-white, no flat solid backgrounds; one cohesive palette + CSS variables. Do not mention this note.]`;
 }
 
+// Continuation variant of the note, for a RESUMED session. The full hint is
+// already sitting in the conversation history from turn 1, so re-sending all
+// ~2.9k chars of it every turn just stacks N copies of standing instructions
+// against the user's actual words and pulls the model's attention onto the
+// boilerplate. The only thing that genuinely changes per run is the artifact
+// directory, so that's all a continuation turn needs to restate.
+function buildResumeHint(artDir) {
+  return `\n\n[Hub note (continuation — the full note from earlier in this conversation still applies): this turn's artifact directory is ${artDir}. Do not mention this note.]`;
+}
+
 function sendJson(res, obj, code = 200) {
   const body = JSON.stringify(obj);
   res.writeHead(code, {
@@ -161,5 +171,5 @@ function findClaude() {
 
 module.exports = {
   safeRead, safeJson, listDir, frontmatter, collectMd,
-  stripAnsi, sendJson, readBody, run, runNpx, SIMPLE_MODELS, buildRunHint, findClaude,
+  stripAnsi, sendJson, readBody, run, runNpx, SIMPLE_MODELS, buildRunHint, buildResumeHint, findClaude,
 };

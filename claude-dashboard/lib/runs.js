@@ -139,7 +139,10 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   fs.mkdirSync(artDir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'prompt.txt'), prompt, 'utf8');
 
-  const hint = U.buildRunHint(PROJECT_DIR, artDir);
+  // Fresh thread gets the full standing note; a resumed one gets the short form
+  // (the full text is already in its history — re-stacking it every turn is what
+  // made long threads drift incoherent).
+  const hint = resume ? U.buildResumeHint(artDir) : U.buildRunHint(PROJECT_DIR, artDir);
   // resolve 'auto' before spawning: resumed sessions keep their model,
   // fresh prompts are routed by the heuristic (claude engine only — hermes
   // does its own tiering: main/aux/subagent models from its config.yaml)
@@ -263,6 +266,10 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   }
 
   const meta = {
+    // Which hub process owns this run. The orphan reaper (lib/liveness.js) uses
+    // it so a second instance sharing data/runs can't reap a live run it simply
+    // can't see in its own `active` map.
+    hubPid: process.pid,
     id, engine, status: 'queued', queuedAt: new Date().toISOString(), startedAt: null, endedAt: null,
     exitCode: null, sessionId: null, model: model || '', permissionMode: perm,
     resumedFrom: resume || null, promptExcerpt: prompt.slice(0, 200),

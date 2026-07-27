@@ -121,6 +121,20 @@ function createEngine({ active, queue, MAX_ACTIVE, runningCount, claudeExe, PROJ
   // event for session id / cost / duration / token usage before persisting the
   // line verbatim. Parse failures are swallowed — a malformed line still streams.
   function onStdoutLine(st, line) {
+    // The CLI announces its session id in the `system`/`init` event at the START
+    // of a run. Claiming it only off the terminal `result` event meant any run
+    // that never reached one — user cancel, stream drop, hub restart, a false
+    // orphan-reap — persisted sessionId:null and left the whole thread
+    // unresumable. Record it as soon as it arrives.
+    if (!st.meta.sessionId && line.includes('"subtype":"init"')) {
+      try {
+        const r = JSON.parse(line);
+        if (r.type === 'system' && r.subtype === 'init' && r.session_id) {
+          st.meta.sessionId = r.session_id;
+          writeMeta(st);   // durable now, not only at finalize
+        }
+      } catch {}
+    }
     if (line.includes('"type":"result"')) {
       try {
         const r = JSON.parse(line);

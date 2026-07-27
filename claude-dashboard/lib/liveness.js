@@ -30,6 +30,12 @@ const REAP_MS = 60000;     // orphan sweep cadence
 // A run whose meta.json says running/queued but which is NOT in the live
 // `active` map can only be a crash/restart orphan (the process that owned it
 // is gone and child.on('close') can never fire for it). Make it terminal.
+// Is `pid` still a live process? EPERM means it exists but isn't ours.
+function pidAlive(pid) {
+  if (!pid || pid === process.pid) return false;
+  try { process.kill(pid, 0); return true; } catch (e) { return e && e.code === 'EPERM'; }
+}
+
 function reapOrphans(runsDir, active) {
   let reaped = 0;
   for (const e of U.listDir(runsDir)) {
@@ -38,6 +44,15 @@ function reapOrphans(runsDir, active) {
     const mp = path.join(runsDir, e.name, 'meta.json');
     const meta = U.safeJson(mp);
     if (!meta || (meta.status !== 'running' && meta.status !== 'queued')) continue;
+    // `active` only knows about runs THIS process launched. A second hub
+    // instance — the throwaway :5758 verify server every handoff tells agents to
+    // boot, or a restart child that never took the port — shares data/runs and
+    // would otherwise reap the real hub's in-flight runs, rewriting a live run
+    // to error+orphaned (seen live 2026-07-27: two successful autopilot runs
+    // flipped to error mid-flight, which then drove duplicate retries and
+    // A5 auto-continuations of already-finished work). Only reap what we own or
+    // what nobody owns any more.
+    if (pidAlive(meta.hubPid)) continue;
     meta.status = 'error';
     meta.endedAt = meta.endedAt || new Date().toISOString();
     meta.orphaned = true;

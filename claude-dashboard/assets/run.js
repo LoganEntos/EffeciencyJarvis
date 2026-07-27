@@ -6,6 +6,13 @@
 const chat = { sessionId: null, runId: null, es: null, running: false, t0: 0, timer: null, seen: -1 };
 // renderUsageGauge() lives in assets/rungauge.js (loaded just before this file).
 
+// The CLI session id is the only thread continuity there is, and app.js reloads
+// the page whenever the per-boot X-Hub-Token goes stale (i.e. every hub
+// restart) — which used to silently drop the thread and make the next prompt a
+// cold session. Persist it so a reload rejoins the same conversation.
+const RUN_SESS_KEY = 'hub.sess.run';
+try { chat.sessionId = localStorage.getItem(RUN_SESS_KEY) || null; } catch {}
+
 function ensureRunUI() {
   if ($('#chatLog')) return;
   $('#run').innerHTML = `
@@ -156,6 +163,13 @@ function ensureRunUI() {
   $('#runEffort').onchange = e => { try { localStorage.setItem('hub.effort', e.target.value); } catch {} };
   $('#runRecall').onchange = e => { try { localStorage.setItem('hub.recall', e.target.checked ? '1' : '0'); } catch {} };
   $('#jarvisToggle').onchange = e => { try { localStorage.setItem('hub.jarvis', e.target.checked ? '1' : '0'); } catch {} initJarvis(); };
+  // A session restored from localStorage outlives the transcript (which is
+  // memory-only), so re-arm the badge and say the thread is still live —
+  // otherwise an empty log after a reload reads as a silent reset.
+  if (chat.sessionId) {
+    setSession(chat.sessionId);
+    addMsg(`⟲ resuming CLI session ${chat.sessionId.slice(0, 8)}… — earlier turns aren't shown here, but Claude still has them. Press ＋ new chat for a clean thread.`, 'sys');
+  }
 }
 
 // hermes is a deprecated paid stack, OFF by default. Reveal the engine option
@@ -270,6 +284,10 @@ function attachStream(id) {
     chat.lastActivity = Date.now(); if (chat.hb) chat.hb.idleMs = 0; // any line = fresh activity
     let o; try { o = JSON.parse(e.data); } catch { return; }
     if (chat.queued && o.type === 'system') { chat.queued = false; chat.t0 = Date.now(); } // slot freed — run started
+    // Claim the session id from the INIT event, not just the terminal result:
+    // a cancel/stream-drop/restart never emits `result`, and waiting for it left
+    // the whole thread unresumable (every cancelled run has sessionId=null).
+    if (o.type === 'system' && o.subtype === 'init' && o.session_id) setSession(o.session_id);
     const result = renderLine(o);
     if (result && result.session_id) setSession(result.session_id);
   });
@@ -314,7 +332,10 @@ async function cancelRun() {
 
 function setSession(sid) {
   chat.sessionId = sid;
+  try { sid ? localStorage.setItem(RUN_SESS_KEY, sid) : localStorage.removeItem(RUN_SESS_KEY); } catch {}
   const b = $('#chatSession');
+  if (!b) return;
+  if (!sid) { b.classList.add('hidden'); return; }
   b.textContent = '⟲ resumes ' + sid.slice(0, 8) + '…';
   b.classList.remove('hidden');
 }
@@ -322,7 +343,7 @@ function setSession(sid) {
 function newChat() {
   if (chat.es) { chat.es.close(); chat.es = null; }
   clearInterval(chat.timer); chat.timer = null;
-  chat.sessionId = null; chat.runId = null; chat.running = false; chat.seen = -1;
+  setSession(null); chat.runId = null; chat.running = false; chat.seen = -1;
   chat.hermesEl = null; chat.hermesText = '';
   $('#chatSession').classList.add('hidden');
   $('#runStatus').innerHTML = '';

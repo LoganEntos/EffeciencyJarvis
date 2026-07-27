@@ -10,8 +10,22 @@
    (pending file chips → images/files refs on the run payload). */
 'use strict';
 (function () {
-  const S = { es: null, running: false, sending: false, runId: null, seen: -1, sessionId: null, bubble: null, buf: '', turnCount: 0 };
+  // S.log mirrors every #jconv entry so the transcript survives a tab re-render
+  // (renderers.jarvis blows away #jarvis wholesale) — same shape projectchat.js
+  // already uses. S.bubbleIdx is the log slot the streaming bubble writes into,
+  // so a replay can re-point S.bubble at the live element.
+  const S = { es: null, running: false, sending: false, runId: null, seen: -1, sessionId: null,
+    bubble: null, bubbleIdx: -1, buf: '', turnCount: 0, log: [] };
   const recallOn = () => { try { return localStorage.getItem('hub.recall') === '1'; } catch { return false; } };
+  // The CLI session id is the ONLY thread continuity we have, and the page
+  // reloads itself on a stale per-boot token (app.js) — so a hub restart used to
+  // silently start every following prompt from scratch. Persist it.
+  const SESS_KEY = 'hub.sess.jarvis';
+  function setSessionId(sid) {
+    S.sessionId = sid || null;
+    try { sid ? localStorage.setItem(SESS_KEY, sid) : localStorage.removeItem(SESS_KEY); } catch {}
+  }
+  try { S.sessionId = localStorage.getItem(SESS_KEY) || null; } catch {}
   const timeOf = iso => { try { return new Date(iso).toLocaleTimeString(undefined, { hour12: false }); } catch { return ''; } };
 
   // ---- session badge (panel header): short id when resumed, "＋ new" when fresh
@@ -28,15 +42,37 @@
     }
   }
 
-  function jconvAppend(html, cls) {
+  // Mount log slot i into #jconv. Every visible entry goes through here so a
+  // replay after a re-render reproduces the feed exactly.
+  function mountEntry(i) {
     const feed = $('#jconv'); if (!feed) return null;
+    const e = S.log[i]; if (!e) return null;
     const stick = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
     const wrap = document.createElement('div');
-    wrap.className = cls || 'jmsg';
-    wrap.innerHTML = html;
+    wrap.className = e.cls;
+    wrap.innerHTML = e.html;
+    wrap.dataset.logi = String(i);
     feed.appendChild(wrap);
     if (stick) feed.scrollTop = feed.scrollHeight;
     return wrap;
+  }
+  function jconvAppend(html, cls) {
+    S.log.push({ html, cls: cls || 'jmsg' });
+    return mountEntry(S.log.length - 1);
+  }
+  // Rebuild the whole feed from S.log — called on every mount (wire()), which
+  // is what makes a Jarvis-tab re-render non-destructive.
+  function replayLog() {
+    const feed = $('#jconv'); if (!feed) return;
+    if (!S.log.length) return;             // nothing to restore; keep the placeholder
+    feed.innerHTML = '';
+    let live = null;
+    for (let i = 0; i < S.log.length; i++) {
+      const el = mountEntry(i);
+      if (i === S.bubbleIdx) live = el;
+    }
+    if (live) S.bubble = live;             // re-point the streaming bubble
+    feed.scrollTop = feed.scrollHeight;
   }
   function jmsgHtml(kind, textHtml) {
     const av = kind === 'user' ? `<div class="java user">you</div>`
@@ -47,6 +83,13 @@
       <div class="jmsg-meta">${esc(who)} · ${esc(timeOf(new Date().toISOString()))}</div>
       <div class="jmsg-text">${textHtml}</div></div>`;
   }
+  // Append an assistant bubble AND remember which log slot it owns, so streamed
+  // text keeps updating the right entry across a re-render.
+  function openBubble(html) {
+    S.bubble = jconvAppend(jmsgHtml('assistant', html), 'jmsg assistant');
+    S.bubbleIdx = S.log.length - 1;
+    return S.bubble;
+  }
   function setBubble(text, streaming) {
     const b = S.bubble; if (!b) return;
     const body = b.querySelector('.jmsg-text');
@@ -54,12 +97,15 @@
     // an escaped plain-text render if it's ever missing.
     const html = (typeof mdToHtml === 'function') ? mdToHtml(text) : esc(text);
     if (body) body.innerHTML = html + (streaming ? '<span class="jcaret">▍</span>' : '');
+    // Mirror the rendered bubble back into the log so a replay shows the reply,
+    // not the "thinking…" shimmer it started as.
+    if (S.bubbleIdx >= 0 && S.log[S.bubbleIdx]) S.log[S.bubbleIdx].html = b.innerHTML;
     const feed = $('#jconv');
     if (feed && feed.scrollHeight - feed.scrollTop - feed.clientHeight < 200) feed.scrollTop = feed.scrollHeight;
   }
   function renderLine(o) {
     if (!o || typeof o !== 'object') return;
-    if (o.type === 'system' && o.subtype === 'init' && o.session_id) S.sessionId = o.session_id;
+    if (o.type === 'system' && o.subtype === 'init' && o.session_id) { setSessionId(o.session_id); renderSessBadge(); }
     if (o.type === 'assistant' && o.message && Array.isArray(o.message.content)) {
       for (const b of o.message.content) {
         if (!b) continue;
@@ -71,7 +117,7 @@
         } else if (b.type === 'tool_use') {
           const summ = (b.input && b.input.title) ? b.input.title : (b.name || 'tool');
           jconvAppend(jmsgHtml('tool', `⚒ ${esc(b.name || 'tool')} · <span class="dim">${esc(summ)}</span>`), 'jmsg tool');
-          S.bubble = jconvAppend(jmsgHtml('assistant', '<span class="jshimmer">working…</span>'), 'jmsg assistant');
+          openBubble('<span class="jshimmer">working…</span>');
           S.buf = '';
         }
       }
@@ -117,8 +163,11 @@
       const noun = imgs.length && !docs.length ? ('image' + (imgs.length > 1 ? 's' : '')) : ('file' + (atts.length > 1 ? 's' : ''));
       prompt = 'Take a look at the attached ' + noun + '.';
     }
+    // Drop the empty-state placeholder on the first real turn. Keyed off the log
+    // being empty — the old `.jmsg-meta[style]` probe also matched a rendered
+    // attach-error row, so any such row made EVERY later send wipe the feed.
     const feed = $('#jconv');
-    if (feed && feed.querySelector('.jmsg-meta[style]')) feed.innerHTML = '';
+    if (feed && !S.log.length) feed.innerHTML = '';
     if (ta) { ta.value = ''; ta.style.height = 'auto'; } S.buf = '';
     // thread timeline (assets/jarvistimeline.js): tag this turn's user bubble
     // so a dot can scrollIntoView it later; the count also drives the dots.
@@ -132,7 +181,7 @@
     // revoking the local blob URLs.
     if (imgs.length) jconvAppend(imgs.map(c => `<img src="/api/files/view?name=${encodeURIComponent(c.previewName || '')}" alt="attached image" class="jattach-img" data-preview="${esc(c.previewName || '')}" style="cursor:zoom-in">`).join(''), 'jmsg attachimgs');
     if (docs.length) jconvAppend(jmsgHtml('user', docs.map(c => `<span class="jattach-doc" data-preview="${esc(c.previewName || '')}" style="cursor:pointer">📎 ${esc(c.name)}</span>`).join('<br>')), 'jmsg user');
-    S.bubble = jconvAppend(jmsgHtml('assistant', '<span class="jshimmer">thinking…</span>'), 'jmsg assistant');
+    openBubble('<span class="jshimmer">thinking…</span>');
     const model = ($('#runModel') && $('#runModel').value) || 'auto';
     const perm = ($('#runPerm') && $('#runPerm').value) || 'bypassPermissions';
     // ◐ think toggle (jarvistab.js #jThinkBtn): one-shot — armed for exactly
@@ -165,7 +214,7 @@
     es.addEventListener('done', ev => {
       es.close(); S.es = null; S.running = false;
       let meta = {}; try { meta = JSON.parse(ev.data); } catch {}
-      if (meta.sessionId) S.sessionId = meta.sessionId;
+      if (meta.sessionId) setSessionId(meta.sessionId);
       setBubble(S.buf || '(no reply)', false);
       try { if (window.HubVoice && HubVoice.onRunDone) HubVoice.onRunDone(S.buf); } catch {}
       setRunningUI(false);
@@ -190,7 +239,7 @@
     if (S.running) cancel(); // don't orphan a live run when starting fresh
     if (S.es) { try { S.es.close(); } catch {} S.es = null; }
     S.running = false; S.sending = false; S.runId = null; S.seen = -1;
-    S.sessionId = null; S.bubble = null; S.buf = ''; S.turnCount = 0;
+    setSessionId(null); S.bubble = null; S.bubbleIdx = -1; S.buf = ''; S.turnCount = 0; S.log = [];
     const feed = $('#jconv'); if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">new conversation — the next prompt starts a fresh CLI session</div>';
     if (window.jarvisAttach) jarvisAttach.clear();
     if (window.jarvisTimeline) jarvisTimeline.render(0);
@@ -212,6 +261,16 @@
       const t = e.target.closest && e.target.closest('[data-preview]');
       if (t && t.dataset.preview && typeof openFilePreview === 'function') openFilePreview(t.dataset.preview);
     };
+    // renderers.jarvis rebuilds #jarvis wholesale (refresh button, R key, retry),
+    // which used to destroy the conversation with no way back. Restore it.
+    replayLog();
+    if (window.jarvisTimeline) jarvisTimeline.render(S.turnCount);
+    // Session survived a page reload but the transcript didn't (it lives in
+    // memory only) — say so rather than looking like a silent reset.
+    if (S.sessionId && !S.log.length) {
+      if (feed) feed.innerHTML = '';   // drop the empty-state placeholder first
+      jconvAppend(`<div class="jmsg-meta">⟲ resuming CLI session ${esc(S.sessionId.slice(0, 8))}… — earlier turns aren't shown, but Jarvis still has them. Press ＋ new for a clean thread.</div>`, 'jmsg result');
+    }
     renderSessBadge();
   }
   // sendText = programmatic entry for the voice conversation engine
