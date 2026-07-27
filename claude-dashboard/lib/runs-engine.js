@@ -177,6 +177,11 @@ function createEngine({ active, queue, MAX_ACTIVE, runningCount, claudeExe, PROJ
       }
     });
     child.stderr.on('data', d => { if (st.stderr.length < 20000) st.stderr += d; });
+    // Cancelling force-taskkills the tree mid-write; a pipe 'error' with no handler
+    // is an uncaughtException that would crash the hub and every other in-flight
+    // run. Swallow it — 'close'/onExit still runs and finalizes the run. (C68; cf. C28/C40/C58)
+    child.stdout.on('error', () => {});
+    child.stderr.on('error', () => {});
     child.on('error', e => { st.stderr += '\nspawn error: ' + e.message; });
     child.on('close', code => onExit(st, code));
   }
