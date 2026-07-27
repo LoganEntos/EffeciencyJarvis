@@ -222,7 +222,10 @@ window.HubVoiceTTS = function (ctx) {
   // Now blocks queue and play back-to-back. The mic re-opens (call mode) / the
   // orb idles only when the queue is EMPTY and the run has stopped streaming —
   // never between two blocks of the same reply.
-  const Q = { items: [], active: false, last: '', streaming: false };
+  // muted = this reply stream was barged-in on (wake word / typing / Esc) while
+  // its source run is still streaming; replyText/replyDone drop further blocks so
+  // the interrupted run can't resume speaking. Cleared per-run by replyStart.
+  const Q = { items: [], active: false, last: '', streaming: false, muted: false };
   function enqueueSpeak(text) {
     const t = String(text || '').trim();
     if (!t || t === Q.last) return !!t;        // dedupe: replyDone repeats the final block
@@ -244,7 +247,7 @@ window.HubVoiceTTS = function (ctx) {
   // Queue-clearing barge-in: every caller in voice.js (typing, Esc, orb click,
   // run start) funnels here, so a new prompt never leaks the prior reply's
   // remaining blocks.
-  function stopSpeak() { Q.items.length = 0; Q.active = false; Q.last = ''; Q.streaming = false; haltAudio(); }
+  function stopSpeak() { Q.items.length = 0; Q.active = false; Q.last = ''; Q.streaming = false; Q.muted = true; haltAudio(); }
   const queueBusy = () => speakingNow() || Q.active;
   // Read replies aloud right now? Voice in → voice out, always (V.voiceTurn);
   // the Jarvis tab is a voice-first surface, so it always speaks; elsewhere
@@ -275,11 +278,11 @@ window.HubVoiceTTS = function (ctx) {
   }
 
   // ---- run-reply hooks (voice.js onRunStart/onAssistantText/onRunDone) ------
-  function replyStart() { stopSpeak(); Q.streaming = true; if (!V.listening) setState('thinking'); }
-  function replyText(text) { if (text && wantSpeak()) enqueueSpeak(text); }
+  function replyStart() { stopSpeak(); Q.muted = false; Q.streaming = true; if (!V.listening) setState('thinking'); }
+  function replyText(text) { if (text && !Q.muted && wantSpeak()) enqueueSpeak(text); }
   function replyDone(text) {
     Q.streaming = false;                       // no more blocks — the queue may transition
-    if (wantSpeak() && text) enqueueSpeak(text);
+    if (!Q.muted && wantSpeak() && text) enqueueSpeak(text);
     if (!Q.active) drainSpeak();               // finish the queue, or (empty) re-listen / idle
   }
   // one-shot public speak (persona-switch confirmations etc.) — a plain enqueue
