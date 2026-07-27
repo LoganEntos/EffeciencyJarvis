@@ -174,6 +174,19 @@ const mapItem = it => ({
 });
 
 // ---- full-tenant index (delta crawl) ---------------------------------------
+// Cache the parsed index keyed by file mtime: searchIndex fires per debounced
+// keystroke and the status poll hits every 3s during device-code login, so
+// re-parsing a multi-MB JSON several times a second stalls live SSE streams.
+// A stat() is cheap; JSON.parse of megabytes is not. Invalidated on mtime change
+// (buildIndex() rewrites the file) — see the explicit reset after writeFileSync.
+let idxCache = { mtimeMs: -1, data: null };
+function loadIndex() {
+  let st; try { st = fs.statSync(INDEX_FILE); } catch { idxCache = { mtimeMs: -1, data: null }; return null; }
+  if (st.mtimeMs === idxCache.mtimeMs) return idxCache.data;
+  const data = U.safeJson(INDEX_FILE);
+  idxCache = { mtimeMs: st.mtimeMs, data };
+  return data;
+}
 let crawl = { running: false, phase: 'idle', sites: 0, drives: 0, files: 0, folders: 0, error: null, startedAt: null };
 async function buildIndex() {
   if (crawl.running) return;
@@ -211,18 +224,19 @@ async function buildIndex() {
     out.durationMs = Date.now() - crawl.startedAt;
     fs.mkdirSync(DATA, { recursive: true });
     fs.writeFileSync(INDEX_FILE, JSON.stringify(out));
+    idxCache = { mtimeMs: -1, data: null }; // force reparse on next read of the fresh index
     crawl.phase = 'done';
   } catch (e) { crawl.error = e.message; crawl.phase = 'error'; }
   crawl.running = false;
 }
 function indexStats() {
-  const idx = U.safeJson(INDEX_FILE);
+  const idx = loadIndex();
   if (!idx) return null;
   return { builtAt: idx.builtAt, counts: idx.counts, durationMs: idx.durationMs, file: 'claude-dashboard/data/sharepoint-index.json' };
 }
 // Offline BREAKDOWN — navigate the static index as a tree, no Graph calls.
 function indexTree() {
-  const idx = U.safeJson(INDEX_FILE);
+  const idx = loadIndex();
   if (!idx) return { error: 'no index yet — build it first' };
   return {
     builtAt: idx.builtAt,
@@ -233,7 +247,7 @@ function indexTree() {
   };
 }
 function browseIndex(driveId, prefix) {
-  const idx = U.safeJson(INDEX_FILE);
+  const idx = loadIndex();
   if (!idx) return { error: 'no index yet — build it first' };
   let drive = null, siteName = '';
   for (const s of idx.sites || []) for (const d of s.drives || []) if (d.id === driveId) { drive = d; siteName = s.name; }
@@ -269,7 +283,7 @@ function graphifyStamp() {
 }
 function graphifyInfo() { const j = U.safeJson(GRAPHIFY_FILE); return j && j.at ? { at: j.at } : null; }
 function searchIndex(q) {
-  const idx = U.safeJson(INDEX_FILE);
+  const idx = loadIndex();
   if (!idx) return { error: 'no index yet — build it first' };
   const needle = (q || '').toLowerCase();
   if (!needle) return { hits: [] };
