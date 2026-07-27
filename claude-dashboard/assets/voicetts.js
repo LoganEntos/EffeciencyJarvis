@@ -109,6 +109,26 @@ window.HubVoiceTTS = function (ctx) {
   // first sentence alone (fast start), then a small chunk (short first gap),
   // then larger ones (fewer boundaries → less total silence). Fetches run
   // back-to-back so the GPU never idles.
+  // The server proxy hard-caps each POST body at 1200 chars (voice.js) and drops
+  // the tail with no spoken marker. A single boundary-less sentence can exceed
+  // that, so cap every chunk to HARD_MAX (< 1200, headroom) here — split on the
+  // last space so nothing is cut mid-word; the pieces stay in order and play
+  // back-to-back, so the whole sentence is spoken instead of silently clipped.
+  const HARD_MAX = 1000;
+  function hardSplit(chunk) {
+    if (chunk.length <= HARD_MAX) return [chunk];
+    const parts = [];
+    let rest = chunk;
+    while (rest.length > HARD_MAX) {
+      const win = rest.slice(0, HARD_MAX);
+      let cut = win.lastIndexOf(' ');
+      if (cut < HARD_MAX * 0.5) cut = HARD_MAX;   // no usable space → hard cut
+      parts.push(rest.slice(0, cut).trim());
+      rest = rest.slice(cut).trim();
+    }
+    if (rest) parts.push(rest);
+    return parts;
+  }
   function csmChunks(text) {
     const sents = text.match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+\s*$/g) || [text];
     const out = []; let cur = '';
@@ -118,7 +138,8 @@ window.HubVoiceTTS = function (ctx) {
       cur += s;
     }
     if (cur.trim()) out.push(cur.trim());
-    return out.length ? out : [text];
+    const chunks = out.length ? out : [text];
+    return chunks.flatMap(hardSplit);            // keep every chunk under the server's 1200-char cap
   }
   // A generic fetch-ahead → play-in-order pipeline. Given ordered `chunks`, it
   // fetches each (opts.fetch → Promise<blob>) back-to-back so the synth engine
