@@ -84,6 +84,11 @@ function summarizeOne(id, timeoutMs = 30000) {
     catch (e) { return finish({ summary: '' }); }
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
+    // Stream 'error' (broken pipe / fd error) is emitted on the stream, not the
+    // ChildProcess emitter below — unhandled it becomes uncaughtException and
+    // crashes the hub. Swallow it; the timeout/close path still resolves. (C58, mirrors C40)
+    child.stdout.on('error', () => {});
+    child.stderr.on('error', () => {});
     child.on('error', () => finish({ summary: '' }));
     child.on('close', () => {
       const s = out.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
