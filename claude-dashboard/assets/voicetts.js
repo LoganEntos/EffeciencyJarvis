@@ -189,7 +189,12 @@ window.HubVoiceTTS = function (ctx) {
         }
         if (firstUnplayed) {                  // nothing spoken yet — full fallback
           V.csmPending = false;
-          if (!speakBrowser(clean, onDone) && onDone) onDone(); // keep the queue moving even if both engines fail
+          // iOS silently drops an async speechSynthesis.speak() but speakBrowser
+          // still returns true, so onend/onerror never fire and the queue hangs
+          // (Q.active stuck → afterReply never runs → orb frozen). Skip the
+          // browser fallback on mobile and drain directly so the turn advances.
+          if (isMobileDevice()) { if (onDone) onDone(); }
+          else if (!speakBrowser(clean, onDone) && onDone) onDone(); // keep the queue moving even if both engines fail
         }
       },
     }).start();
