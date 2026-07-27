@@ -44,6 +44,7 @@ function request(method, urlStr, headers, body) {
       const chunks = [];
       res.on('data', d => chunks.push(d));
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+      res.on('error', reject); // conn drop mid-response (VPN/proxy RST) else crashes the hub
     });
     req.on('error', reject);
     req.setTimeout(60000, () => { req.destroy(new Error('graph request timeout')); });
