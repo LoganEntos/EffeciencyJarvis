@@ -1,7 +1,21 @@
 # HANDOFF — Claude Hub  ⭐ START HERE
 
 Read this first, then `docs/roadmap.md` — the ONE canonical status + plan doc.
-Work happens in **this repo** (`C:\Users\logto\Documents\claude-hub`).
+Work happens in **this repo**:
+`C:\Users\Logan Barker\Desktop\claudecodeproject\EffeciencyJarvis`
+
+**Doc map** (there are only four files you need; everything else in `docs/` is
+reference or history):
+| File | Answers |
+|------|---------|
+| `AGENTS.md` | the short, binding rules — read if you read nothing else |
+| `CLAUDE.md` | the same rules in full, plus the design language |
+| `HANDOFF.md` (this) | what is true right now, and what's blocking |
+| `docs/roadmap.md` | what to build next |
+
+`docs/archive/` is history — never a source of current truth. Handoffs in
+`docs/handoffs/` are live work orders; resolved ones move to
+`docs/archive/handoffs/`.
 
 ## What this is (30 seconds)
 A **zero-dependency** local Node web app that is the user's front end for working
@@ -54,19 +68,32 @@ docs/handoffs/           live work orders for hub runs (resolved ones → docs/a
 ```
 Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Sources · Tools · Config (+ SharePoint).
 
-## Current truth (2026-07-25)
+## Current truth (2026-07-27)
 
-- **The self-improvement loop is code-complete and hardened** (C14–C18,
-  `90c7b92`): autopilot falls back to the hub task queue FIFO, retries
-  errored/gone tasks (capped), follows continuation-on-death relinks, and the
-  claude CLI is auto-discovered (npm global → desktop-app bundle). The scout
-  schedule is seeded but DISABLED, autopilot toggle OFF.
-- **Desktop node (Desktop\claudecodeproject\EffeciencyJarvis): hub runs are
-  blocked on auth** — the CLI here has never been logged in (desktop-app auth
-  doesn't reach headless spawns; every run ends "Not logged in"). One-time fix
-  by the USER: run `claude` in a terminal once and `/login`, then arm autopilot
-  + the scout schedule from Config. Everything else is verified working (95/95
-  smoke, run engine spawns the CLI fine).
+**⚠ Git: 81 commits unpushed. `origin/master` is at `58ad57d` (2026-07-24).**
+Everything from 07-25 onward — the marathon, the autopilot run, today's
+stability fixes — exists ONLY in local git on this machine. History is linear
+(0 behind), so a push would be a clean fast-forward. **The user drives the
+push and has deliberately held it**: GitHub is the last known-good checkpoint
+and there are no branches, so it stays untouched until the tree is trusted
+again. Do not push.
+
+- **The autonomous loop is OFF, deliberately** (2026-07-27). Autopilot toggle
+  off and the seeded scout schedule disabled. It had been dispatching unattended
+  opus runs every ~5 min, saturating both run slots (`MAX_ACTIVE = 2`) so user
+  prompts queued for minutes or were refused outright, and committing to the
+  repo while the user was trying to debug it. Re-arm from Config only
+  deliberately, and not while doing hands-on work.
+- **Auth is resolved** — the CLI on this node is logged in; runs spawn and
+  complete normally. (Older notes saying hub runs end "Not logged in" are stale.)
+- **The front-end chat reset is FIXED** (`b866cfa`). Threads now survive
+  sequential prompts, a Jarvis tab re-render, and a full page reload; a
+  cancelled run stays resumable. Session ids are claimed from the `system/init`
+  event and persisted per surface (`hub.sess.jarvis` / `hub.sess.run`). Verified
+  live on :5758, smoke 98/98.
+- **Known-good invariants as of today:** no file over 500 lines (largest:
+  `components.css` 478), zero npm deps, `127.0.0.1` bind only, all 76 JS files
+  parse, index.html script wiring is a 1:1 match with `assets/`.
 
 - **Engine = Claude ONLY.** The stack is Claude Code's own: auto model-routing +
   14 model-tiered subagents + agent teams (`lib/teams.js`). **hermes is DEPRECATED
@@ -89,6 +116,24 @@ Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph ·
 
 
 ## Latest work shipped
+
+**2026-07-27 — stability pass (`b866cfa`).** Fixed the "chat resets after every
+prompt and is incoherent" P0. Four independent faults, all in continuity, none
+in the `--resume` plumbing (which was verified working): (1) `jarvischat.js`
+kept no transcript log, so the Jarvis tab's wholesale re-render destroyed the
+conversation — it now mirrors entries into `S.log` and replays on mount, as
+`projectchat.js` already did; (2) the session id lived only in memory while
+`app.js` reloads the page on a stale per-boot token, so every hub restart
+started a cold session — now persisted per surface; (3) the session id was
+claimed only from the terminal `result` event, so any cancel / stream drop /
+restart left the thread unresumable (every cancelled run before today has
+`sessionId: null`) — now claimed from `system/init`; (4) `buildRunHint`'s ~2.9k
+chars rode in the user turn of *every* prompt including resumed ones, stacking N
+copies against the user's words — resumed turns now get a 155-char continuation
+note. Plus: the orphan reaper had no ownership check, so a second hub instance
+(the throwaway :5758 verify server) reaped the live hub's in-flight runs and
+drove duplicate retries — runs now carry `hubPid` and only their owner reaps
+them.
 
 **2026-07-25/26 marathon (21 commits, full log: `docs/archive/autonomy-log-2026-07-26.md`):**
 loop hardening C14–C18 (`90c7b92`) → chat items 4+5, persona system-layer,
