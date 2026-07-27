@@ -163,7 +163,7 @@ document.querySelectorAll('nav a').forEach(a => {
 // rendered, and one delegated key handler activates it. The global :focus-visible
 // ring (style.css) then shows keyboard focus for free. To cover a new clickable
 // pattern anywhere, just add its selector here — nothing else to touch.
-const CLICKABLE_SEL = '.row.clickable,.card.clickable,.iconCell,.tag-pill,.mem-item,.mem-backlink,.mem-tag,.ndnb,.pill[data-f],.pill[data-t],#liveBadge,.prun[data-id],.projTile[data-img],.projTile[data-doc],.pchat-hpill[data-id],.dropzone';
+const CLICKABLE_SEL = '.row.clickable,.card.clickable,.iconCell,.tag-pill,.mem-item,.mem-backlink,.mem-tag,.ndnb,.pill[data-f],.pill[data-t],.pill[data-m],.pill[data-v],#liveBadge,.prun[data-id],.projTile[data-img],.projTile[data-doc],.pchat-hpill[data-id],.dropzone';
 function upgradeClickables(root) {
   const els = root.matches && root.matches(CLICKABLE_SEL) ? [root] : [];
   root.querySelectorAll && els.push(...root.querySelectorAll(CLICKABLE_SEL));
