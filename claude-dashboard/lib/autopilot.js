@@ -232,6 +232,7 @@ function tick() {
   state.lastTick = new Date().toISOString();
   if (!state.enabled) { saveState(state); return; }
   refreshDispatched(state);
+  tasks.pruneAutopilot(); // C55: evict old settled autopilot tasks so tasks.json can't grow unbounded
   if (inflightCount(state) >= MAX_INFLIGHT) { saveState(state); return; }
   if (runs.runningCount() + runs.queueLength() >= MAX_QUEUE_PRESSURE) { saveState(state); return; } // don't pile onto a busy engine
   // Infra backoff: an API/TLS/network failure was just observed — dispatching

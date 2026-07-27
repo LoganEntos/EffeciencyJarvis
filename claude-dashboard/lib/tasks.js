@@ -103,6 +103,33 @@ function enqueue({ title, prompt, model, source, effort }) {
   return t;
 }
 
+// Keep tasks.json bounded (C55). Autopilot enqueues one task per backlog
+// dispatch AND per retry (lib/autopilot.js); nothing else deletes them, so over
+// long unattended operation the file grows without bound and enrich() — a
+// getRunMeta disk read per row on every /api/tasks GET — degrades linearly.
+// Evict the OLDEST *settled* source:'autopilot' tasks, keeping the most recent
+// `keep`. Only settled ones are removed: a never-run or still-running task must
+// survive so autopilot's inflightCount/refreshDispatched can still find it, and
+// user-typed tasks are never touched. Returns the number removed.
+const AUTOPILOT_KEEP = 40;
+function pruneAutopilot(keep = AUTOPILOT_KEEP) {
+  const list = load();
+  const auto = list.filter(t => t.source === 'autopilot');
+  if (auto.length <= keep) return 0; // cheap early-out: no getRunMeta reads
+  const isSettled = t => {
+    if (t.done) return true;         // completed out-of-band
+    if (!t.runId) return false;      // never ran — still pickable/inflight, keep
+    const m = runs.getRunMeta(t.runId);
+    return !m || settled(m.status);  // gone (history deleted) counts as settled
+  };
+  const settledAuto = auto.filter(isSettled)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))); // newest first
+  const remove = new Set(settledAuto.slice(keep).map(t => t.id));
+  if (!remove.size) return 0;
+  save(list.filter(t => !remove.has(t.id)));
+  return remove.size;
+}
+
 // Continuation-on-death (runs.js continueRun) resumed a dead run as a new one:
 // point the owning task at the live run so the Tasks tab and autopilot follow
 // the chain instead of treating the dead original as this task's final word.
@@ -171,4 +198,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, enqueue, runTask, load, relinkRun };
+module.exports = { handle, enqueue, runTask, load, relinkRun, pruneAutopilot };
