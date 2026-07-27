@@ -77,7 +77,7 @@
     // which neural sidecar the status pill / Start / Test act on (browser → the
     // recommended fast one so you can install it before switching)
     const neuralEngine = () => (store.neural ? store.engine : 'kokoro');
-    container.querySelector('#vEngine').onchange = e => { store.engine = e.target.value; pollEngine(0); };
+    container.querySelector('#vEngine').onchange = e => { stopSpeak(); /* kill any in-flight reply so chunks aren't half Kokoro/half CSM + no mid-sentence cold-start gap */ store.engine = e.target.value; pollEngine(0); };
     container.querySelector('#vCsmSpk').onchange = e => {
       const n = parseInt(e.target.value, 10);
       store.csmSpeaker = isNaN(n) ? 0 : Math.max(0, Math.min(9, n));
