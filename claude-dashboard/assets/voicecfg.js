@@ -73,7 +73,10 @@
     container.querySelector('#vVoice').onchange = e => { store.voiceURI = e.target.value; };
     container.querySelector('#vRate').onchange = e => { store.rate = parseFloat(e.target.value); };
     container.querySelector('#vPause').oninput = e => { store.pause = parseFloat(e.target.value); const pv = container.querySelector('#vPauseVal'); if (pv) pv.textContent = parseFloat(e.target.value).toFixed(1) + 's'; };
-    container.querySelector('#vTest').onclick = () => speakBrowser('Voice is ready. I will read Claude\'s replies aloud when you turn talk-back on.');
+    // stopSpeak() first (like #vCsmTest) so the test can't overlap a draining
+    // neural reply with a second voice — SS.cancel() alone won't touch the CSM
+    // audio element, and its onend would desync the orb from the live queue.
+    container.querySelector('#vTest').onclick = () => { stopSpeak(); speakBrowser('Voice is ready. I will read Claude\'s replies aloud when you turn talk-back on.'); };
     // which neural sidecar the status pill / Start / Test act on (browser → the
     // recommended fast one so you can install it before switching)
     const neuralEngine = () => (store.neural ? store.engine : 'kokoro');
