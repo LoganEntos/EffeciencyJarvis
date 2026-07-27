@@ -135,6 +135,14 @@ function inflightCount(state) {
 // 2-minute error runs — so one infra sighting also pauses dispatch briefly.
 const INFRA_RE = /UNKNOWN_CERTIFICATE|Unable to connect to API|ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|rate.?limit|overloaded|api_error_status.:5|529|503/i;
 const INFRA_BACKOFF_MS = 10 * 60 * 1000;
+// C53 — cap cumulative infra refunds per ITEM (not per runId). The per-runId
+// guard (infraCredited) stops double-refunding one run, but attempts and the
+// runId reset on every re-dispatch, so an item whose fix legitimately echoes an
+// INFRA_RE token in its verify output would refund forever (attempts oscillate
+// 1→0→1→0) and re-dispatch every backoff window, burning opus/high budget. The
+// running total (infraRefunds) is carried forward across re-dispatch like
+// attempts; once it hits this cap refunds stop and MAX_ATTEMPTS finally bites.
+const MAX_INFRA_REFUNDS = 3;
 
 function refreshDispatched(state) {
   // Continuation-on-death (runs.js continueRun) relinks a task to its resumed
@@ -153,10 +161,16 @@ function refreshDispatched(state) {
     if (m) d.status = m.status;
     // Infra failure: refund the attempt (once per runId), un-park if it was
     // parked for this, and start the global dispatch backoff.
+    // Refund once per runId AND only while under the per-item lifetime cap, so a
+    // fix that keeps re-erroring with an INFRA_RE token can't dodge MAX_ATTEMPTS
+    // forever (C53). Backoff still fires on every infra sighting regardless.
     if (m && m.status === 'error' && INFRA_RE.test(m.errorExcerpt || '') && d.infraCredited !== d.runId) {
       d.infraCredited = d.runId;
-      d.attempts = Math.max(0, (d.attempts || 0) - 1);
       state.lastInfraAt = new Date().toISOString();
+      if ((d.infraRefunds || 0) < MAX_INFRA_REFUNDS) {
+        d.infraRefunds = (d.infraRefunds || 0) + 1;
+        d.attempts = Math.max(0, (d.attempts || 0) - 1);
+      }
     }
     if (m && m.status === 'error' && (d.attempts || 0) >= MAX_ATTEMPTS) d.status = 'stuck';
     else if (d.status === 'stuck' && (d.attempts || 0) < MAX_ATTEMPTS) d.status = 'error'; // un-park after refund
@@ -192,7 +206,7 @@ Keep the total change scoped to this one backlog item — do not bundle unrelate
   state.dispatched[item.id] = {
     taskId: t.id, runId: r.runId || null, status: r.error ? 'error' : 'running',
     attempts: (prev.attempts || 0) + 1, at: new Date().toISOString(),
-    error: r.error || null,
+    error: r.error || null, infraRefunds: prev.infraRefunds || 0, // carry the cap forward (C53)
   };
   state.lastPick = item.id;
   return r;
@@ -207,7 +221,7 @@ function dispatchTask(state, task) {
   state.dispatched[task.id] = {
     taskId: task.id, runId: r.runId || null, status: r.error ? 'error' : 'running',
     attempts: (prev.attempts || 0) + 1, at: new Date().toISOString(),
-    error: r.error || null, fromQueue: true,
+    error: r.error || null, fromQueue: true, infraRefunds: prev.infraRefunds || 0, // carry the cap forward (C53)
   };
   state.lastPick = task.id;
   return r;
