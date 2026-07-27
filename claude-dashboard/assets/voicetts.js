@@ -243,6 +243,26 @@ window.HubVoiceTTS = function (ctx) {
       || (typeof currentTab !== 'undefined' && currentTab === 'jarvis');
   }
 
+  // Pre-warm the chosen neural sidecar so the FIRST spoken chunk isn't also
+  // paying the engine's cold-start (CSM ~4.5 s fixed; Kokoro compiles GPU
+  // kernels on its first inference). Fired at Jarvis-tab-open and run-start —
+  // while the model is still thinking — so the warm-up overlaps the LLM's own
+  // latency instead of stacking onto the first word. A throw-away "." wav is
+  // fetched and discarded (never played). Throttled to one warm-up per engine
+  // per WARM_TTL so tab flips / back-to-back runs don't spam the GPU; a failed
+  // warm-up resets the clock so the next attempt can retry.
+  let warmEng = '', warmAt = 0;
+  const WARM_TTL = 60000;
+  function warmup() {
+    if (!wantSpeak()) return;                 // not speaking this turn → nothing to warm
+    const eng = store.neural ? store.engine : (isMobileDevice() ? 'kokoro' : null);
+    if (eng !== 'kokoro' && eng !== 'csm') return; // browser voice has no sidecar
+    const now = Date.now();
+    if (eng === warmEng && now - warmAt < WARM_TTL) return; // recently warmed
+    warmEng = eng; warmAt = now;
+    csmFetch('.', eng).catch(() => { if (eng === warmEng) warmAt = 0; }); // allow retry on failure; blob ignored
+  }
+
   // ---- run-reply hooks (voice.js onRunStart/onAssistantText/onRunDone) ------
   function replyStart() { stopSpeak(); Q.streaming = true; if (!V.listening) setState('thinking'); }
   function replyText(text) { if (text && wantSpeak()) enqueueSpeak(text); }
@@ -255,5 +275,5 @@ window.HubVoiceTTS = function (ctx) {
   function speak(text) { return enqueueSpeak(text); }
 
   return { synth, speak, speakBrowser, stopSpeak, speakingNow, queueBusy, csmFetch, playBlob,
-           replyStart, replyText, replyDone };
+           replyStart, replyText, replyDone, warmup };
 };

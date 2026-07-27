@@ -226,7 +226,7 @@
   // voicetts.js alongside the engines they drive; voice.js keeps the orb and
   // hotkeys. stopSpeak here is the queue-aware barge-in.
   const { speak, speakBrowser, stopSpeak, speakingNow, queueBusy, csmFetch, playBlob,
-          replyStart, replyText, replyDone } = _tts;
+          replyStart, replyText, replyDone, warmup } = _tts;
 
   // Build the conversation engine now that speak/stopSpeak/queueBusy exist.
   convo = window.HubVoiceConvo = window.HubVoiceConvoFactory({
@@ -305,7 +305,10 @@
   // queue (barge-in on the previous reply); onAssistantText speaks each block as
   // it streams (progress narration + the answer) so long CLI wind-down doesn't
   // read as lag; onRunDone closes the queue so the mic/orb transitions once.
-  function onRunStart() { if (!VOICE_DISABLED) { markRttStart(); replyStart(); } }
+  // warmup(): pre-warm the neural sidecar the instant a run begins, so its
+  // cold-start overlaps the LLM's thinking time instead of the first spoken
+  // chunk. No-op unless this turn will actually speak (see wantSpeak).
+  function onRunStart() { if (!VOICE_DISABLED) { markRttStart(); replyStart(); warmup(); } }
   function onAssistantText(text) {
     if (VOICE_DISABLED) return;
     if (convo) convo.noteReply(text); // feed the self-echo filter BEFORE audio plays
@@ -385,7 +388,7 @@
   }
 
   window.HubVoice = {
-    init, onRunStart, onRunDone, onAssistantText, speak, beginCall, endCall,
+    init, onRunStart, onRunDone, onAssistantText, speak, warmup, beginCall, endCall,
     _state: () => V.state, _call: () => V.call,
     // True while an in-flight run was voice-initiated (set by voiceconvo before
     // routeSend, cleared on convo close). run.js reads it to send the 'spoken'

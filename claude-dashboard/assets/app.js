@@ -140,6 +140,9 @@ function goTab(tab) {
   sec.setAttribute('aria-label', link ? link.textContent.trim() : tab);
   sec.tabIndex = -1;
   requestAnimationFrame(() => sec.focus({ preventScroll: true }));
+  // Opening the voice-first Jarvis tab pre-warms the neural TTS sidecar so the
+  // first spoken reply doesn't also pay the engine's cold-start (L5).
+  if (tab === 'jarvis') { try { window.HubVoice?.warmup?.(); } catch {} }
   load(tab);
 }
 // nav items are hrefless <a> that switch tabs, not navigate to a URL (backlog
