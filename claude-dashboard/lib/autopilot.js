@@ -81,7 +81,7 @@ function pickNext(state) {
     if (it.done) continue;
     const d = state.dispatched[it.id];
     if (d && d.status === 'stuck') continue;               // parked, don't retry forever
-    if (d && !['error', 'cancelled', 'gone'].includes(d.status)) continue; // still in flight or already done
+    if (d && !['error', 'gone'].includes(d.status)) continue; // in flight, done, or cancelled (human decision — stays skipped, matches A2)
     if (d && (d.attempts || 0) >= MAX_ATTEMPTS) continue;   // exhausted retries this session
     return { type: 'backlog', item: it };
   }
