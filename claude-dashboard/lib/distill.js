@@ -30,8 +30,10 @@ function claudeExe() {
 }
 
 // The distiller is a prompt engineer, NOT the agent: it rewrites, it never
-// answers or executes. Output is the bare prompt so the client can drop it
-// straight into the run + the transcript turn.
+// answers or executes. It emits a single JSON object {prompt, confidence} so
+// the caller can ship exactly ONE version of the ask (the rewrite) — and drop
+// the rewrite entirely when confidence is low, rather than ever handing the
+// agent two versions to hedge between (backlog C4).
 const SYS =
   'You are a prompt engineer for a coding agent working in a software repository. '
   + 'Rewrite the user\'s rough, spoken "vibe" request below into ONE clear, self-contained '
@@ -42,7 +44,10 @@ const SYS =
   + 'Write in plain words a person would say; only name a specific file, function, or flag when '
   + 'the user named it themselves. Keep it concise. Do NOT invent requirements, do NOT ask '
   + 'questions, do NOT answer or perform the task, do NOT add preamble or quotes. '
-  + 'Output ONLY the rewritten prompt.';
+  + 'Reply with ONLY a JSON object: {"prompt": "<the rewritten prompt>", "confidence": "high" | "low"}. '
+  + 'Set confidence to "low" when the request is ambiguous, emotional, or worded so precisely that '
+  + 'any rewrite risks losing meaning — the caller will then use the user\'s original words instead. '
+  + 'No markdown, no code fences, no text outside the JSON object.';
 
 // Build-shaped = an imperative "do/change something in the repo" ask. ONLY
 // these are worth paraphrasing through Haiku: nuance a rewrite drops off a
@@ -89,14 +94,22 @@ function distill(text, timeoutMs = 8000) {
     child.stderr.on('data', d => { err += d; });
     child.on('error', e => finish({ prompt: '', error: e.message }));
     child.on('close', code => {
-      const cleaned = out.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
-      if (!cleaned) return finish({ prompt: '', error: err.trim() || ('exit ' + code) });
-      // Append the user's exact words below the rewrite so nothing Haiku dropped
-      // or reshaped is lost — the agent sees the engineered prompt AND the source.
-      const withOriginal = cleaned
-        + '\n\n--- User\'s original words (verbatim — defer to these if the rewrite lost anything) ---\n'
-        + input;
-      finish({ prompt: withOriginal });
+      let raw = out.trim();
+      if (!raw) return finish({ prompt: '', error: err.trim() || ('exit ' + code) });
+      // Tolerate an accidental ```json fence, then parse the {prompt, confidence}
+      // object. We ship ONE version of the ask — never the rewrite plus the
+      // verbatim original — so the agent can't act on the wrong one or hedge.
+      raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch {}
+      // Unparseable output = we can't trust it; low confidence = the rewrite
+      // likely lost meaning. Either way skip distill entirely: the client falls
+      // back to the user's own words rather than a doubtful paraphrase.
+      if (!parsed || typeof parsed.prompt !== 'string') return finish({ prompt: '', skipped: 'unparseable' });
+      const prompt = parsed.prompt.trim();
+      if (!prompt) return finish({ prompt: '', skipped: 'empty rewrite' });
+      if (String(parsed.confidence).toLowerCase() !== 'high') return finish({ prompt: '', skipped: 'low confidence' });
+      finish({ prompt });
     });
   });
 }
