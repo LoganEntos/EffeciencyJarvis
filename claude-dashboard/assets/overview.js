@@ -50,13 +50,13 @@ function spark(vals, w, h) {
 
 renderers.overview = async function () {
   const [d, runs, routing, usage] = await Promise.all([
-    api('/api/overview'),
+    api('/api/overview').catch(() => ({})),
     api('/api/runs').catch(() => []),
     api('/api/routing').catch(() => null),
     api('/api/usage').catch(() => null),
   ]);
-  $('#projBadge').textContent = d.project;
-  $('#nodeBadge').textContent = 'Node ' + d.nodeVersion;
+  $('#projBadge').textContent = d.project || '—';
+  $('#nodeBadge').textContent = 'Node ' + (d.nodeVersion || '—');
 
   const today = new Date().toDateString();
   const tRuns = runs.filter(m => new Date(m.startedAt || m.queuedAt || 0).toDateString() === today);
@@ -275,9 +275,9 @@ renderers.overview = async function () {
       <div class="ovstatus-row"><span class="k">api auth</span><span class="v" style="color:${d.hasApiKey ? 'var(--green)' : 'var(--red)'}">${d.hasApiKey ? 'ok' : 'no auth'}</span></div>
       <div class="ovstatus-row"><span class="k">engram</span><span class="v">${d.engramCount || 0}</span></div>
       <div class="ovstatus-row"><span class="k">mcp</span><span class="v">${(d.mcpServers || []).length}</span></div>
-      <div class="ovstatus-row"><span class="k">agents</span><span class="v">${d.counts.agents}</span></div>
-      <div class="ovstatus-row"><span class="k">skills</span><span class="v">${d.counts.skills}</span></div>
-      <div class="ovstatus-row"><span class="k">commands</span><span class="v">${d.counts.commands}</span></div>
+      <div class="ovstatus-row"><span class="k">agents</span><span class="v">${d.counts?.agents ?? 0}</span></div>
+      <div class="ovstatus-row"><span class="k">skills</span><span class="v">${d.counts?.skills ?? 0}</span></div>
+      <div class="ovstatus-row"><span class="k">commands</span><span class="v">${d.counts?.commands ?? 0}</span></div>
     </div>
   </section>`;
 
