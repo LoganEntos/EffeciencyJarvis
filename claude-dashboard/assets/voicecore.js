@@ -72,8 +72,11 @@ window.HubVoiceCore = function (ctx) {
       const el = V.audioEl = V.audioEl || new Audio();
       el.src = silentWavUrl();
       const p = el.play();
-      if (p && p.catch) p.catch(() => {});
-      Promise.resolve(p).finally(() => { try { el.pause(); el.currentTime = 0; } catch {} });
+      // Chain the pause/reset onto the SAME caught promise — a separate
+      // Promise.resolve(p).finally(...) derivation would reject unhandled if
+      // play() rejects (autoplay block / device change on first gesture).
+      const reset = () => { try { el.pause(); el.currentTime = 0; } catch {} };
+      if (p && p.then) p.then(reset, reset); else reset();
     } catch {}
   }
   // A tiny, valid, silent WAV as a blob URL — used only to unlock the audio
