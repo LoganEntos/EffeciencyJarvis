@@ -115,7 +115,10 @@ function inflightCount(state) {
     const d = state.dispatched[id];
     if (!d.taskId) continue;
     const m = d.runId ? runs.getRunMeta(d.runId) : null;
-    const settled = m ? ['done', 'error', 'cancelled', 'gone'].includes(m.status) : !d.runId;
+    // A set runId whose meta is gone (run deleted from history) is SETTLED, not
+    // inflight — matches the C25 "gone=settled" fix in pickNext(). Otherwise a
+    // deleted done-run counts inflight forever and deadlocks the whole loop.
+    const settled = d.runId ? (m ? ['done', 'error', 'cancelled', 'gone'].includes(m.status) : true) : true;
     if (!settled) n++;
   }
   return n;
