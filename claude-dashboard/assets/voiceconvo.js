@@ -59,7 +59,12 @@ window.HubVoiceConvoFactory = function (ctx) {
   // token BEFORE the echo compare, using the same matcher the wake gate uses.
   // Otherwise STT mangling Jarvis's own name in the speaker bleed ("jarvas")
   // slips past isEcho's substring test while wakeRe still matches → self-barge-in.
-  const wakeCanon = s => s.replace(new RegExp(wakeRe().source, 'gi'), 'jarvis');
+  // BUT: drop real-word collisions ("travis") from the echo-side list only —
+  // otherwise a reply that mentions the name Travis canonicalizes to "jarvis"
+  // in replyTail, so the user's next bare "Jarvis" reads as an echo and gets
+  // swallowed instead of barging in (C74). The live wake gate keeps them.
+  const echoWakeRe = () => new RegExp(wakeRe().source.replace(/\|travis(?=[)|])/i, ''), 'gi');
+  const wakeCanon = s => s.replace(echoWakeRe(), 'jarvis');
   const norm = t => wakeCanon(String(t || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')).replace(/\s+/g, ' ').trim();
   function noteReply(text) {
     S.replyTail = (S.replyTail + ' ' + norm(text)).slice(-600);
