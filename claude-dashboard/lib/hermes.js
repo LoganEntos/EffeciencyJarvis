@@ -90,6 +90,10 @@ function launchOneshot(st, { HERMES_EXE, PROJECT_DIR, pushLine, finalize }) {
     }
   });
   child.stderr.on('data', d => { if (st.stderr.length < 20000) st.stderr += d; });
+  // Guard the pipe emitters: an EPIPE/fd error on either stream would otherwise
+  // be an uncaughtException that crashes the hub (same class as C58/C69).
+  child.stdout.on('error', () => {});
+  child.stderr.on('error', () => {});
   child.on('error', e => { st.stderr += '\nspawn error: ' + e.message; });
   child.on('close', code => {
     // flush a trailing partial line: if hermes' final output isn't newline-
