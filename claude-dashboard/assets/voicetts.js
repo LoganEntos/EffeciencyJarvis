@@ -29,11 +29,17 @@ window.HubVoiceTTS = function (ctx) {
   // trigger it.
   function synth(text, onDone) {
     let clean = String(text || '').replace(/```[\s\S]*?```/g, ' (code block) ').replace(/[*_`#>]/g, '').trim();
-    // CSM generates at ~0.4x realtime on this GPU, so its spoken cap is much
-    // tighter: long replies would take longer to synthesize than anyone waits.
-    // Kokoro is fast (near-realtime) so it gets the full browser-sized cap.
-    // Full text is always on screen regardless.
-    const cap = store.engine === 'csm' ? 400 : 700;
+    // Cap the SPOKEN length by the engine that will actually play it. Kokoro
+    // (near-realtime) and the browser voice both stream long replies fine —
+    // Kokoro flows through the csmChunks→ChunkPipeline fetch-ahead, the browser
+    // keeps a single utterance alive via the keep-alive timer — so they get a
+    // generous ceiling that only trips on an extreme wall of text, not on a
+    // substantive answer. CSM generates at ~0.4x realtime, so a very long reply
+    // would take longer to synthesize than anyone waits: it keeps a tighter cap
+    // and hands off to screen. Full text is always on screen regardless.
+    const engine = store.neural ? store.engine
+      : (isMobileDevice() && store.engine === 'browser') ? 'kokoro' : 'browser';
+    const cap = engine === 'csm' ? 900 : 2400;
     if (clean.length > cap) {
       // never cut mid-word: end the spoken part at the last sentence that fits
       const head = clean.slice(0, cap);
