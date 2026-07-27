@@ -40,6 +40,9 @@ async function renderAgentViz(body) {
   sel.value = aviz.runId;
   sel.onchange = () => { aviz.runId = sel.value; aviz.pinned = true; aviz.sel = null; fetchAgentGraph(); };
   await fetchAgentGraph();
+  // the await above yields; if the user left Agents mode meanwhile (stopAgentViz
+  // already ran, canvas gone from the DOM) don't install an orphaned poll/RAF
+  if (!$('#avCanvas')) return;
   // permanent light poll (local disk read, zero tokens): keeps the crew live
   // during a run and auto-jumps to a new run the moment one starts
   aviz.poll = setInterval(() => { if (!$('#graph').classList.contains('hidden')) fetchAgentGraph(); }, 3000);
