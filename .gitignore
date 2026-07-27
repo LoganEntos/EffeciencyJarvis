@@ -7,6 +7,10 @@ claude-dashboard/graphify-out/cache/
 # local-only Claude Code settings
 .claude/settings.local.json
 
+# MCP connectors: local machine paths + env blocks that may hold API keys.
+# The Config tab writes these verbatim; never let them reach git history.
+.mcp.json
+
 # node noise (the app itself must stay dependency-free)
 node_modules/
 

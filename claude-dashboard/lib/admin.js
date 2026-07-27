@@ -102,6 +102,9 @@ async function gitStatus() {
 async function gitCommit(message) {
   const msg = String(message || '').trim();
   if (!msg) return { error: 'commit message required' };
+  // add -A stages every non-ignored change. .mcp.json is gitignored (and no
+  // longer tracked) precisely because addMcp writes env blocks that routinely
+  // hold API keys — so it is skipped here and can never reach git history.
   const add = await U.run('git', ['add', '-A'], 15000, false, PROJECT_DIR);
   if (add.code !== 0) return { error: 'git add failed: ' + add.out.slice(0, 300) };
   const c = await U.run('git', ['commit', '-m', msg], 20000, false, PROJECT_DIR);
