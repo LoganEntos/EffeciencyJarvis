@@ -7,6 +7,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const U = require('./util');
 
 const DATA_DIR = path.join(path.resolve(__dirname, '..'), 'data');
@@ -32,9 +33,22 @@ const DEFAULTS = {
 
 function load() { return Object.assign({}, DEFAULTS, U.safeJson(FILE) || {}); }
 
+// Atomic write (temp + rename) mirroring lib/tasks.js so a concurrent GET load()
+// can never read a half-written settings.json (which safeJson would null → the
+// app transiently falling back to DEFAULTS). Unique tmp name so two concurrent
+// POSTs can't clobber each other's temp file before the rename. Errors propagate
+// — never swallow a failed write and report false success to the client.
 function save(patch) {
   const s = Object.assign(load(), patch);
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(s, null, 2)); } catch {}
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = FILE + '.' + process.pid + '.' + crypto.randomBytes(4).toString('hex') + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(s, null, 2));
+    fs.renameSync(tmp, FILE);
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch {}
+    throw e;
+  }
   return s;
 }
 
@@ -56,7 +70,8 @@ async function handle(req, res, url) {
       patch.runGuardrails = r;
     }
     if (b.plan && typeof b.plan === 'object') patch.plan = Object.assign({}, load().plan, b.plan, { updatedAt: new Date().toISOString() });
-    U.sendJson(res, save(patch));
+    try { U.sendJson(res, save(patch)); }
+    catch (e) { U.sendJson(res, { error: 'could not persist settings: ' + e.message }, 500); }
     return true;
   }
   return false;
