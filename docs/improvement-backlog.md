@@ -317,3 +317,26 @@ session (L2/L3/C1/C2/C3); the rest are queued rows for the autonomous loop.
 | L5 | assets/voicetts.js warmup | Spoken first-word latency: CSM ~4.5s fixed; Kokoro sidecar pays a cold warmup on first call | pre-warm the chosen sidecar at tab-open/run-start so the first chunk isn't also paying warmup | M | med | ✅ 2026-07-26 |
 | C4 | lib/distill.js:93 | Distill appends the verbatim original under the rewrite, so the agent receives TWO versions of the ask and can act on the wrong one or hedge | send one prompt; if confidence in the rewrite is low, skip distill entirely rather than shipping both | S | low | ✅ 2026-07-26 |
 | C5 | assets/voicetts.js:36 | Spoken replies hard-cap at 400 (CSM)/700 (Kokoro) chars + "The rest is on screen" — a substantive answer gets clipped mid-thought | raise the Kokoro cap and/or split long replies into queued ChunkPipeline chunks instead of truncating | S | low | ✅ 2026-07-26 |
+
+## Audit round — 2026-07-26 (replenishment: recent-diff + least-swept modules)
+
+Four-agent read-only sweep after the L1–L5/C1–C5 latency+comms marathon: (a) code-reviewer
+over the last 8 commits' diff, (b) functionality-gap sweep (every SPA api()/fetch() endpoint
+matched to a live server route), (c) least-swept large modules (projects/xlsxcells/core/
+projectdetail/projectchat/overview/assetlib), (d) security pass on the new mic-dictation +
+AUTONOMOUS LOOP button. Two regressions from THIS session's own C4/L3 work found + two
+older items; every row re-verified against current source by the orchestrator.
+
+**Clean (no findings):** SPA↔server endpoint contract is fully consistent — ~90 distinct
+endpoints, zero 404-class mismatch, no dead nav/buttons (all in CLICKABLE_SEL wired).
+Security invariants intact on the changed surface — token guard on all non-GET, argv-only
+spawns (distill/sessionsum/runs-engine), traversal guards (inboxFile/resolveImages/safeDir/
+serveArtifact) all hold, CSP+nosniff on artifacts/uploads. No new stream-'error' crash class
+in the swept files (they use readFileSync, not createReadStream.pipe).
+
+| id | file:line | issue | fix | effort | risk | status |
+|----|-----------|-------|-----|--------|------|--------|
+| C47 | assets/jarvistab.js:134 | Stale `J.shaped` runs the WRONG prompt after C4's new confidence-gated distill returns `''` (now common). `shape()` only sets `J.shaped` on success and never clears it on the `!out` failure path (line 134 flashes + returns); `shapedPrompt()` (line 141) reads `J.shaped || value`. Scenario: user shapes a long build request (J.shaped set), edits the box to a different short/ambiguous ask, clicks Shape → Haiku returns low-confidence `''`, user sees only "distiller returned nothing"; clicking ▷ run then fires the OLD shaped prompt silently. The other two jarvisDistill callers (run-composer.js:110, projectchat.js:196) got a jarvisTransform fallback this round — this caller was missed | on `!out`, `J.shaped = ''` (or fall back to `jarvisTransform(src)`) so shapedPrompt() uses the live textarea | S | med | ⬜ |
+| C48 | assets/run-composer.js:131-132 | L3's optimistic user bubble is orphaned + composer left empty on POST failure. Line 103 renders `optimisticEl` and clears `ta.value`; the line-108 "run slipped in" race restores both, but the `catch` (131) and `r.error` (132) branches do NOT — they `addMsg(err)` and return, leaving a bubble that looks sent above an error, with the user's >60-word prompt gone from the box. Regressed from pre-L3 (bubble was drawn only after a successful POST) | in both failure branches: if `optimisticEl`, remove it (or mark failed) and `ta.value = prompt` before returning, mirroring line 108 | S | low | ✅ 2026-07-26 |
+| C49 | lib/projects.js:340 + assets/projectchat.js:127 | `/api/projects/get` synchronously `readFileSync`+`JSON.parse`s EVERY .jsonl transcript in a claude-kind workspace (projectSessions, projects.js:225) on each call — and a detail-open fires it twice back-to-back (projectdetail.js:30 then projectchat mount→loadHistory at :127, which only wants `d.runs` and discards `sessions`); every project run calls it again (refreshAfterRun). On a large workspace (40+ multi-MB sessions) each call blocks the single-threaded event loop, stalling live SSE streams | add a runs-only path (`?runsOnly=1` skipping projectSessions, or a `/api/projects/runs` endpoint) for loadHistory/refreshAfterRun; chat panel never consumes `sessions` | M | low | ⬜ |
+| U22 | assets/overview.js:52 | `api('/api/overview')` is the only one of four parallel Overview calls without a `.catch` (runs/routing/usage all have one at :52-57). A transient 500/blip on /api/overview rejects the whole Promise.all → renderers.overview throws → app.js load() shows the generic "Couldn't load this tab" box, defeating the sibling calls' deliberate partial-render degradation | `.catch(() => ({}))` on the overview call + null-guard the `d.*` reads, mirroring the siblings | S | low | ⬜ |

@@ -128,8 +128,8 @@ async function sendPrompt() {
         effort: $('#runEffort').value, channel,
         resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked,
         projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
-  } catch (e) { addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
-  if (r.error) { addMsg(r.error, 'errmsg'); return; }
+  } catch (e) { if (optimisticEl) { optimisticEl.remove(); ta.value = prompt; } addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
+  if (r.error) { if (optimisticEl) { optimisticEl.remove(); ta.value = prompt; } addMsg(r.error, 'errmsg'); return; }
   ta.value = '';
   if (!optimisticEl) addMsg(displayPrompt, 'user'); // else the optimistic bubble already shows it
   if (atts.length) {
