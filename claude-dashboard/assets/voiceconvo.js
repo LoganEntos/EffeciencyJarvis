@@ -55,7 +55,12 @@ window.HubVoiceConvoFactory = function (ctx) {
   // ---- self-echo filter ------------------------------------------------------
   // Normalized-substring check against what Jarvis recently said, so speaker
   // bleed (including his own name in a reply) never reads as the user talking.
-  const norm = t => String(t || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Collapse every wake-word variant (jarvas/jervis/javis/…) to one canonical
+  // token BEFORE the echo compare, using the same matcher the wake gate uses.
+  // Otherwise STT mangling Jarvis's own name in the speaker bleed ("jarvas")
+  // slips past isEcho's substring test while wakeRe still matches → self-barge-in.
+  const wakeCanon = s => s.replace(new RegExp(wakeRe().source, 'gi'), 'jarvis');
+  const norm = t => wakeCanon(String(t || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')).replace(/\s+/g, ' ').trim();
   function noteReply(text) {
     S.replyTail = (S.replyTail + ' ' + norm(text)).slice(-600);
   }
