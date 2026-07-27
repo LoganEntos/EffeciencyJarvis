@@ -62,7 +62,9 @@ function parseBacklog() {
     const [, id, loc, issue, fix, , , status] = m;
     items.push({
       id, loc: loc.trim(), issue: issue.trim(), fix: fix.trim(),
-      done: /✅/.test(status),
+      // Open ONLY if explicitly ⬜ (and not done). ⚠️/blocked rows are NOT open —
+      // treat them as done so pickNext skips known-unfixable items (e.g. C43 CUDA).
+      done: !(/⬜/.test(status) && !/✅/.test(status)),
     });
   }
   return items;
