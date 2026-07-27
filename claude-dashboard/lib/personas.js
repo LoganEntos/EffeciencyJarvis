@@ -89,7 +89,11 @@ function readState() { return U.safeJson(STATE_FILE) || {}; }
 function writeState(patch) {
   const s = Object.assign(readState(), patch);
   fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2));
+  // Atomic temp+rename so a crash/kill mid-write can't leave a torn file that
+  // reads null and silently reverts to the default persona (mirrors tasks.js).
+  const tmp = STATE_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(s, null, 2));
+  fs.renameSync(tmp, STATE_FILE);
 }
 
 // Parse the tiny frontmatter head (--- ... ---). Returns { meta, body }.
