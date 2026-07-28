@@ -28,6 +28,7 @@ const teams = require('./lib/teams');
 const sources = require('./lib/sources');
 const personas = require('./lib/personas');
 const projects = require('./lib/projects');
+const pairing = require('./lib/pairing');
 const sharepoint = require('./lib/sharepoint');
 const clientlog = require('./lib/clientlog');
 const distill = require('./lib/distill');
@@ -168,6 +169,7 @@ const server = http.createServer(async (req, res) => {
     if (await sessionsum.handle(req, res, url)) return;
     if (await health.handle(req, res, url)) return;
     if (await clientlog.handle(req, res, url)) return;
+    if (await pairing.handle(req, res, url)) return;
     if (await projects.handle(req, res, url)) return;
     if (await sharepoint.handle(req, res, url)) return;
     if (await files.handle(req, res, url)) return;

@@ -74,6 +74,9 @@ Check "GET /assets/projects.js" "$base/assets/projects.js"
 Check "GET /assets/projects.css" "$base/assets/projects.css"
 Check "GET /assets/projectchat.js" "$base/assets/projectchat.js"
 Check "GET /assets/projectdetail.js" "$base/assets/projectdetail.js"
+Check "GET /api/projects/pairs"      "$base/api/projects/pairs?slug=vpp-historical-import-test"
+Check "GET /api/projects/pairs (traversal 404)" "$base/api/projects/pairs?slug=..%2F..%2Fx" 404
+Check "GET /api/projects/pairs (no slug 404)"   "$base/api/projects/pairs" 404
 Check "GET /api/agentgraph"    "$base/api/agentgraph"
 Check "GET /api/hermes"        "$base/api/hermes"
 Check "GET /vendor/css/fonts.css" "$base/vendor/css/fonts.css"
