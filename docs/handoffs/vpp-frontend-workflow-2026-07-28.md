@@ -1,3 +1,13 @@
+> **PROGRESS 2026-07-28 (same-day execution):** steps 2 and 4 are now ✅ DONE —
+> README fully rewritten to the current product (`bd45350`), and the PDF↔CSV
+> pairing model is BUILT: read-only pairing engine + `GET /api/projects/pairs`
+> (`2218d53`) and the pairing panel in the Projects detail view (`9f8efdd`).
+> All 5 canonical test orders pair complete (incl. the 22610/22610-2 split via
+> manifest); smoke suite 106 checks green; both diffs code-reviewed SHIP.
+> Live after the user's next hub restart. Remaining: steps 3 (tab ownership),
+> 6 (dedicated refresh + surface the move/import action in Files/Projects),
+> 5 (preview consistency pass), 8 (sample-batch validation), 9 (backlog runs).
+
 # Handoff: VPP front-end workflow — make the PDF→CSV pipeline reliable
 
 **Model:** Opus 4.8 · xhigh (multi-module product work). **Perms:**
