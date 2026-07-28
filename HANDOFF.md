@@ -61,7 +61,7 @@ index.html               markup shell (token injected at serve time)
 assets/*.js  style.css   SPA modules (app/run/tasks/files/graph/agentviz/memory/voice/…)
 vendor/                  LOCAL asset library: fonts + 4 icon sprites (~9.8k) + css + manifest.json
 .claude/skills/          curated active skills; skills-library/ = full 278 ECC set (not auto-loaded)
-.claude/agents/          14 curated model-tiered local specialists (never a bulk library)
+.claude/agents/          18 curated model-tiered local specialists (never a bulk library)
 data/                    runtime: runs/, inbox/, tasks.json, schedules.json, memory.json (gitignored)
 docs/roadmap.md          THE canonical status+plan doc · jarvis-soul.md the persona · archive/ history
 docs/handoffs/           live work orders for hub runs (resolved ones → docs/archive/handoffs/)
@@ -106,11 +106,11 @@ again. Do not push.
   own `RestartCount 3 / 1-min` setting. **If a 5-minute repetition ever
   reappears on that task, an agent put it there — take it back off.**
 - **Known-good invariants as of today:** no file over 500 lines (largest:
-  `components.css` 478), zero npm deps, `127.0.0.1` bind only, all 76 JS files
+  `components.css` 482), zero npm deps, `127.0.0.1` bind only, all JS files
   parse, index.html script wiring is a 1:1 match with `assets/`.
 
 - **Engine = Claude ONLY.** The stack is Claude Code's own: auto model-routing +
-  14 model-tiered subagents + agent teams (`lib/teams.js`). **hermes is DEPRECATED
+  18 model-tiered subagents + agent teams (`lib/teams.js`). **hermes is DEPRECATED
   as too expensive** — not deleted, hidden behind `settings.hermesEnabled` (default
   off); for real hermes work use Hermes Desktop. ruflo/claude-flow retired long ago.
 - **Design = clean-dark "amber-agent-orb"**, ported 1:1 from the user's Lovable

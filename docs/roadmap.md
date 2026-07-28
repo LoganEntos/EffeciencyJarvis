@@ -57,9 +57,9 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
 5. **N8 iPhone polish** — builds on N2.
 6. ✅ **Size guard CLEAR (2026-07-26):** every file under cap with headroom.
    Splits this session: style.css (`156a920`), jarvistab.js (`67c4004`),
-   lib/runs.js (`6a9862e`), run.js + voice.js (`f465850`). Largest now:
-   components.css 448, jarvistab.js 410, sharepoint.js 396 — none within 50 of
-   the cap.
+   lib/runs.js (`6a9862e`), run.js + voice.js (`f465850`). Largest (refreshed
+   2026-07-28): components.css 482, jarvistab.js 455, sharepoint.js 426 — the
+   first two are now within 50 of the cap; still all under 500.
 
 ## 🙋 Needs the USER (interactive / system)
 
