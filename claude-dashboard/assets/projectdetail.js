@@ -60,6 +60,12 @@ async function renderProjectDetail(id) {
       <div id="pChatMount" style="margin-top:8px"></div>
     </div>`;
 
+  const secPairing = `
+    <div class="row">
+      <div class="psection"><span class="name">◫ File pairing <span class="muted" style="font-weight:400;font-size:11.5px">— PDFs matched to their converted CSVs, per order</span></span></div>
+      <div id="pPairing" style="margin-top:8px"></div>
+    </div>`;
+
   // Empty-state UX: a brand-new project with no files and no instructions
   // otherwise stacks three empty setup sections above the chat. Lead with the
   // chat so the first thing you see is somewhere to start.
@@ -85,6 +91,7 @@ async function renderProjectDetail(id) {
       <div id="pSessions" style="display:grid;gap:8px;margin-top:6px">${sessions.length ? sessions.map(sessionRow).join('') : '<div class="muted">No sessions in this workspace.</div>'}</div>
     </div>` : ''}
     ${setupSections}
+    ${secPairing}
 
     <div class="row" id="pRunsSection">${runsSection(runs)}</div>
 
@@ -130,6 +137,10 @@ async function renderProjectDetail(id) {
   // inline chat panel — instructions/files/memory above ride every message via projectSlug
   const chatMount = $('#pChatMount');
   if (chatMount && window.projectChat) projectChat.mount(chatMount, { id: p.id, slug: p.slug, name: p.name });
+
+  // file pairing panel — its own fetch (GET /api/projects/pairs), guarded so
+  // load order (or an older server build without the route) can't crash the view
+  if (typeof renderPairingPanel === 'function') renderPairingPanel(p.slug, $('#pPairing'));
 
   // file manifest — what the model actually sees as paths
   if ($('#pManifest')) $('#pManifest').onclick = () => {

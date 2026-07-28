@@ -214,3 +214,10 @@ main section > h2:first-of-type .muted{display:inline-block;font-size:13px;font-
 .hlth-modal{background:var(--panel);border:1px solid var(--line2);border-radius:var(--r);width:min(900px,100%);max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
 .hlth-modalhd{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
 .hlth-pre{margin:0;padding:16px;overflow:auto;font-family:var(--font-mono);font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:var(--txt)}
+
+/* projpairs — Projects detail "File pairing" panel (projectpairs.js). Table
+   rows/links/buttons all reuse .hlth-table/.pill/.ghost/.muted; the only gap
+   is a --cool tone pill for the csv-only state (existing .pill only ships
+   ok/warn/err/neutral/accent). */
+.pill.cool{background:#6fa6a018;color:var(--cool);border:1px solid #6fa6a045}
+:root[data-theme="light"] .pill.cool{color:#2c6a63}
