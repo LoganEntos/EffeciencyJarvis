@@ -63,10 +63,11 @@ const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
 // Text-like files the in-app document viewer can open (mirror of server TEXT_EXTS).
 const TEXT_RE = /\.(md|markdown|txt|text|csv|tsv|json|log|ya?ml|xml|html?|ini|cfg|conf|toml|env|sql|rst|py|m?js|cjs|tsx?|jsx|css|sh|ps1|bat)$/i;
 const XLSX_RE = /\.(xlsx|xlsm|xltx)$/i;
+const PDF_RE = /\.pdf$/i;
 
 // What kind of inline preview a file gets when its card is expanded.
-const fileKind = n => IMG_RE.test(n) ? 'img' : XLSX_RE.test(n) ? 'xlsx' : TEXT_RE.test(n) ? 'text' : 'other';
-const KIND_ICON = { img: 'image', xlsx: 'table', text: 'file-text', other: 'file' };
+const fileKind = n => IMG_RE.test(n) ? 'img' : PDF_RE.test(n) ? 'pdf' : XLSX_RE.test(n) ? 'xlsx' : TEXT_RE.test(n) ? 'text' : 'other';
+const KIND_ICON = { img: 'image', pdf: 'file-text', xlsx: 'table', text: 'file-text', other: 'file' };
 
 // R4: day-bucket label for grouping uploads — Today / Yesterday / weekday / date
 function dayLabel(iso) {
@@ -143,6 +144,13 @@ async function expandCard(card, head) {
       body.innerHTML = `<img class="fcard-img" src="/api/files/view?name=${encodeURIComponent(name)}" alt="${esc(name)}" loading="lazy">`;
       return;
     }
+    if (kind === 'pdf') {
+      // Native browser PDF viewer, embedded — shows the rendered page image.
+      const u = '/api/files/view?name=' + encodeURIComponent(name);
+      body.innerHTML = `<iframe class="fcard-pdf" src="${u}" title="${esc(name)}" loading="lazy"></iframe>
+        <div class="muted" style="margin-top:6px;font-size:11px">Can't see it? <a class="link" href="${u}" target="_blank" rel="noopener">Open the PDF in a new tab</a>.</div>`;
+      return;
+    }
     if (kind === 'xlsx') {
       await renderXlsxPreview(body, name); // sheet tabs + real cell grid (sheetgrid.js)
       return;
@@ -186,7 +194,7 @@ function showImageLightbox(name) {
 function openFilePreview(name) {
   const kind = fileKind(name);
   if (kind === 'img') return showImageLightbox(name);
-  if (kind === 'text' || kind === 'xlsx') return showDocViewer(name);
+  if (kind === 'text' || kind === 'xlsx' || kind === 'pdf') return showDocViewer(name);
   const a = document.createElement('a');
   a.href = '/api/files/download?name=' + encodeURIComponent(name);
   document.body.appendChild(a); a.click(); a.remove();
@@ -220,6 +228,11 @@ async function showDocViewer(name) {
   ov.classList.add('show');
   body.scrollTop = 0;
   if (fileKind(name) === 'xlsx') { await renderXlsxPreview(body, name); return; }
+  if (fileKind(name) === 'pdf') {
+    const u = '/api/files/view?name=' + encodeURIComponent(name);
+    body.innerHTML = `<iframe class="dv-pdf" src="${u}" title="${esc(short)}"></iframe>`;
+    return;
+  }
   let r;
   try { r = await api('/api/files/text?name=' + encodeURIComponent(name)); }
   catch (e) { body.innerHTML = `<div class="pill err" style="margin:16px">couldn't open: ${esc(e.message || 'error')}</div>`; return; }

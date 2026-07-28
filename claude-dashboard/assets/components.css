@@ -273,6 +273,10 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .fcard-body::-webkit-scrollbar{width:9px}
 .fcard-body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
 .fcard-img{max-width:100%;border-radius:6px;border:1px solid var(--line);display:block}
+/* Inline PDF preview — native browser viewer embedded in the file card. */
+.fcard-pdf{width:100%;height:min(70vh,780px);border:1px solid var(--line);border-radius:6px;background:var(--panel2);display:block}
+#docViewer .dv-pdf{width:100%;height:100%;min-height:70vh;border:0;background:var(--panel2);display:block}
+#docViewer .dv-body:has(.dv-pdf){padding:0;flex:1;display:flex}
 /* R4: click a thumb to see the full image a run was given */
 #imgLightbox{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
   padding:5vmin;background:#080706e6;backdrop-filter:blur(4px);animation:fadein .15s ease-out}

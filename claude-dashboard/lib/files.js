@@ -114,12 +114,19 @@ async function handle(req, res, url) {
     const f = inboxFile(url.searchParams.get('name') || '');
     if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
     const ext = (f.safe.split('.').pop() || '').toLowerCase();
-    const ctype = IMAGE_TYPES[ext];
-    if (!ctype) { U.sendJson(res, { error: 'not a previewable image' }, 400); return true; }
+    // PDFs render inline via the browser's native viewer (<iframe>/<embed>), so
+    // they need a page-render context, not the images' bare `sandbox` (which
+    // blanks the viewer). nosniff + inline disposition keep them non-executable.
+    const isPdf = ext === 'pdf';
+    const ctype = isPdf ? 'application/pdf' : IMAGE_TYPES[ext];
+    if (!ctype) { U.sendJson(res, { error: 'not a previewable image or pdf' }, 400); return true; }
     const st = fs.statSync(f.full);
     // SVG can carry inline <script>; on direct navigation (not <img>) it would
     // run in the hub's own origin. Sandbox it via CSP — harmless to <img> use.
-    res.writeHead(200, { 'Content-Type': ctype, 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
+    const headers = isPdf
+      ? { 'Content-Type': ctype, 'Content-Length': st.size, 'Content-Disposition': `inline; filename="${f.safe}"`, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60', 'Content-Security-Policy': "default-src 'none'; img-src 'self' blob: data:" }
+      : { 'Content-Type': ctype, 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" };
+    res.writeHead(200, headers);
     const rs = fs.createReadStream(f.full);
     rs.on('error', () => { if (!res.headersSent) U.sendJson(res, { error: 'read failed' }, 500); res.destroy(); });
     rs.pipe(res);
