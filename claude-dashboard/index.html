@@ -39,6 +39,7 @@
   <symbol id="nv-brain" viewBox="0 0 24 24"><path d="M12 18V5"/><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path d="M18 18a4 4 0 0 0 2-7.464"/><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path d="M6 18a4 4 0 0 1-2-7.464"/><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/></symbol>
   <symbol id="nv-layout-dashboard" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
   <symbol id="nv-share-2" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></symbol>
+  <symbol id="nv-heart-pulse" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></symbol>
   <symbol id="nv-bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol>
   <symbol id="nv-sparkles" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></symbol>
   <symbol id="nv-square-terminal" viewBox="0 0 24 24"><path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></symbol>
@@ -80,6 +81,7 @@
     <a data-tab="memory"><svg class="ico" aria-hidden="true"><use href="#nv-brain"/></svg><span class="txt">Memory</span><kbd>6</kbd></a>
     <a data-tab="overview"><svg class="ico" aria-hidden="true"><use href="#nv-layout-dashboard"/></svg><span class="txt">Overview</span><kbd>7</kbd></a>
     <a data-tab="graph"><svg class="ico" aria-hidden="true"><use href="#nv-share-2"/></svg><span class="txt">Graph</span><kbd>8</kbd></a>
+    <a data-tab="health"><svg class="ico" aria-hidden="true"><use href="#nv-heart-pulse"/></svg><span class="txt">Health</span></a>
     <div class="navlabel" style="margin-top:14px">Library</div>
     <a data-tab="agents"><svg class="ico" aria-hidden="true"><use href="#nv-bot"/></svg><span class="txt">Agents</span><kbd>9</kbd></a>
     <a data-tab="skills"><svg class="ico" aria-hidden="true"><use href="#nv-sparkles"/></svg><span class="txt">Skills</span><kbd>0</kbd></a>
@@ -102,6 +104,7 @@
     <section id="memory" class="hidden"></section>
     <section id="overview" class="hidden"></section>
     <section id="graph" class="hidden"></section>
+    <section id="health" class="hidden"></section>
     <section id="agents" class="hidden"></section>
     <section id="skills" class="hidden"></section>
     <section id="commands" class="hidden"></section>
@@ -129,6 +132,7 @@
 <script src="assets/memory.js"></script>
 <script src="assets/files.js"></script>
 <script src="assets/sheetgrid.js"></script>
+<script src="assets/health.js"></script>
 <script src="assets/projects.js"></script>
 <script src="assets/projectchat.js"></script>
 <script src="assets/projectdetail.js"></script>

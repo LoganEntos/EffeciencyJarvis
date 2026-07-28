@@ -11,7 +11,7 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
 
 ## Current state (what is true today)
 
-- **Engine = Claude ONLY** — auto model-routing + 14 model-tiered subagents +
+- **Engine = Claude ONLY** — auto model-routing + 18 model-tiered subagents +
   agent teams. hermes is DEPRECATED (too expensive; hidden behind
   `settings.hermesEnabled`, default off). ruflo/claude-flow retired.
 - **Design = clean-dark "amber-agent-orb"** (Lovable 1:1 port; `#0c0b0a` /
@@ -59,7 +59,19 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
    Splits this session: style.css (`156a920`), jarvistab.js (`67c4004`),
    lib/runs.js (`6a9862e`), run.js + voice.js (`f465850`). Largest (refreshed
    2026-07-28): components.css 482, jarvistab.js 455, sharepoint.js 426 — the
-   first two are now within 50 of the cap; still all under 500.
+   first two are now within 50 of the cap; still all under 500. **The size guard
+   is now also a live UI surface — see the Health tab (item 7).**
+7. ✅ **Health tab — project transparency (2026-07-28).** New Monitor-group tab
+   (`lib/health.js` + `assets/health.js`) surfacing, live from disk, what an
+   audit used to dig for by hand: unassigned inbox files (with inline
+   delete/move), project docs + an mtime staleness heuristic + inline raw
+   viewer, live line-counts with 450/500 markers + an orphan-module check,
+   active vs dormant (`.claude/skills-library/`) skill counts, and backlog
+   open/closed via autopilot's own parser. Closes the transparency gap the user
+   flagged 2026-07-28 ("the OS does not display ANY of this"). Companion to the
+   contamination cleanup (`docs/archive/cleanup-2026-07-28-contamination.md`).
+   Follow-up (non-blocking, from code review): `POST /api/files/move` could
+   validate its target `project` against the project registry.
 
 ## 🙋 Needs the USER (interactive / system)
 
