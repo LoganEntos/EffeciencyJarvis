@@ -90,6 +90,11 @@ Check "GET /api/voice/tts (404)"  "$base/api/voice/tts" 404
 Check "GET /api/voice/status"  "$base/api/voice/status"
 Check "GET /api/routing"       "$base/api/routing"
 Check "GET /api/autopilot"     "$base/api/autopilot"
+Check "GET /api/health"        "$base/api/health"
+Check "GET /api/health/doc"    "$base/api/health/doc?path=docs/roadmap.md"
+Check "GET /api/health/doc (traversal 404)" "$base/api/health/doc?path=..%2F..%2Fserver.js" 404
+Check "GET /api/health/doc (non-md 404)" "$base/api/health/doc?path=claude-dashboard%2Fserver.js" 404
+Check "GET /assets/health.js"  "$base/assets/health.js"
 Check "GET /api/usage"         "$base/api/usage"
 Check "GET /api/sharepoint/status" "$base/api/sharepoint/status"
 Check "GET /api/sharepoint/index/status" "$base/api/sharepoint/index/status"
@@ -114,6 +119,7 @@ Check "GET traversal blocked (403)" "$base/api/run/artifact?id=x&file=..%2F..%2F
 CheckPost "POST /api/run w/o token (403)"        "$base/api/run"        '{"prompt":"x"}' 403
 CheckPost "POST /api/run/delete w/o token (403)" "$base/api/run/delete" '{"id":"x"}' 403
 CheckPost "POST /api/files/delete w/o token (403)" "$base/api/files/delete" '{"name":"x"}' 403
+CheckPost "POST /api/files/move w/o token (403)" "$base/api/files/move" '{"name":"x","project":"y"}' 403
 CheckPost "POST /api/clientlog w/o token (403)"  "$base/api/clientlog"  '{"msg":"x"}' 403
 CheckPost "POST /api/projects/import w/o token (403)" "$base/api/projects/import" '{}' 403
 CheckPost "POST /api/projects/delete w/o token (403)" "$base/api/projects/delete" '{"id":"x"}' 403

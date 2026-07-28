@@ -205,6 +205,28 @@ async function handle(req, res, url) {
     rs.pipe(res);
     return true;
   }
+  // Relocate a root-level inbox file into a project subfolder (Health tab's
+  // "move into project" action). Both source and destination go through the
+  // same inboxFile() traversal guard; refuse if the source is already inside a
+  // project, the target project name is unsafe, or the destination exists.
+  if (p === '/api/files/move' && req.method === 'POST') {
+    let b = {};
+    try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
+    const src = inboxFile((b.name || '').toString());
+    if (!src || !src.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    if (src.safe.includes('/')) { U.sendJson(res, { error: 'already in a project folder' }, 400); return true; }
+    const project = sanitizeName(b.project || '');
+    if (!project) { U.sendJson(res, { error: 'invalid project name' }, 400); return true; }
+    const dst = inboxFile(project + '/' + src.safe);
+    if (!dst) { U.sendJson(res, { error: 'invalid destination' }, 400); return true; }
+    if (dst.exists) { U.sendJson(res, { error: 'a file with that name already exists in the project' }, 409); return true; }
+    try {
+      fs.mkdirSync(path.join(INBOX, project), { recursive: true });
+      fs.renameSync(src.full, dst.full);
+      U.sendJson(res, { ok: true, name: dst.safe });
+    } catch (e) { U.sendJson(res, { error: e.message }, 500); }
+    return true;
+  }
   if (p === '/api/files/delete' && req.method === 'POST') {
     let b = {};
     try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}

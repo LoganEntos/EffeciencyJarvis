@@ -66,7 +66,7 @@ function parseBacklog() {
     if (!/^[A-Z]\d+$/.test(id)) continue;
     // Open ONLY if explicitly ⬜ (and not done). ⚠️/blocked rows are NOT open —
     // treat them as done so pickNext skips known-unfixable items (e.g. C43 CUDA).
-    items.push({ id, loc, issue, fix, done: !(/⬜/.test(status) && !/✅/.test(status)) });
+    items.push({ id, loc, issue, fix, status, done: !(/⬜/.test(status) && !/✅/.test(status)) });
   }
   return items;
 }
@@ -308,4 +308,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, startTicker, status };
+module.exports = { handle, startTicker, status, parseBacklog };
