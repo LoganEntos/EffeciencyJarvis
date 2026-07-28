@@ -14,6 +14,9 @@ roadmaps, and completed handoff work orders live here verbatim.
 - `autonomy-log-2026-07-19.md` / `-20.md`, `deliberation-2026-07-20.md` —
   autonomy-loop ground truth + deliberation transcripts.
 - `agent-skill-efficiency-report.md` — the claude-flow purge plan (executed).
+- `cleanup-2026-07-28-contamination.md` — quarantined a 15-file foreign
+  "Personal Jarvis" package out of the inbox; doc-staleness fixes; flags the
+  Claude Flow V3 leftover in `.claude/helpers/`+`settings.json` for a user call.
 - `hermes-adoption.md` — hermes adopt-then-deprecate record.
 - `crawl4ai-evaluation.md` — SKIP verdict + capability table.
 - `voice-plan.md` — voice Track A/B/C plan (Track A shipped; B tied to

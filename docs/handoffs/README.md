@@ -30,6 +30,8 @@ Commit at each working, browser-verified stage.
 | # | file | status | model |
 | --- | --- | --- | --- |
 | 0 | `fix-all-2026-07-23.md` | READY — loop rebuild (Phase A) + full task-queue sprint (Phase B); supersedes 1–2 while it runs | Opus 4.8 · xhigh |
+| 1 | `cleanup-contamination-2026-07-28.md` | ✅ DONE 2026-07-28 — foreign package quarantined; scan clean; doc fixes. Claude Flow V3 helpers left for a user call (statusline live-references them). See `docs/archive/cleanup-2026-07-28-contamination.md`. | Opus 4.8 · xhigh |
+| 2 | `project-transparency-tab-2026-07-28.md` | READY — build a Health tab (inbox/docs/structure/skills/backlog visibility, actionable in-browser). Demo is stronger after #1 lands. | Opus 4.8 · xhigh |
 | ∞ | `improvement-cycle.md` | repeatable — one improvement per run, fire on a loop anytime | Fable 5 |
 
 Completed work orders were moved verbatim to `docs/archive/handoffs/`
