@@ -1,4 +1,4 @@
-# Overnight orchestration log — 2026-07-28 (LIVE work order)
+# Overnight orchestration log — 2026-07-28 (RESOLVED 17:25 — all phases done)
 
 **Context:** User work order (~04:00): orchestrate ~5h. Phase 1 = light stress test
 with agent waves (≥20 min), then self-paced autonomous work until ~09:00: markdown
@@ -50,18 +50,30 @@ the resume point. Never touch port 5757. No pushes. Subagents never run fable.
   22610+22610-2 disjoint. FLAG for user: 22610 pair PO metadata 877689 vs 877687
   vs PDF naming — eyeball against PDFs sometime.
 
+- 17:20-17:25 — fix-lib DONE (C56 guard, C52 parser, dead runNpx removed; checks +
+  5758 smoke green). Backlog: C47/C52/C56 → ✅ 2026-07-28, \| escape rule added.
+  Opus code-review: SHIP (parser edge cases verified against real backlog).
+  Committed a4fdbaa. Tree clean.
+
 ## Phases
 
 - [x] Phase 0: baseline health + git state
-- [ ] Phase 1: stress test ≥20 min (wave 1 running; wave 2 heavier batch after)
-- [ ] Phase 2: commit reviewed doc/agent changes (after docs-audit verdict; commit-captain)
-- [ ] Phase 3: backlog rows — C47 (jarvistab stale J.shaped → frontend-engineer),
-      C52 (parseBacklog pipe-in-cell rows dropped → agentops-engineer),
-      C56 (runAll skips deleted-run tasks → agentops-engineer). Each: fix, node --check,
-      smoke on 5758, code-reviewer over diff, commit.
-- [ ] Phase 4: acquisition analysis — data-analyst re-verifies the 5 VPP order CSVs
-      against manifest.csv totals (reconciliation summary as chat text/md, NO HTML).
-- [ ] Phase 5: wind-down — update this log, flip it to resolved, final report.
+- [x] Phase 1: stress test ≥20 min — hub never degraded (2 waves, 9 agents, 2 cold
+      5758 boots; boot-cycle probe abandoned to the network outage, verdict covered)
+- [x] Phase 2: doc/agent commits 61421b5 + 55065c8
+- [x] Phase 3: C47/C52/C56 fixed, reviewed, committed a4fdbaa
+- [x] Phase 4: VPP acquisition reconciliation — all 5 orders match manifest to the
+      cent ($371,223.04 / 168,092 units / 116 lines); flag: 22610 pair PO metadata
+      877689 vs 877687 vs PDF naming — user eyeball recommended
+- [x] Phase 5: wind-down — this log resolved 17:25
+
+## Deferred to next session (small, non-blocking)
+- Escape the raw `||` pipes inside the now-closed C47/C52/C56 backlog rows for
+  consistency with the new format rule (reviewer note; harmless while closed).
+- Theoretical parser edge: cell ending in a real backslash before a delimiter
+  merges cells → row dropped (not present in current data).
+- Legacy Jarvis .md pile in data/inbox root (11 files from 07-12) — candidates
+  for archive/deletion, needs user call.
 
 ## Verdicts so far
 
