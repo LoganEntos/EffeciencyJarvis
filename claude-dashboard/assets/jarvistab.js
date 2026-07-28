@@ -131,12 +131,24 @@
     let out = '';
     try { out = await jarvisDistill(src); } catch {}
     if (btn) { btn.disabled = false; btn.innerHTML = label; }
-    if (!out) { flash('✗ distiller returned nothing — try again', true); return; }
+    let ok = true;
+    if (!out) {
+      // Distill miss → local cleanup (mirrors run-composer.js). Feed the RAW
+      // textarea value, not `src` — `src` may carry an appended "(Refine: …)"
+      // annotation that must never leak into the fired prompt.
+      ok = false;
+      const raw = ta.value.trim();
+      const tr = (typeof jarvisTransform === 'function') && jarvisTransform(raw);
+      out = tr ? tr.buffered : raw;
+    }
+    // Always overwrite J.shaped for the current ask — a stale shape from a
+    // prior successful call must never survive a failed one.
     J.shaped = out;
     const box = $('#jwsOut'), wrap = $('#jwsOutWrap');
     if (box) box.textContent = out;
     if (wrap) wrap.classList.remove('hidden');
-    flash('✓ shaped' + (mod ? ' · ' + mod.replace(/\.$/, '').toLowerCase() : ''));
+    if (ok) flash('✓ shaped' + (mod ? ' · ' + mod.replace(/\.$/, '').toLowerCase() : ''));
+    else flash('✗ distiller returned nothing — used local cleanup instead', true);
   }
   function shapedPrompt() { return (J.shaped || ($('#jwsIn') && $('#jwsIn').value) || '').trim(); }
   // ▷ run this fires in-tab via jarvisChat.send — the user never leaves Jarvis.

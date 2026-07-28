@@ -78,7 +78,7 @@ function runAll() {
     if (t.done) continue; // completed out-of-band — nothing to run
     const m = t.runId ? runs.getRunMeta(t.runId) : null;
     // run tasks that never ran, or that failed/cancelled (retry); leave done/active ones
-    if (!t.runId || (m && settled(m.status) && m.status !== 'done')) {
+    if (!t.runId || !m || (settled(m.status) && m.status !== 'done')) {
       const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions',
         effort: t.effort || '', source: t.source === 'autopilot' ? 'autopilot' : 'task' });
       if (!r.error) { t.runId = r.id; t.startedAt = new Date().toISOString(); started++; }

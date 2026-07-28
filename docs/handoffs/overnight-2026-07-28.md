@@ -36,6 +36,20 @@ the resume point. Never touch port 5757. No pushes. Subagents never run fable.
   (runAll is human-initiated; autopilot pickNext untouched); done:true safe via
   line-78 continue.
 
+- 04:21-04:24 — prep-c47 + prep-c52 CONFIRMED both bugs. C52 headline: ALL THREE
+  open rows (C47/C52/C56) contain raw pipes → parseBacklog drops them → autopilot
+  backlog effectively empty. Fix = unescaped-pipe split parser + escape pipes in rows.
+  Phase 2 committed: 61421b5 (agents) + 55065c8 (docs). Phase 3 fixers dispatched.
+- ~04:25 — **Long network outage killed fix-lib, fix-c47, stress-boot** (stress-boot
+  abandoned; verdict already in). Session idle until WiFi restored.
+- 17:12 — WiFi back (user). Resumed both fixers; launched vpp-recon (phase 4).
+- 17:15 — fix-c47 DONE: jarvistab.js J.shaped overwritten on both paths, box synced,
+  node --check OK, smoke 91/91 on 5759, 455 lines. Uncommitted pending review.
+- 17:17 — vpp-recon DONE (phase 4 ✓): all 5 orders match manifest to the cent
+  ($371,223.04 / 168,092 units / 116 lines), no dupes/malformed/suspicious values,
+  22610+22610-2 disjoint. FLAG for user: 22610 pair PO metadata 877689 vs 877687
+  vs PDF naming — eyeball against PDFs sometime.
+
 ## Phases
 
 - [x] Phase 0: baseline health + git state

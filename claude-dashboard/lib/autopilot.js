@@ -57,15 +57,16 @@ function parseBacklog() {
   const txt = U.safeRead(BACKLOG_FILE) || '';
   const items = [];
   for (const line of txt.split('\n')) {
-    const m = line.match(/^\|\s*([A-Z]\d+)\s*\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|\s*$/);
-    if (!m) continue;
-    const [, id, loc, issue, fix, , , status] = m;
-    items.push({
-      id, loc: loc.trim(), issue: issue.trim(), fix: fix.trim(),
-      // Open ONLY if explicitly ⬜ (and not done). ⚠️/blocked rows are NOT open —
-      // treat them as done so pickNext skips known-unfixable items (e.g. C43 CUDA).
-      done: !(/⬜/.test(status) && !/✅/.test(status)),
-    });
+    if (!/^\s*\|/.test(line)) continue;
+    // Split on UNESCAPED pipes so a cell may contain `\|`; drop the leading/
+    // trailing empty cells the table border produces, then un-escape.
+    const cells = line.split(/(?<!\\)\|/).slice(1, -1).map(c => c.trim().replace(/\\\|/g, '|'));
+    if (cells.length !== 7) continue;
+    const [id, loc, issue, fix, , , status] = cells;
+    if (!/^[A-Z]\d+$/.test(id)) continue;
+    // Open ONLY if explicitly ⬜ (and not done). ⚠️/blocked rows are NOT open —
+    // treat them as done so pickNext skips known-unfixable items (e.g. C43 CUDA).
+    items.push({ id, loc, issue, fix, done: !(/⬜/.test(status) && !/✅/.test(status)) });
   }
   return items;
 }

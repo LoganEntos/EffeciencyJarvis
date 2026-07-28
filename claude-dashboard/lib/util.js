@@ -7,7 +7,6 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const NODE_BIN = path.dirname(process.execPath);
-const NPX_CLI = path.join(NODE_BIN, 'node_modules', 'npm', 'bin', 'npx-cli.js');
 
 // C5: the tier-alias model list ('auto' hub-routed, '' CLI default, the three
 // tier names) was hand-copied in runs.js/tasks.js/schedules.js — export one
@@ -122,13 +121,6 @@ function run(cmd, args, timeoutMs, useShell, cwd) {
   });
 }
 
-// Invoke npx cross-platform. `npx` is a .cmd on Windows and can't be spawned
-// without a shell, so run npm's npx-cli.js through node directly (no shell → no injection).
-function runNpx(args, timeoutMs, cwd) {
-  if (fs.existsSync(NPX_CLI)) return run(process.execPath, [NPX_CLI, ...args], timeoutMs, false, cwd);
-  return run(process.platform === 'win32' ? 'npx.cmd' : 'npx', args, timeoutMs, true, cwd);
-}
-
 // Locate the claude CLI binary — the ONE shared resolver (runs, distill,
 // sessionsum all spawn it). Resolution: HUB_CLAUDE_EXE env → global npm
 // install → newest CLI bundled by the Claude desktop app
@@ -171,5 +163,5 @@ function findClaude() {
 
 module.exports = {
   safeRead, safeJson, listDir, frontmatter, collectMd,
-  stripAnsi, sendJson, readBody, run, runNpx, SIMPLE_MODELS, buildRunHint, buildResumeHint, findClaude,
+  stripAnsi, sendJson, readBody, run, SIMPLE_MODELS, buildRunHint, buildResumeHint, findClaude,
 };
