@@ -68,8 +68,8 @@ the resume point. Never touch port 5757. No pushes. Subagents never run fable.
 - [x] Phase 5: wind-down — this log resolved 17:25
 
 ## Deferred to next session (small, non-blocking)
-- Escape the raw `||` pipes inside the now-closed C47/C52/C56 backlog rows for
-  consistency with the new format rule (reviewer note; harmless while closed).
+- ~~Escape the raw pipes inside the now-closed C47/C52/C56 backlog rows~~ —
+  DONE 17:30, committed right after a4fdbaa.
 - Theoretical parser edge: cell ending in a real backslash before a delimiter
   merges cells → row dropped (not present in current data).
 - Legacy Jarvis .md pile in data/inbox root (11 files from 07-12) — candidates
