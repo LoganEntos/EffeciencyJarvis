@@ -68,15 +68,15 @@ docs/handoffs/           live work orders for hub runs (resolved ones → docs/a
 ```
 Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Sources · Tools · Config (+ SharePoint).
 
-## Current truth (2026-07-27)
+## Current truth (2026-07-28)
 
-**⚠ Git: 81 commits unpushed. `origin/master` is at `58ad57d` (2026-07-24).**
-Everything from 07-25 onward — the marathon, the autopilot run, today's
-stability fixes — exists ONLY in local git on this machine. History is linear
-(0 behind), so a push would be a clean fast-forward. **The user drives the
-push and has deliberately held it**: GitHub is the last known-good checkpoint
-and there are no branches, so it stays untouched until the tree is trusted
-again. Do not push.
+**Git: fully pushed and versioned (2026-07-28, user-directed).** `master` on
+GitHub is current; the pre-marathon checkpoint is preserved as branch
+`checkpoint-2026-07-24-known-good`; the tip is tagged **`v1.0.0`** (first
+versioned release — cleanup + Health tab + README rewrite + VPP pairing).
+Versioning is now in use: tag stable milestones (v1.x.y), keep historical
+checkpoints as named branches. The user still drives pushes — don't push
+unprompted.
 
 - **The autonomous loop is OFF, deliberately** (2026-07-27). Autopilot toggle
   off and the seeded scout schedule disabled. It had been dispatching unattended
