@@ -1,3 +1,10 @@
+> **DONE 2026-07-28.** Health tab shipped — server `lib/health.js` + `GET /api/health`
+> + guarded `/api/health/doc` + `POST /api/files/move` (`1b42358`); client
+> `assets/health.js` renderer with actionable inbox, doc modal, size guard,
+> skills, backlog (`5a1b92f`); wired into nav/section/scripts (`8aef9b2`).
+> Full smoke green on a throwaway :5761; code-reviewer verdict SHIP. Goes live
+> on the user's next hub restart. No browser screenshot (no Playwright installed).
+
 # Handoff: A "Health" tab — make the whole project visible from inside the hub
 
 **Model:** Opus 4.8 · xhigh (multi-module design + build — do not undershoot).

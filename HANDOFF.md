@@ -131,6 +131,18 @@ again. Do not push.
 
 ## Latest work shipped
 
+**2026-07-28 — contamination cleanup + Health tab.** (1) Quarantined a 15-file
+foreign "Personal Jarvis"/crypto-trading package out of `data/inbox/` into a
+gitignored `_quarantine-personal-jarvis-package/`; repo-wide re-scan clean;
+doc-staleness fixes (`2e859e0`,`f763ca1`,`dfc5584`; record in
+`docs/archive/cleanup-2026-07-28-contamination.md`). ⚠ **Open user decision:**
+the Claude Flow V3 leftover in `.claude/helpers/` + `settings.json` can't be
+auto-purged while the statusline live-references `statusline.cjs`. (2) New
+**Health tab** (Monitor group): `lib/health.js` + `assets/health.js` surface
+unassigned inbox files (inline delete + move-into-project), doc health, live
+size guard + orphan check, active/dormant skills, backlog — all read-only from
+disk (`1b42358`,`5a1b92f`,`8aef9b2`). Goes live on the next hub restart.
+
 **2026-07-27 — stability pass (`b866cfa`).** Fixed the "chat resets after every
 prompt and is incoherent" P0. Four independent faults, all in continuity, none
 in the `--resume` plumbing (which was verified working): (1) `jarvischat.js`
@@ -159,9 +171,14 @@ Everything older is archived verbatim in `docs/archive/handoff-shipped-log-2026-
 
 ## What's next
 
-**→ `docs/roadmap.md` is the single source of truth.** Read it before proposing
-or starting any work. It holds the current state, the NOW queue (N2 mobile
-ergonomic pass in progress, N8 iPhone polish queued), pending USER verifications
-(real-mic pass, persona-card pass, Q1 Playwright yes), and the deferred list.
-Chat-attachment and schedules-verify work is ✅ complete (2026-07-25, archived
-handoffs in `docs/archive/handoffs/`).
+**→ PRIMARY WORKSTREAM (user directive 2026-07-28): the VPP front-end
+workflow.** Make the hub reliable for high-volume VPP PDF→CSV order processing —
+scoped to **Inbox · Projects · Run** only; token viz / broad UI polish /
+orchestrator work are deferred. Directive: `docs/vpp-frontend-cleanup-plan.md`
+(the user's own words). Work order: `docs/handoffs/vpp-frontend-workflow-2026-07-28.md`
+— starts with a plan-before-code pass (README rewrite + PDF↔CSV pairing model).
+Status map of what's already done vs missing is in that handoff. **Fire it next.**
+
+`docs/roadmap.md` remains the broader status doc (NOW queue: N2 mobile pass, N8
+iPhone polish; pending USER verifications: real-mic, persona-card, Q1 Playwright)
+— but the VPP workstream above takes priority until the core flow is stable.
