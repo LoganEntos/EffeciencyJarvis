@@ -1,6 +1,9 @@
 # runtime data (run transcripts, upload inbox)
 claude-dashboard/data/
 
+# quarantined foreign-project files pulled out of data/inbox (2026-07-28 cleanup)
+_quarantine-personal-jarvis-package/
+
 # graphify output is regenerated
 claude-dashboard/graphify-out/cache/
 
