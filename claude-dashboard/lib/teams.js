@@ -18,10 +18,11 @@ const U = require('./util');
 const DATA_DIR = path.join(path.resolve(__dirname, '..'), 'data');
 const FILE = path.join(DATA_DIR, 'teams.json');
 
-// The 14 local Claude specialists (must match .claude/agents/).
-const ROSTER = ['architect', 'backend-builder', 'code-reviewer', 'commit-captain',
-  'data-analyst', 'doc-scribe', 'excel-formatter', 'json-wrangler', 'librarian',
-  'scraper', 'security-auditor', 'test-runner', 'ui-designer', 'web-researcher'];
+// The local Claude specialists (must match .claude/agents/).
+const ROSTER = ['agentops-engineer', 'architect', 'backend-builder', 'code-reviewer',
+  'commit-captain', 'data-analyst', 'doc-scribe', 'excel-formatter', 'frontend-engineer',
+  'json-wrangler', 'librarian', 'node-perf-engineer', 'scraper', 'security-auditor',
+  'test-runner', 'ui-designer', 'voice-engineer', 'web-researcher'];
 
 const BUILTINS = [
   {
@@ -44,16 +45,23 @@ const BUILTINS = [
   },
   {
     id: 'ui', name: 'UI / frontend', builtin: true,
-    description: 'Front-end design + polish on the hub UI — the amber-agent-orb system, then accessibility + motion-performance.',
-    agents: ['ui-designer', 'code-reviewer'],
+    description: 'Front-end BUILD team — behavior first (frontend-engineer), design second (ui-designer), then review + real acceptance verification.',
+    agents: ['frontend-engineer', 'ui-designer', 'code-reviewer', 'test-runner'],
     skills: ['frontend-design', 'baseline-ui', 'fixing-accessibility', 'fixing-motion-performance'],
-    hint: 'This session is UI / front-end work on the dashboard. START with the /frontend-design skill '
-      + '(it sets the amber-agent-orb design system + the ZERO-DEP vanilla JS/CSS stack), then run the polish '
-      + 'loop on the files you touch: /baseline-ui → /fixing-accessibility → /fixing-motion-performance. '
-      + 'Prefer the ui-designer specialist and have code-reviewer check the diff. Edit the real source in place '
-      + '(assets/*.js, style.css, index.html) — NEVER build preview/mockup HTML. Keep one accent per view, reuse '
-      + 'the existing CSS-variable tokens + components, respect prefers-reduced-motion and never leave an rAF loop '
-      + 'running unbounded, and never add npm/React/Tailwind.',
+    hint: 'This session is UI / front-end work on the dashboard. BEHAVIOR BEFORE BEAUTY: before editing anything, '
+      + 'read the existing module and trace every control you will touch through its full chain — control → event '
+      + 'handler → api() call → server route → persisted state → visible feedback — and classify each defect as '
+      + 'cosmetic vs missing product logic; route logic/wiring to frontend-engineer and pure styling to ui-designer, '
+      + 'with non-overlapping file ownership when both run. Reuse the shared helpers in assets/app.js (api(), esc(), '
+      + 'CLICKABLE_SEL) and the existing attachment/preview components — never duplicate them. A control is DONE only '
+      + 'when its loading, success, empty, error, retry, keyboard, and narrow-screen states all work and survive a '
+      + 'page reload; verify by driving the real workflow in the live app (throwaway server on 5758 if server code '
+      + 'changed — NEVER touch 5757), not by screenshots, static HTML, or unit tests alone. Edit the real source in '
+      + 'place (assets/*.js, style.css, index.html) — NEVER build preview/mockup HTML. For styling: /frontend-design '
+      + 'sets the amber-agent-orb ZERO-DEP vanilla JS/CSS system; finish touched files with /baseline-ui → '
+      + '/fixing-accessibility → /fixing-motion-performance, one accent per view, existing CSS-variable tokens, '
+      + 'respect prefers-reduced-motion, no unbounded rAF loops, no npm/React/Tailwind. code-reviewer checks every '
+      + 'diff; test-runner runs scripts/verify-dashboard.ps1 before any completion claim.',
   },
   {
     id: 'github', name: 'GitHub intake', builtin: true,

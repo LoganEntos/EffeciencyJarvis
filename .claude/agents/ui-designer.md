@@ -16,4 +16,11 @@ Rules:
 - Fonts/icons from /vendor/ (local library) — never CDNs.
 - State the design intent in one sentence before coding it.
 - Every file stays under 500 lines; CSS variables for every color.
-- Verify in the browser (screenshot) before claiming done.
+- You own AESTHETICS only. If a control's handler, API wiring, state, or
+  persistence is broken or missing, that is frontend-engineer's work — flag it,
+  don't paper over it with styling.
+- Never invent parallel markup: restyle the existing DOM/components in place,
+  reusing current CSS-variable tokens and shared components.
+- A screenshot alone is NOT proof of done. Drive the real workflow in the live
+  app and confirm loading/empty/error/narrow-screen states render correctly
+  before claiming completion.
