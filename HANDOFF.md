@@ -159,8 +159,9 @@ Everything older is archived verbatim in `docs/archive/handoff-shipped-log-2026-
 
 ## What's next
 
-**→ `docs/roadmap.md` is the single source of truth** — current state, the
-NOW queue (finish `docs/handoffs/chat-stop-attach-project-fixes.md` items 4–5,
-then `docs/handoffs/schedules-verify.md`, then N2 mobile), pending USER
-verifications (real-mic pass, persona-card pass, Q1 Playwright yes), and the
-deferred list. Read it before proposing or starting any work.
+**→ `docs/roadmap.md` is the single source of truth.** Read it before proposing
+or starting any work. It holds the current state, the NOW queue (N2 mobile
+ergonomic pass in progress, N8 iPhone polish queued), pending USER verifications
+(real-mic pass, persona-card pass, Q1 Playwright yes), and the deferred list.
+Chat-attachment and schedules-verify work is ✅ complete (2026-07-25, archived
+handoffs in `docs/archive/handoffs/`).
