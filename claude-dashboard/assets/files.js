@@ -6,8 +6,11 @@ renderers.files = async function () {
   const el = $('#files');
   if (!el.querySelector('#dropzone')) {
     el.innerHTML = `
-      <h2>File inbox <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— uploads land in claude-dashboard/data/inbox/ for runs to use</span></h2>
-      <div class="dropzone" id="dropzone">Drop files here or click to browse<br>
+      <div class="flex" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px">
+        <h2 style="margin-bottom:0">File inbox <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— uploads land in claude-dashboard/data/inbox/ for runs to use</span></h2>
+        <button id="fileRefresh" class="ghost">↻ Refresh</button>
+      </div>
+      <div class="dropzone" id="dropzone" style="margin-top:10px">Drop files here or click to browse<br>
         <span class="muted" style="font-size:11.5px">50 MB per upload · xlsx, csv, pdf, docs, anything</span></div>
       <input type="file" id="fileIn" multiple class="hidden">
       <div class="flex" style="margin:8px 0">
@@ -20,6 +23,10 @@ renderers.files = async function () {
     dz.ondragleave = () => dz.classList.remove('drag');
     dz.ondrop = e => { e.preventDefault(); dz.classList.remove('drag'); uploadFiles(e.dataTransfer.files); };
     fi.onchange = () => { uploadFiles(fi.files); fi.value = ''; };
+    $('#fileRefresh').onclick = async () => {
+      const b = $('#fileRefresh'); b.disabled = true; b.textContent = '↻ Refreshing…';
+      try { await refreshFiles(); } finally { b.disabled = false; b.textContent = '↻ Refresh'; }
+    };
   }
   await refreshFiles();
   // Deep-link: ?tab=files&open=<name> auto-expands that file's preview card
@@ -84,9 +91,19 @@ function dayLabel(iso) {
 async function refreshFiles() {
   const el = $('#fileList');
   if (!el) return;
-  let list;
-  try { list = await api('/api/files'); } catch { el.innerHTML = '<div class="muted">Inbox unavailable.</div>'; return; }
+  // Projects ride along so root-level files get a "move to project…" action
+  // (same POST /api/files/move the Health tab uses). Claude-kind projects are
+  // excluded — they have no data/inbox/<slug>/ folder, so a move there would
+  // strand the file where no view lists it.
+  let list, projs = [];
+  try {
+    [list, projs] = await Promise.all([
+      api('/api/files'),
+      api('/api/projects').then(d => (d.projects || []).filter(p => p.kind !== 'claude'), () => []),
+    ]);
+  } catch { el.innerHTML = '<div class="muted">Inbox unavailable.</div>'; return; }
   if (!Array.isArray(list) || !list.length) { el.innerHTML = '<div class="muted">Inbox is empty — drop a workbook or document above.</div>'; return; }
+  const projOpts = projs.map(p => `<option value="${esc(p.slug)}">${esc(p.name || p.slug)}</option>`).join('');
   const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
   let lastGroup = null, html = '';
   for (const f of list) {
@@ -105,6 +122,7 @@ async function refreshFiles() {
       <div class="fcard-acts">
         <button class="ghost procBtn" data-path="${esc(f.path)}">▷ Process with Claude</button>
         <a class="link" style="font-size:12px" href="/api/files/download?name=${encodeURIComponent(f.name)}">download</a>
+        ${!f.project && projOpts ? `<select class="fmoveto" data-name="${esc(f.name)}" title="Move this file into a project folder"><option value="">move to project…</option>${projOpts}</select>` : ''}
         <button class="danger delBtn" data-name="${esc(f.name)}" style="padding:6px 12px;font-size:11.5px">delete</button>
       </div>
       <div class="fcard-body"></div>
@@ -119,6 +137,16 @@ async function refreshFiles() {
     const go = () => expandCard(h.closest('.fcard'), h);
     h.onclick = go;
     h.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
+  el.querySelectorAll('.fmoveto').forEach(sel => sel.onchange = async e => {
+    const project = e.target.value; if (!project) return;
+    const name = e.target.dataset.name;
+    e.target.disabled = true;
+    try {
+      const r = await api('/api/files/move', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, project }) });
+      if (r && r.error) { alert('Move failed: ' + r.error); e.target.disabled = false; e.target.value = ''; return; }
+    } catch { alert('Move failed.'); e.target.disabled = false; e.target.value = ''; return; }
+    refreshFiles();
   });
   el.querySelectorAll('.delBtn').forEach(b => b.onclick = async () => {
     if (!confirm(`Delete ${b.dataset.name} from the inbox?`)) return;

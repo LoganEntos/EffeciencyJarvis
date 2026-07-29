@@ -32,6 +32,7 @@ renderers.projects = async function () {
         <option value="active">Most runs</option>
       </select>
       <span style="flex:1"></span>
+      <button id="pRefreshList" class="ghost" title="Re-fetch projects and run stats">↻</button>
       <button id="pXfer" class="ghost" title="The SharePoint file-transfer prompt — copy it to paste into a project run, and edit it to taste">⧉ Transfer prompt</button>
       <button id="pImportClaude" class="ghost" title="Find your Claude Code projects (~/.claude/projects) and archive them here">⇊ Import Claude projects</button>
       <button id="pImport" class="ghost" title="Adopt every data/inbox/ folder that isn't already a project">Import inbox</button>
@@ -45,6 +46,7 @@ renderers.projects = async function () {
   $('#pSort').value = projSort;
   $('#pSearch').oninput = e => { projQuery = e.target.value; projToast(''); paintCards(); };
   $('#pSort').onchange = e => { projSort = e.target.value; projToast(''); paintCards(); };
+  $('#pRefreshList').onclick = () => { projToast(''); renderers.projects(); };
   $('#pNew').onclick = () => { projToast(''); toggleNewForm(); };
   $('#pImport').onclick = importInbox;
   $('#pImportClaude').onclick = () => { projToast(''); openClaudePicker(); };

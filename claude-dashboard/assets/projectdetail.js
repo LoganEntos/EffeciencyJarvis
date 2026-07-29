@@ -87,7 +87,10 @@ async function renderProjectDetail(id) {
   el.innerHTML = `
     <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <button id="pBack" class="ghost" style="padding:5px 11px;font-size:11.5px">← All projects</button>
-      <button id="pDel" class="danger" style="padding:5px 11px;font-size:11px">Delete project</button>
+      <span class="flex" style="gap:8px">
+        <button id="pRefresh" class="ghost" style="padding:5px 11px;font-size:11.5px" title="Re-fetch files, runs, pairing and memory">↻ Refresh</button>
+        <button id="pDel" class="danger" style="padding:5px 11px;font-size:11px">Delete project</button>
+      </span>
     </div>
     <input id="pName" value="${esc(p.name)}" style="font-family:var(--font-body);font-size:24px;font-weight:800;letter-spacing:-.02em;background:none;border:none;padding:0;margin:2px 0;width:100%">
     <input class="search" id="pDesc" value="${esc(p.description)}" placeholder="Short description (optional)" style="max-width:560px;margin:4px 0 10px">
@@ -114,6 +117,14 @@ async function renderProjectDetail(id) {
     </div>`;
 
   $('#pBack').onclick = async () => { if (projInstrFlush) await projInstrFlush(); if (window.projectChat && projectChat.destroy) projectChat.destroy(); projSel = null; renderers.projects(); };
+  // Refresh mirrors the back-button teardown (flush dirty instructions, unmount
+  // chat) then re-renders in place — projectchat replays its log on mount, so
+  // the visible conversation survives the round-trip.
+  $('#pRefresh').onclick = async () => {
+    if (projInstrFlush) await projInstrFlush();
+    if (window.projectChat && projectChat.destroy) projectChat.destroy();
+    renderProjectDetail(p.id);
+  };
   wireDelete(p);
   const saveMeta = async (patch, note) => {
     const s = $('#pSaved'); if (s && note) s.textContent = 'saving…';
