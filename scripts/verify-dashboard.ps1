@@ -126,6 +126,11 @@ CheckPost "POST /api/files/move w/o token (403)" "$base/api/files/move" '{"name"
 CheckPost "POST /api/clientlog w/o token (403)"  "$base/api/clientlog"  '{"msg":"x"}' 403
 CheckPost "POST /api/projects/import w/o token (403)" "$base/api/projects/import" '{}' 403
 CheckPost "POST /api/projects/delete w/o token (403)" "$base/api/projects/delete" '{"id":"x"}' 403
+CheckPost "POST /api/projects w/o token (403)"        "$base/api/projects"        '{"name":"x"}' 403
+CheckPost "POST /api/projects/update w/o token (403)" "$base/api/projects/update" '{"id":"x"}' 403
+CheckPost "POST /api/projects/note w/o token (403)"   "$base/api/projects/note"   '{"id":"x","text":"y"}' 403
+CheckPost "POST /api/files w/o token (403)"           "$base/api/files"           '{"name":"x.txt","data":""}' 403
+CheckPost "POST /api/teams/select w/o token (403)"    "$base/api/teams/select"    '{"id":"lean"}' 403
 CheckPost "POST /api/tasks w/o token (403)"       "$base/api/tasks"       '{"prompt":"x"}' 403
 CheckPost "POST /api/tasks/done w/o token (403)"  "$base/api/tasks/done"  '{"id":"x"}' 403
 CheckPost "POST /api/memory w/o token (403)"      "$base/api/memory"      '{"text":"x"}' 403

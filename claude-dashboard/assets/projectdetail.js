@@ -50,11 +50,23 @@ async function renderProjectDetail(id) {
       <div id="pManifestBox" class="hidden"></div>
       <div class="dropzone" id="pDrop" style="margin-top:8px">Drop files here or click to add<br><span class="muted" style="font-size:11.5px">50 MB per upload · grouped under data/inbox/${esc(p.slug)}/</span></div>
       <input type="file" id="pFileIn" multiple class="hidden">
-      <div id="pUpStatus" class="badgebar" style="margin:8px 0"></div>
+      <div id="pUpStatus" class="badgebar" role="status" aria-live="polite" style="margin:8px 0"></div>
       <div id="pFiles" class="pfiles-grid">${files.length ? files.map(projFileTile).join('') : '<div class="muted">No files yet.</div>'}</div>
     </div>`;
 
-  const secChat = `
+  // Imported Claude-workspace projects (p.kind === 'claude') never mount the
+  // chat composer: runs always spawn Claude in the hub's own directory, so
+  // chatting "in" a workspace project would silently write to the wrong repo.
+  // Show a calm inline notice instead and point at the real ways to work in
+  // that workspace (Run tab, or the terminal directly).
+  const secChat = claude ? `
+    <div class="row">
+      <div class="psection"><span class="name">▷ Chat in this project</span></div>
+      <div class="note" role="status" aria-live="polite" style="margin-top:8px;font-size:12.5px">
+        Chat is disabled for imported Claude Code workspace projects — runs always execute in the hub's own directory, not
+        <span class="mono">${esc(p.cwd || 'this workspace')}</span>. Use the Run tab, or open the workspace directly in a terminal, instead.
+      </div>
+    </div>` : `
     <div class="row">
       <div class="psection"><span class="name">▷ Chat in this project <span class="muted" style="font-weight:400;font-size:11.5px">— runs here auto-carry the instructions, files and memory above</span></span></div>
       <div id="pChatMount" style="margin-top:8px"></div>
@@ -134,9 +146,10 @@ async function renderProjectDetail(id) {
   }
   $('#pChat').onclick = () => { if (typeof bindRunProject === 'function') bindRunProject({ id: p.id, name: p.name }); if (typeof prefillRun === 'function') prefillRun(''); };
 
-  // inline chat panel — instructions/files/memory above ride every message via projectSlug
+  // inline chat panel — instructions/files/memory above ride every message via
+  // projectSlug. Never mounted for claude-kind projects (see secChat above).
   const chatMount = $('#pChatMount');
-  if (chatMount && window.projectChat) projectChat.mount(chatMount, { id: p.id, slug: p.slug, name: p.name });
+  if (!claude && chatMount && window.projectChat) projectChat.mount(chatMount, { id: p.id, slug: p.slug, name: p.name });
 
   // file pairing panel — its own fetch (GET /api/projects/pairs), guarded so
   // load order (or an older server build without the route) can't crash the view
@@ -300,25 +313,41 @@ function memTile(m) {
   </div>`;
 }
 
+// Upload status pill (#pUpStatus): info/progress messages auto-clear after
+// ~5s (tracked so a newer message cancels the older timer); error messages
+// persist until the ✕ dismiss is clicked or a new upload overwrites them.
+let pUpStatusTimer = null;
+function setUpStatus(inner, isError) {
+  const st = $('#pUpStatus'); if (!st) return;
+  if (pUpStatusTimer) { clearTimeout(pUpStatusTimer); pUpStatusTimer = null; }
+  if (!inner) { st.innerHTML = ''; return; }
+  if (isError) {
+    st.innerHTML = `${inner} <button class="pUpStatusX" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0" aria-label="Dismiss">✕</button>`;
+    const x = st.querySelector('.pUpStatusX'); if (x) x.onclick = () => setUpStatus('');
+  } else {
+    st.innerHTML = inner;
+    pUpStatusTimer = setTimeout(() => setUpStatus(''), 5000);
+  }
+}
 async function projUpload(slug, fileList, overwrite) {
   const files = [...fileList];
   if (!files.length) return;
-  const st = $('#pUpStatus');
   const tooBig = files.find(f => f.size > 50 * 1024 * 1024);
-  if (tooBig) { if (st) st.innerHTML = `<span class="pill err">${esc(tooBig.name)} exceeds the 50 MB cap</span>`; return; }
+  if (tooBig) { setUpStatus(`<span class="pill err">${esc(tooBig.name)} exceeds the 50 MB cap</span>`, true); return; }
   const fd = new FormData();
   for (const f of files) fd.append('file', f, f.name);
-  if (st) st.innerHTML = `<span class="pill warn">uploading ${files.length} file${files.length === 1 ? '' : 's'}…</span>`;
+  setUpStatus(`<span class="pill warn">uploading ${files.length} file${files.length === 1 ? '' : 's'}…</span>`);
   let r;
   try { r = await api('/api/files?' + new URLSearchParams({ project: slug, ...(overwrite ? { overwrite: 1 } : {}) }), { method: 'POST', body: fd, timeoutMs: 120000 }); }
-  catch (e) { if (st) st.innerHTML = `<span class="pill err">upload failed: ${esc(e.message || 'network error')}</span>`; return; }
+  catch (e) { setUpStatus(`<span class="pill err">upload failed: ${esc(e.message || 'network error')}</span>`, true); return; }
   if ((r.conflicts && r.conflicts.length) && !(r.saved && r.saved.length)) {
     // Retry with the `files` snapshot, not the live `fileList` — the picker's
     // input was cleared (fin.value='') right after the first call, so the
     // original FileList is now empty and would silently upload nothing.
     if (confirm(`Already attached: ${(r.conflicts || []).join(', ')}\n\nOverwrite?`)) return projUpload(slug, files, true);
   }
-  if (r.error && r.error !== 'exists') { if (st) st.innerHTML = `<span class="pill err">${esc(r.error)}</span>`; return; }
+  if (r.error && r.error !== 'exists') { setUpStatus(`<span class="pill err">${esc(r.error)}</span>`, true); return; }
+  setUpStatus('');
   if (projSel) renderProjectDetail(projSel);
 }
 

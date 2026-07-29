@@ -160,7 +160,7 @@ function pairProject(slug) {
     return { orderId, state, pdfs, csvs, authoritativePdf, note };
   });
 
-  return { slug, orders: orderList, support, unparsed };
+  return { slug, dir: path.join(INBOX, slug), orders: orderList, support, unparsed };
 }
 
 async function handle(req, res, url) {

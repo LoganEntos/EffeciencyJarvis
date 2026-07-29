@@ -50,9 +50,10 @@ function ppRender(slug, containerEl, d) {
     return;
   }
   orders.sort((a, b) => (PP_RANK[a.state] ?? 9) - (PP_RANK[b.state] ?? 9));
+  const dir = typeof d.dir === 'string' ? d.dir : '';
   const table = orders.length
     ? `<table class="hlth-table"><thead><tr><th>Order</th><th>State</th><th>PDF</th><th>CSV</th><th>Note</th><th></th></tr></thead>
-      <tbody>${orders.map(o => ppRow(slug, o)).join('')}</tbody></table>`
+      <tbody>${orders.map(o => ppRow(slug, o, dir)).join('')}</tbody></table>`
     : '<div class="muted">No orders matched yet.</div>';
   containerEl.innerHTML = ppShell(
     `<div class="muted" style="font-size:11.5px;margin-bottom:8px">${ppCounts(orders)}</div>${table}${ppExtraLine(support, unparsed)}`
@@ -79,14 +80,23 @@ function ppLink(slug, name, tag) {
   }</div>`;
 }
 
-function ppRow(slug, o) {
+// Joins the server-supplied absolute inbox dir (mirrors files.js statEntry's
+// `path` field) with a filename using a forward slash — Windows accepts
+// forward slashes in paths too, so this stays a single well-formed absolute
+// path the Claude CLI (cwd = repo root) can actually resolve, unlike the old
+// hand-rolled 'data/inbox/' + relative-path prefix.
+function ppAbsPath(dir, name) {
+  return dir ? dir.replace(/[\\/]+$/, '') + '/' + name : name;
+}
+
+function ppRow(slug, o, dir) {
   const tone = PP_TONE[o.state] || 'neutral';
   const pdfs = (o.pdfs || []).map(pf => {
     const tag = pf.name === o.authoritativePdf ? 'authoritative' : (pf.kind === 'commercial-invoice' ? 'reference' : '');
     return ppLink(slug, pf.name, tag);
   }).join('') || '<span class="muted">—</span>';
   const csvs = (o.csvs || []).map(n => ppLink(slug, n)).join('') || '<span class="muted">—</span>';
-  const pdfPaths = (o.pdfs || []).map(pf => slug + '/' + pf.name).join('|');
+  const pdfPaths = (o.pdfs || []).map(pf => ppAbsPath(dir, pf.name)).join('|');
   const convertBtn = o.state === 'pdf-only' && (o.pdfs || []).length
     ? `<button type="button" class="ghost pp-convert" data-pdfs="${esc(pdfPaths)}" style="padding:4px 10px;font-size:11px;white-space:nowrap">&#9655; convert</button>`
     : '';
@@ -117,7 +127,9 @@ function ppWireRows(slug, containerEl) {
   // Same mechanism as the Files tab's "Process with Claude" (files.js
   // procBtn) — prefillRun() pre-fills and switches to the Run tab.
   containerEl.querySelectorAll('.pp-convert').forEach(b => b.onclick = () => {
-    const paths = (b.dataset.pdfs || '').split('|').filter(Boolean).map(p => 'data/inbox/' + p);
+    // data-pdfs already holds server-supplied absolute paths (see ppAbsPath) —
+    // no client-side prefix needed.
+    const paths = (b.dataset.pdfs || '').split('|').filter(Boolean);
     if (!paths.length || typeof prefillRun !== 'function') return;
     prefillRun(`Process the PDF${paths.length > 1 ? 's' : ''} at ${paths.join(', ')} — convert to CSV, matching the paired commercial invoice format if present — `);
   });

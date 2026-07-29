@@ -63,24 +63,41 @@ function projectFiles(slug) {
   return out.sort((a, b) => new Date(b.modified) - new Date(a.modified));
 }
 
+// Cheap count for the list/summary views: readdirSync withFileTypes already
+// tells us isFile() per entry, so no per-file statSync is needed just to get
+// a count (unlike projectFiles(), which needs size+mtime for the detail view).
+function fileCountFor(slug) {
+  let n = 0;
+  for (const e of U.listDir(path.join(INBOX, slug))) if (e.isFile()) n++;
+  return n;
+}
+
 function shape(p, stats) {
   const s = stats || {};
   const claude = p.kind === 'claude';
   return { id: p.id, name: p.name, slug: p.slug, kind: p.kind || 'standard', cwd: p.cwd || '',
     description: p.description || '', instructions: p.instructions || '',
     createdAt: p.createdAt, updatedAt: p.updatedAt,
-    fileCount: claude ? 0 : projectFiles(p.slug).length,
+    fileCount: claude ? 0 : fileCountFor(p.slug),
     sessionCount: claude ? countSessions(p.claudeDir) : 0,
     runCount: s.count || 0, lastRunAt: s.last || null };
 }
 
+// Lazy, memoized-per-call fetch of the full run list. require('./runs') is
+// lazy: runs.js requires this module at load, so a top-level require here
+// would be circular; by request time both are resolved. Callers that need
+// both runStatsBySlug() and runsForSlug() in the same request should call
+// this once and pass the result in, so a single request never scans
+// data/runs/ (readFileSync+JSON.parse per meta.json) more than once.
+function allRuns() {
+  try { return require('./runs').listRuns(); } catch { return []; }
+}
+
 // Run activity per project, keyed by slug. Runs launched in a project carry
 // meta.projectSlug (see runs.js), so we bucket the existing run list — no new
-// store. require('./runs') is lazy: runs.js requires this module at load, so a
-// top-level require here would be circular; by request time both are resolved.
-function runStatsBySlug() {
-  let runs = [];
-  try { runs = require('./runs').listRuns(); } catch {}
+// store. `runs` is optional so existing callers keep working unchanged.
+function runStatsBySlug(runs) {
+  runs = runs || allRuns();
   const by = {};
   for (const r of runs) {
     if (!r.projectSlug) continue;
@@ -93,9 +110,9 @@ function runStatsBySlug() {
 }
 
 // The most recent runs launched in one project (listRuns is already newest-first).
-function runsForSlug(slug, limit = 8) {
-  let runs = [];
-  try { runs = require('./runs').listRuns(); } catch {}
+// `runs` is optional so existing callers keep working unchanged.
+function runsForSlug(slug, limit = 8, runs) {
+  runs = runs || allRuns();
   return runs.filter(r => r.projectSlug === slug).slice(0, limit).map(r => ({
     id: r.id, model: r.model || '?', status: r.status || '?',
     tokensIn: r.tokensIn || 0, tokensOut: r.tokensOut || 0,
@@ -303,7 +320,7 @@ function remove(id) {
 async function handle(req, res, url) {
   const p = url.pathname;
   if (p === '/api/projects' && req.method === 'GET') {
-    const stats = runStatsBySlug();
+    const stats = runStatsBySlug(allRuns());
     U.sendJson(res, { projects: load().map(x => shape(x, stats[x.slug])) });
     return true;
   }
@@ -335,15 +352,17 @@ async function handle(req, res, url) {
     // per-transcript parse in projectSessions (and memory recall) so these hot,
     // repeated calls don't block the event loop on a large claude workspace.
     if (url.searchParams.get('runsOnly')) {
-      U.sendJson(res, { project: shape(proj, runStatsBySlug()[proj.slug]), runs: runsForSlug(proj.slug) });
+      const runs = allRuns();
+      U.sendJson(res, { project: shape(proj, runStatsBySlug(runs)[proj.slug]), runs: runsForSlug(proj.slug, 8, runs) });
       return true;
     }
     const q = url.searchParams.get('q') || (proj.instructions + ' ' + proj.description) || proj.name;
     let mem = { items: [] };
     try { mem = memory.recallForProject(proj.slug, q, { limit: 6 }); } catch {}
-    const stats = runStatsBySlug();
+    const runs = allRuns();
+    const stats = runStatsBySlug(runs);
     U.sendJson(res, { project: shape(proj, stats[proj.slug]), files: projectFiles(proj.slug),
-      memory: { items: mem.items }, runs: runsForSlug(proj.slug),
+      memory: { items: mem.items }, runs: runsForSlug(proj.slug, 8, runs),
       sessions: proj.kind === 'claude' ? projectSessions(proj.claudeDir) : [] });
     return true;
   }

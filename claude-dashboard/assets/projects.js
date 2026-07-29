@@ -40,14 +40,14 @@ renderers.projects = async function () {
     <div id="pXferPanel"></div>
     <div id="pClaudePicker"></div>
     <div id="pNewForm"></div>
-    <div id="pToast" class="muted" style="font-size:12px;margin-bottom:10px;min-height:0"></div>
+    <div id="pToast" class="muted" role="status" aria-live="polite" style="font-size:12px;margin-bottom:10px;min-height:0"></div>
     <div id="pGridWrap"></div>`;
   $('#pSort').value = projSort;
-  $('#pSearch').oninput = e => { projQuery = e.target.value; paintCards(); };
-  $('#pSort').onchange = e => { projSort = e.target.value; paintCards(); };
-  $('#pNew').onclick = toggleNewForm;
+  $('#pSearch').oninput = e => { projQuery = e.target.value; projToast(''); paintCards(); };
+  $('#pSort').onchange = e => { projSort = e.target.value; projToast(''); paintCards(); };
+  $('#pNew').onclick = () => { projToast(''); toggleNewForm(); };
   $('#pImport').onclick = importInbox;
-  $('#pImportClaude').onclick = openClaudePicker;
+  $('#pImportClaude').onclick = () => { projToast(''); openClaudePicker(); };
   $('#pXfer').onclick = () => { projShowXfer = !projShowXfer; renderXfer(); };
   if (projShowNew) renderNewForm();
   if (projShowXfer) renderXfer();
@@ -95,7 +95,23 @@ function projCard(p) {
   </div>`;
 }
 
-function projToast(msg) { const t = $('#pToast'); if (t) t.textContent = msg || ''; }
+// #pToast: info/success messages auto-clear after ~5s (tracked so a newer
+// message cancels the older timer); errors persist until the ✕ dismiss is
+// clicked or the next user-initiated action (search/sort/new/import) in this
+// view clears them.
+let projToastTimer = null;
+function projToast(msg, isError) {
+  const t = $('#pToast'); if (!t) return;
+  if (projToastTimer) { clearTimeout(projToastTimer); projToastTimer = null; }
+  if (!msg) { t.innerHTML = ''; return; }
+  if (isError) {
+    t.innerHTML = `${esc(msg)} <button class="pToastX" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0;margin-left:6px" aria-label="Dismiss">✕</button>`;
+    const x = t.querySelector('.pToastX'); if (x) x.onclick = () => projToast('');
+  } else {
+    t.textContent = msg;
+    projToastTimer = setTimeout(() => projToast(''), 5000);
+  }
+}
 
 // ---------------------------------------------------------- inline new-project
 function toggleNewForm() { projShowNew = !projShowNew; renderNewForm(); }
@@ -127,8 +143,8 @@ async function importInbox() {
   projToast('Scanning inbox…');
   let r;
   try { r = await api('/api/projects/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); }
-  catch (e) { projToast('Import failed: ' + (e.message || 'network error')); return; }
-  if (r.error) { projToast(r.error); return; }
+  catch (e) { projToast('Import failed: ' + (e.message || 'network error'), true); return; }
+  if (r.error) { projToast(r.error, true); return; }
   if (!r.count) { projToast('Nothing to import — every inbox folder already has a project.'); return; }
   try { const data = await api('/api/projects'); projCache = (data && data.projects) || []; } catch {}
   paintCards();
