@@ -3,8 +3,10 @@
    same jmsg bubble language (reuses jarvis.css's global .jmsg/.jconv/.jchat-row
    rules so it reads as one more instrument panel, not a bolted-on widget), same
    disable/enable-on-send/done/error dance. Differences: payload carries
-   projectId so lib/runs.js auto-injects this project's instructions + files
-   + engram memory (no client-side re-injection); a history strip up top seeds
+   projectId so lib/runs.js auto-injects this project's instructions + a file
+   manifest + engram memory (no client-side re-injection; file contents are
+   never inlined — Claude reads files itself via the manifest's absolute
+   paths); a history strip up top seeds
    from /api/projects/get; state survives remounts of the SAME project (the
    caller re-renders the whole detail view on `done`, which would otherwise
    wipe the transcript out from under the user right as the reply lands). */
@@ -293,7 +295,7 @@
       </div></div>`;
     const feed = $('#pchatConv');
     if (S.log.length) { S.log.forEach(e => renderEntry(e, false)); if (feed) feed.scrollTop = feed.scrollHeight; }
-    else if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">start a chat below — instructions, files and project memory ride every message</div>';
+    else if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">start a chat below — instructions, a file manifest and project memory ride every message</div>';
     wire();
     loadHistory();
   }

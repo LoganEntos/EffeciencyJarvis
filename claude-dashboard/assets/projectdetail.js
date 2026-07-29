@@ -68,7 +68,7 @@ async function renderProjectDetail(id) {
       </div>
     </div>` : `
     <div class="row">
-      <div class="psection"><span class="name">▷ Chat in this project <span class="muted" style="font-weight:400;font-size:11.5px">— runs here auto-carry the instructions, files and memory above</span></span></div>
+      <div class="psection"><span class="name">▷ Chat in this project <span class="muted" style="font-weight:400;font-size:11.5px">— runs here auto-carry the instructions, a file manifest and memory above; Claude opens the files it needs from the manifest</span></span></div>
       <div id="pChatMount" style="margin-top:8px"></div>
     </div>`;
 
@@ -89,6 +89,7 @@ async function renderProjectDetail(id) {
       <button id="pBack" class="ghost" style="padding:5px 11px;font-size:11.5px">← All projects</button>
       <span class="flex" style="gap:8px">
         <button id="pRefresh" class="ghost" style="padding:5px 11px;font-size:11.5px" title="Re-fetch files, runs, pairing and memory">↻ Refresh</button>
+        <button id="pArch" class="ghost" style="padding:5px 11px;font-size:11.5px" title="${p.archived ? 'Bring this project back into the grid' : 'Hide from the grid — files, memory and history all stay'}">${p.archived ? '⤒ Unarchive' : '⤓ Archive'}</button>
         <button id="pDel" class="danger" style="padding:5px 11px;font-size:11px">Delete project</button>
       </span>
     </div>
@@ -125,6 +126,16 @@ async function renderProjectDetail(id) {
     if (window.projectChat && projectChat.destroy) projectChat.destroy();
     renderProjectDetail(p.id);
   };
+  // Archive is reversible metadata-only (unlike Delete): archiving returns to
+  // the grid, where the card sits behind the "show N archived" toggle.
+  $('#pArch').onclick = async () => {
+    if (projInstrFlush) await projInstrFlush();
+    try { const r = await api('/api/projects/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, archived: !p.archived }) });
+      if (r && r.error) { alert('Could not update: ' + r.error); return; } } catch (e) { alert('Could not update: ' + (e.message || 'network error')); return; }
+    if (p.archived) return renderProjectDetail(p.id);
+    if (window.projectChat && projectChat.destroy) projectChat.destroy();
+    projSel = null; renderers.projects();
+  };
   wireDelete(p);
   const saveMeta = async (patch, note) => {
     const s = $('#pSaved'); if (s && note) s.textContent = 'saving…';
@@ -157,8 +168,9 @@ async function renderProjectDetail(id) {
   }
   $('#pChat').onclick = () => { if (typeof bindRunProject === 'function') bindRunProject({ id: p.id, name: p.name }); if (typeof prefillRun === 'function') prefillRun(''); };
 
-  // inline chat panel — instructions/files/memory above ride every message via
-  // projectSlug. Never mounted for claude-kind projects (see secChat above).
+  // inline chat panel — instructions/file-manifest/memory above ride every
+  // message via projectSlug (file contents ride only when attached). Never
+  // mounted for claude-kind projects (see secChat above).
   const chatMount = $('#pChatMount');
   if (!claude && chatMount && window.projectChat) projectChat.mount(chatMount, { id: p.id, slug: p.slug, name: p.name });
 

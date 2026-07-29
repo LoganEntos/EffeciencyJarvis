@@ -14,6 +14,7 @@ let projShowNew = false;   // inline "new project" form visible
 let projSort = 'recent';   // recent | name | active
 let projQuery = '';        // grid search
 let projShowXfer = false;  // transfer-prompt panel visible
+let projShowArchived = false; // archived projects hidden from the grid by default
 
 // ---------------------------------------------------------------- grid state
 renderers.projects = async function () {
@@ -69,14 +70,26 @@ function paintCards() {
   const wrap = $('#pGridWrap');
   if (!wrap) return;
   const total = projCache.length;
+  const archivedN = projCache.filter(p => p.archived).length;
+  const pool = projShowArchived ? projCache.slice() : projCache.filter(p => !p.archived);
   const q = projQuery.trim().toLowerCase();
-  let list = q ? projCache.filter(p => (p.name + ' ' + (p.description || '')).toLowerCase().includes(q)) : projCache.slice();
+  let list = q ? pool.filter(p => (p.name + ' ' + (p.description || '')).toLowerCase().includes(q)) : pool.slice();
   list = sortProjects(list, projSort);
-  wrap.innerHTML = list.length
+  const grid = list.length
     ? `<div class="cards">${list.map(projCard).join('')}</div>`
     : (total ? '<div class="note">No projects match that search.</div>'
              : '<div class="note">No projects yet. Create one, drop in its files, and write the instructions Claude should follow every time you work in it — or Import inbox to adopt existing folders.</div>');
+  const archLine = archivedN
+    ? `<div class="muted" style="font-size:11.5px;margin-top:10px"><a class="link" id="pArchToggle" role="button" tabindex="0">${projShowArchived ? 'hide' : 'show'} ${archivedN} archived project${archivedN === 1 ? '' : 's'}</a></div>`
+    : '';
+  wrap.innerHTML = grid + archLine;
   wrap.querySelectorAll('.card.clickable[data-id]').forEach(c => c.onclick = () => { projSel = c.dataset.id; renderProjectDetail(projSel); });
+  const at = $('#pArchToggle');
+  if (at) {
+    const flip = () => { projShowArchived = !projShowArchived; paintCards(); };
+    at.onclick = flip;
+    at.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } };
+  }
 }
 
 function projCard(p) {
@@ -86,9 +99,10 @@ function projCard(p) {
   const desc = claude
     ? `<div class="pcard-cwd">${esc(p.cwd || '')}</div>`
     : (p.description ? `<div class="pcard-desc">${esc(p.description)}</div>` : '<div class="pcard-desc empty">No description</div>');
+  const arch = p.archived ? '<span class="pill warn">archived</span>' : '';
   const pills = claude
-    ? `<span class="pill accent">Claude Code</span><span class="pill neutral">${p.sessionCount} session${p.sessionCount === 1 ? '' : 's'}</span>`
-    : `<span class="pill neutral">${p.fileCount} file${p.fileCount === 1 ? '' : 's'}</span><span class="pill neutral">${runs}</span>${p.instructions ? '<span class="pill ok">instructions</span>' : '<span class="pill warn">no instructions</span>'}`;
+    ? `${arch}<span class="pill accent">Claude Code</span><span class="pill neutral">${p.sessionCount} session${p.sessionCount === 1 ? '' : 's'}</span>`
+    : `${arch}<span class="pill neutral">${p.fileCount} file${p.fileCount === 1 ? '' : 's'}</span><span class="pill neutral">${runs}</span>${p.instructions ? '<span class="pill ok">instructions</span>' : '<span class="pill warn">no instructions</span>'}`;
   return `<div class="card clickable" data-id="${esc(p.id)}">
     <div class="pcard-name">${esc(p.name)}</div>
     ${desc}
@@ -130,15 +144,28 @@ function renderNewForm() {
   $('#pnName').focus();
   $('#pnName').onkeydown = e => { if (e.key === 'Enter') $('#pnCreate').click(); };
   $('#pnCancel').onclick = toggleNewForm;
-  $('#pnCreate').onclick = async () => {
+  // extra = {} | {adopt:true} | {fresh:true}. The server 409s with
+  // 'folder-exists' when this name's inbox folder still holds a deleted
+  // project's files — the one place the user must choose: adopt them (the only
+  // recovery path for those files) or start fresh in a new folder.
+  const doCreate = async extra => {
     const name = ($('#pnName').value || '').trim();
     if (!name) { $('#pnErr').textContent = 'Name required.'; return; }
     let r;
-    try { r = await api('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, description: ($('#pnDesc').value || '').trim() }) }); }
+    try { r = await api('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ name, description: ($('#pnDesc').value || '').trim() }, extra)) }); }
     catch (e) { $('#pnErr').textContent = 'Could not create: ' + (e.message || 'network error'); return; }
+    if (r.error === 'folder-exists') {
+      $('#pnErr').innerHTML = `A folder <span class="mono">data/inbox/${esc(r.slug)}/</span> already holds ${r.fileCount} file${r.fileCount === 1 ? '' : 's'} from a previous project of this name.
+        <button id="pnAdopt" class="ghost" style="padding:3px 9px;font-size:11px;margin-left:6px">Adopt those files</button>
+        <button id="pnFresh" class="ghost" style="padding:3px 9px;font-size:11px">Start fresh</button>`;
+      $('#pnAdopt').onclick = () => doCreate({ adopt: true });
+      $('#pnFresh').onclick = () => doCreate({ fresh: true });
+      return;
+    }
     if (r.error) { $('#pnErr').textContent = r.error; return; }
     projShowNew = false; projSel = r.project.id; renderProjectDetail(projSel);
   };
+  $('#pnCreate').onclick = () => doCreate({});
 }
 
 async function importInbox() {

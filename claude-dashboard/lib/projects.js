@@ -76,7 +76,7 @@ function shape(p, stats) {
   const s = stats || {};
   const claude = p.kind === 'claude';
   return { id: p.id, name: p.name, slug: p.slug, kind: p.kind || 'standard', cwd: p.cwd || '',
-    description: p.description || '', instructions: p.instructions || '',
+    description: p.description || '', instructions: p.instructions || '', archived: !!p.archived,
     createdAt: p.createdAt, updatedAt: p.updatedAt,
     fileCount: claude ? 0 : fileCountFor(p.slug),
     sessionCount: claude ? countSessions(p.claudeDir) : 0,
@@ -284,13 +284,39 @@ function sessionTranscript(claudeDir, sid) {
 
 function get(id) { return load().find(p => p.id === id) || null; }
 
-function create(name, description) {
+// Slug-reuse guard: create() used to uniquify the slug only against CURRENT
+// projects.json entries. Deleting a project frees its slug but leaves its
+// inbox folder (+ memory notes + run history) on disk (remove() is metadata-
+// only, by design — see below); recreating a same-named project would
+// silently inherit all of it. That inheritance is also the only recovery path
+// for a deleted project's files, so we don't silently uniquify — instead we
+// surface the conflict and let the caller pick adopt (opt.adopt) or fresh
+// (opt.fresh) via a second call.
+function create(name, description, opts) {
+  opts = opts || {};
   name = (name || '').toString().trim().slice(0, 80);
   if (!name) return { error: 'name required' };
   const list = load();
-  const slug = slugify(name, new Set(list.map(p => p.slug)));
+  const takenSlugs = new Set(list.map(p => p.slug));
+  let slug;
+  if (opts.fresh) {
+    // Seed the uniquifier with every existing inbox folder name too (not just
+    // slugs already in projects.json) so a fresh start can never land on a
+    // folder that still holds another deleted project's files.
+    const taken = new Set(takenSlugs);
+    for (const e of U.listDir(INBOX)) if (e.isDirectory()) taken.add(e.name);
+    slug = slugify(name, taken);
+  } else {
+    slug = slugify(name, takenSlugs);
+    if (!opts.adopt) {
+      const fileCount = fileCountFor(slug);
+      if (fileCount > 0) return { error: 'folder-exists', slug, fileCount };
+    }
+    // opts.adopt (or an empty/missing folder): fall through and adopt/reuse
+    // the folder as-is — existing behavior.
+  }
   const now = new Date().toISOString();
-  const p = { id: newId(), name, slug, description: (description || '').toString().slice(0, 300), instructions: '', createdAt: now, updatedAt: now };
+  const p = { id: newId(), name, slug, archived: false, description: (description || '').toString().slice(0, 300), instructions: '', createdAt: now, updatedAt: now };
   list.unshift(p);
   save(list);
   return { ok: true, project: shape(p) };
@@ -303,6 +329,7 @@ function update(id, patch) {
   if (typeof patch.name === 'string' && patch.name.trim()) p.name = patch.name.trim().slice(0, 80);
   if (typeof patch.description === 'string') p.description = patch.description.slice(0, 300);
   if (typeof patch.instructions === 'string') p.instructions = patch.instructions.slice(0, 12000);
+  if (typeof patch.archived === 'boolean') p.archived = patch.archived;
   p.updatedAt = new Date().toISOString();
   save(list);
   return { ok: true, project: shape(p) };
@@ -368,8 +395,9 @@ async function handle(req, res, url) {
   }
   if (p === '/api/projects' && req.method === 'POST') {
     let b = {}; try { b = JSON.parse(await U.readBody(req, 16 * 1024) || '{}'); } catch {}
-    const r = create(b.name, b.description);
-    U.sendJson(res, r, r.error ? 400 : 200);
+    const r = create(b.name, b.description, { adopt: !!b.adopt, fresh: !!b.fresh });
+    const code = r.error ? (r.error === 'folder-exists' ? 409 : 400) : 200;
+    U.sendJson(res, r, code);
     return true;
   }
   if (p === '/api/projects/update' && req.method === 'POST') {

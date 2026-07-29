@@ -15,6 +15,7 @@ const liveness = require('./liveness');
 const teams = require('./teams');
 const personas = require('./personas');
 const projects = require('./projects');
+const projectContext = require('./project-context');
 const settings = require('./settings');
 const { listArtifacts, serveArtifact } = require('./artifacts');
 const { createQueries } = require('./runs-query');
@@ -186,16 +187,24 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     try { personaName = personas.activeName(); } catch {}
   }
   // Project binding (Projects tab): the project's standing instructions lead the
-  // prompt like a persona does, plus a small project-scoped engram recall block
-  // (this project's own past runs/notes). Claude engine only; token-neutral when
-  // no project is bound. See lib/projects.js.
+  // prompt like a persona does, followed by a compact file manifest (names/
+  // types/sizes + the absolute inbox folder path — never file contents) and an
+  // output-destination rule so generated files land where lib/pairing.js's
+  // scan will find them, plus a small project-scoped engram recall block (this
+  // project's own past runs/notes). Manifest/output-hint building lives in
+  // lib/project-context.js (kept out of this file to hold its 500-line cap).
+  // Claude engine only; token-neutral when no project is bound. See lib/projects.js.
   let projectPrefix = '', projectName = null, projectSlug = null, projRecall = null;
   if (engine === 'claude' && projectId) {
     try {
       const pr = projects.get(projectId);
       if (pr) {
         projectName = pr.name; projectSlug = pr.slug;
-        if (pr.instructions && pr.instructions.trim()) projectPrefix = `<project name="${pr.name}">\n${pr.instructions.trim()}\n</project>\n\n`;
+        const parts = [];
+        if (pr.instructions && pr.instructions.trim()) parts.push(pr.instructions.trim());
+        parts.push(projectContext.buildManifest(pr.slug));
+        parts.push(projectContext.outputHint(pr.slug));
+        projectPrefix = `<project name="${pr.name}">\n${parts.join('\n\n')}\n</project>\n\n`;
         try { projRecall = memory.recallForProject(pr.slug, prompt, { forInjection: true }).injection; } catch {}
       }
     } catch {}
