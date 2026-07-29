@@ -51,7 +51,7 @@ async function renderProjectDetail(id) {
       <div class="dropzone" id="pDrop" style="margin-top:8px">Drop files here or click to add<br><span class="muted" style="font-size:11.5px">50 MB per upload · grouped under data/inbox/${esc(p.slug)}/</span></div>
       <input type="file" id="pFileIn" multiple class="hidden">
       <div id="pUpStatus" class="badgebar" role="status" aria-live="polite" style="margin:8px 0"></div>
-      <div id="pFiles" class="pfiles-grid">${files.length ? files.map(projFileTile).join('') : '<div class="muted">No files yet.</div>'}</div>
+      <div id="pFiles">${files.length ? `<div class="pfiles-grid">${files.map(projFileTile).join('')}</div>` : '<div class="muted">No files yet.</div>'}</div>
     </div>`;
 
   // Imported Claude-workspace projects (p.kind === 'claude') never mount the
@@ -96,6 +96,7 @@ async function renderProjectDetail(id) {
     <input id="pName" value="${esc(p.name)}" style="font-family:var(--font-body);font-size:24px;font-weight:800;letter-spacing:-.02em;background:none;border:none;padding:0;margin:2px 0;width:100%">
     <input class="search" id="pDesc" value="${esc(p.description)}" placeholder="Short description (optional)" style="max-width:560px;margin:4px 0 10px">
     <div class="badgebar" style="margin:0 0 10px">
+      ${p.archived ? '<span class="pill meta">archived</span>' : ''}
       ${claude ? `<span class="pill accent">Claude Code</span><span class="pill neutral">${sessions.length} session${sessions.length === 1 ? '' : 's'}</span>`
                : `<span class="pill neutral">${files.length} file${files.length === 1 ? '' : 's'}</span><span class="pill neutral">${p.runCount || 0} run${p.runCount === 1 ? '' : 's'}</span>`}
       <span class="pill neutral">${mem.length} memor${mem.length === 1 ? 'y' : 'ies'}</span>

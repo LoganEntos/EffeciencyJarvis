@@ -14,7 +14,7 @@ let projShowNew = false;   // inline "new project" form visible
 let projSort = 'recent';   // recent | name | active
 let projQuery = '';        // grid search
 let projShowXfer = false;  // transfer-prompt panel visible
-let projShowArchived = false; // archived projects hidden from the grid by default
+let projShowArchived = false; // grid: reveal archived projects (hidden by default)
 
 // ---------------------------------------------------------------- grid state
 renderers.projects = async function () {
@@ -103,7 +103,7 @@ function projCard(p) {
   const pills = claude
     ? `${arch}<span class="pill accent">Claude Code</span><span class="pill neutral">${p.sessionCount} session${p.sessionCount === 1 ? '' : 's'}</span>`
     : `${arch}<span class="pill neutral">${p.fileCount} file${p.fileCount === 1 ? '' : 's'}</span><span class="pill neutral">${runs}</span>${p.instructions ? '<span class="pill ok">instructions</span>' : '<span class="pill warn">no instructions</span>'}`;
-  return `<div class="card clickable" data-id="${esc(p.id)}">
+  return `<div class="card clickable${p.archived ? ' pcard-archived' : ''}" data-id="${esc(p.id)}">
     <div class="pcard-name">${esc(p.name)}</div>
     ${desc}
     <div class="pcard-pills">${pills}</div>
