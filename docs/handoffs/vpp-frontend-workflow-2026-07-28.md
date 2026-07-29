@@ -4,9 +4,18 @@
 > (`2218d53`) and the pairing panel in the Projects detail view (`9f8efdd`).
 > All 5 canonical test orders pair complete (incl. the 22610/22610-2 split via
 > manifest); smoke suite 106 checks green; both diffs code-reviewed SHIP.
-> Live after the user's next hub restart. Remaining: steps 3 (tab ownership),
-> 6 (dedicated refresh + surface the move/import action in Files/Projects),
-> 5 (preview consistency pass), 8 (sample-batch validation), 9 (backlog runs).
+> Live after the user's next hub restart.
+>
+> **PROGRESS 2026-07-29:** step 6 is now ✅ DONE (`0e30e0c`) — dedicated ↻
+> refresh in Files, Projects grid, and project detail; move-into-project select
+> on root-level Files cards (reuses `POST /api/files/move`). Preceded by a
+> review/perf pass (`84bdc32`): one runs-scan per request, absolute convert
+> paths in the pairing panel, chat gated off for claude-kind projects,
+> dismissible auto-clearing toasts, +5 smoke token-guard checks. Both stages
+> verified on a throwaway port, full smoke green. Remaining: steps 3 (tab
+> ownership — needs user decisions), 5 (preview consistency pass),
+> 8 (sample-batch validation — needs explicit user prompt to touch VPP data),
+> 9 (backlog runs).
 
 # Handoff: VPP front-end workflow — make the PDF→CSV pipeline reliable
 
