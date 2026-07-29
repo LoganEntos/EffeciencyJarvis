@@ -12,10 +12,18 @@
 > review/perf pass (`84bdc32`): one runs-scan per request, absolute convert
 > paths in the pairing panel, chat gated off for claude-kind projects,
 > dismissible auto-clearing toasts, +5 smoke token-guard checks. Both stages
-> verified on a throwaway port, full smoke green. Remaining: steps 3 (tab
-> ownership — needs user decisions), 5 (preview consistency pass),
-> 8 (sample-batch validation — needs explicit user prompt to touch VPP data),
-> 9 (backlog runs).
+> verified on a throwaway port, full smoke green.
+>
+> **Later same day (`efda7d8`):** honest project-run context shipped — project
+> runs now carry a file manifest (names/sizes + absolute folder path, never
+> contents) and an output-destination hint so converted CSVs land where
+> pairing scans (`lib/project-context.js`); plus a slug-reuse guard on create
+> (409 folder-exists → adopt-or-fresh choice in the new-project form) and a
+> reversible Archive (button in detail, "show N archived" toggle in the grid).
+> Recovered from a run that died mid-verification with server-side done and
+> client-side missing. Remaining: steps 3 (tab ownership — needs user
+> decisions), 5 (preview consistency pass), 8 (sample-batch validation —
+> needs explicit user prompt to touch VPP data), 9 (backlog runs).
 
 # Handoff: VPP front-end workflow — make the PDF→CSV pipeline reliable
 
