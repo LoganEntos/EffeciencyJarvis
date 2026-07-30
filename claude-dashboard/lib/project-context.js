@@ -31,10 +31,11 @@ function humanSize(bytes) {
   return `${(kb / 1024).toFixed(1)}MB`;
 }
 
-// One line per file: name, extension/type, human size. Newest-first (matches
-// the Files tab / lib/projects.js's projectFiles ordering).
-function buildManifest(slug) {
-  if (!slug) return '';
+// Shared directory read: newest-first list of files in a project's inbox
+// folder. Used by both buildManifest (prompt text) and manifestFiles (run
+// meta) so the two never drift apart.
+function listFiles(slug) {
+  if (!slug) return [];
   const dir = path.join(INBOX_DIR, slug);
   const files = [];
   for (const e of U.listDir(dir)) {
@@ -43,6 +44,15 @@ function buildManifest(slug) {
     files.push({ name: e.name, size: st.size || 0, mtime: st.mtimeMs || 0 });
   }
   files.sort((a, b) => b.mtime - a.mtime);
+  return files;
+}
+
+// One line per file: name, extension/type, human size. Newest-first (matches
+// the Files tab / lib/projects.js's projectFiles ordering).
+function buildManifest(slug) {
+  if (!slug) return '';
+  const dir = path.join(INBOX_DIR, slug);
+  const files = listFiles(slug);
   if (!files.length) return `Project folder: ${dir} (empty — no files attached yet)`;
   const lines = [`Project folder: ${dir}`, `Files (${files.length}):`];
   const shown = files.slice(0, MAX_LISTED);
@@ -54,6 +64,20 @@ function buildManifest(slug) {
   return lines.join('\n');
 }
 
+// Plain-data counterpart of buildManifest, for persisting onto run meta
+// (data/todos/projects.md finding 2026-07-30): same file set, same
+// newest-first order, same MAX_LISTED cap — but structured, not prose, so
+// the run detail view can render "which files this run saw" without
+// re-parsing the injected prompt text. Metadata only: never fed back into
+// the prompt, so it doesn't change token usage.
+function manifestFiles(slug) {
+  return listFiles(slug).slice(0, MAX_LISTED).map(f => ({
+    name: f.name,
+    ext: (path.extname(f.name).replace(/^\./, '') || 'file').toLowerCase(),
+    size: f.size,
+  }));
+}
+
 // Where generated/converted output for this project belongs, so it lands
 // somewhere lib/pairing.js's re-scan will actually find it.
 function outputHint(slug) {
@@ -61,4 +85,4 @@ function outputHint(slug) {
   return `Save any generated or converted files for this project into ${dir} (not the run's artifacts folder) unless the user asks otherwise — that folder is what gets auto-paired and shown in the project's Files tab.`;
 }
 
-module.exports = { buildManifest, outputHint, humanSize };
+module.exports = { buildManifest, outputHint, humanSize, manifestFiles };

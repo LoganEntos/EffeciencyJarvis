@@ -91,6 +91,12 @@ function dayLabel(iso) {
 async function refreshFiles() {
   const el = $('#fileList');
   if (!el) return;
+  // #fileList itself doesn't scroll — <main> does (style.css). A full innerHTML
+  // rebuild below (e.g. after a move/delete removes a card) shifts content
+  // height above the fold, which yanks the scrolled-down user's view. Snapshot
+  // and restore main's scroll position around the rebuild so it doesn't jump.
+  const scroller = el.closest('main');
+  const savedScroll = scroller ? scroller.scrollTop : 0;
   // Projects ride along so root-level files get a "move to project…" action
   // (same POST /api/files/move the Health tab uses). Claude-kind projects are
   // excluded — they have no data/inbox/<slug>/ folder, so a move there would
@@ -129,6 +135,7 @@ async function refreshFiles() {
     </div>`;
   }
   el.innerHTML = html;
+  if (scroller) scroller.scrollTop = savedScroll; // restore position clobbered by the rebuild above
   el.querySelectorAll('.procBtn').forEach(b => b.onclick = () =>
     prefillRun(`Process the uploaded file at ${b.dataset.path} — `));
   // Whole header is the hit target — click (or Enter/Space) expands an inline

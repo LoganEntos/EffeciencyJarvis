@@ -162,7 +162,7 @@ function renderNewForm() {
     <input class="search pform-field" id="pnName" placeholder="Project name">
     <input class="search pform-field" id="pnDesc" placeholder="Short description (optional)">
     <div class="flex" style="margin-top:10px"><button id="pnCreate">Create</button><button id="pnCancel" class="ghost">Cancel</button></div>
-    <div id="pnErr" class="muted" style="font-size:11.5px;margin-top:6px;color:var(--red)"></div></div>`;
+    <div id="pnErr" class="muted" style="font-size:11.5px;margin-top:6px;color:var(--red)" aria-live="polite"></div></div>`;
   $('#pnName').focus();
   $('#pnName').onkeydown = e => { if (e.key === 'Enter') $('#pnCreate').click(); };
   $('#pnCancel').onclick = toggleNewForm;
@@ -182,6 +182,10 @@ function renderNewForm() {
         <button id="pnFresh" class="ghost" style="padding:3px 9px;font-size:11px">Start fresh</button>`;
       $('#pnAdopt').onclick = () => doCreate({ adopt: true });
       $('#pnFresh').onclick = () => doCreate({ fresh: true });
+      // aria-live announces the new copy, but a keyboard user's focus is still
+      // wherever it was (on Create, or on the name field via Enter) — move it
+      // to the first new control so both input methods discover the choice.
+      $('#pnAdopt').focus();
       return;
     }
     if (r.error) { $('#pnErr').textContent = r.error; return; }

@@ -194,7 +194,7 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   // project's own past runs/notes). Manifest/output-hint building lives in
   // lib/project-context.js (kept out of this file to hold its 500-line cap).
   // Claude engine only; token-neutral when no project is bound. See lib/projects.js.
-  let projectPrefix = '', projectName = null, projectSlug = null, projRecall = null;
+  let projectPrefix = '', projectName = null, projectSlug = null, projRecall = null, projectFiles = [];
   if (engine === 'claude' && projectId) {
     try {
       const pr = projects.get(projectId);
@@ -206,6 +206,10 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
         parts.push(projectContext.outputHint(pr.slug));
         projectPrefix = `<project name="${pr.name}">\n${parts.join('\n\n')}\n</project>\n\n`;
         try { projRecall = memory.recallForProject(pr.slug, prompt, { forInjection: true }).injection; } catch {}
+        // Metadata only, not injected into fullPrompt below — the manifest's
+        // prose form (buildManifest) already carries the file list to Claude,
+        // this is just a structured copy for the run-detail view. Token-neutral.
+        try { projectFiles = projectContext.manifestFiles(pr.slug); } catch {}
       }
     } catch {}
   }
@@ -286,6 +290,11 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
     team: teamName, persona: personaName, channel, routedReason, recallCount: recalled ? recalled.count : 0,
     imageCount: imgPaths.length,
     project: projectName, projectSlug: projectSlug || null,
+    // Structured file manifest at dispatch time (data/todos/projects.md finding
+    // 2026-07-30): [] whenever no project is bound; never undefined, so old
+    // meta.json files predating this field and reads of it here both stay
+    // consistent — readers should still treat a missing key as "no data".
+    projectFiles: projectFiles || [],
     think: engine === 'claude' && !!think,
     effort: effApplied || null,
     fable5: engine === 'claude' && !!GOD_PROMPT && isOpusTier(model),

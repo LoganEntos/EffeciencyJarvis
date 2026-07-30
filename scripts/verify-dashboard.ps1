@@ -119,6 +119,9 @@ Check "GET /assets/projectdetail.js" "$base/assets/projectdetail.js"
 Check "GET /api/projects/pairs"      "$base/api/projects/pairs?slug=vpp-historical-import-test"
 Check "GET /api/projects/pairs (traversal 404)" "$base/api/projects/pairs?slug=..%2F..%2Fx" 404
 Check "GET /api/projects/pairs (no slug 404)"   "$base/api/projects/pairs" 404
+Check "GET /api/projects/claude"     "$base/api/projects/claude"
+Check "GET /api/projects/session (not found 404)" "$base/api/projects/session?id=nope&sid=nope" 404
+CheckPost "POST /api/projects/import-claude w/o token (403)" "$base/api/projects/import-claude" '{}' 403
 Check "GET /api/agentgraph"    "$base/api/agentgraph"
 Check "GET /api/delegations"   "$base/api/delegations"
 Check "GET /api/delegations (bad id 404)" "$base/api/delegations?runId=..%2F..%2Fserver" 404
