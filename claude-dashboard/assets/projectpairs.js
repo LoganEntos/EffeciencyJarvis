@@ -64,8 +64,10 @@ function ppRender(slug, containerEl, d) {
 
 function ppCounts(orders) {
   const c = { complete: 0, 'pdf-only': 0, 'csv-only': 0, review: 0 };
-  orders.forEach(o => { if (c[o.state] !== undefined) c[o.state]++; });
-  return `${c.complete} complete &middot; ${c['pdf-only']} pdf-only &middot; ${c['csv-only']} csv-only &middot; ${c.review} review`;
+  let dups = 0;
+  orders.forEach(o => { if (c[o.state] !== undefined) c[o.state]++; if (o.dup) dups++; });
+  const base = `${c.complete} complete &middot; ${c['pdf-only']} pdf-only &middot; ${c['csv-only']} csv-only &middot; ${c.review} review`;
+  return dups ? `${base} &middot; <span style="color:var(--err,#e05b4f)">${dups} duplicate</span>` : base;
 }
 
 // One clickable file reference — a native <button> styled inline as a link
@@ -100,9 +102,16 @@ function ppRow(slug, o, dir) {
   const convertBtn = o.state === 'pdf-only' && (o.pdfs || []).length
     ? `<button type="button" class="ghost pp-convert" data-pdfs="${esc(pdfPaths)}" style="padding:4px 10px;font-size:11px;white-space:nowrap">&#9655; convert</button>`
     : '';
-  return `<tr>
+  // Duplicate flag (server: pairing.js sets dup:true + duplicates:[names] when
+  // 2+ PDFs claim one order id with no clear authority). Make it unmistakably a
+  // review row — a distinct badge in the State cell — rather than a plain pair.
+  // Guard on the field so the older response shape just renders a normal row.
+  const dupBadge = o.dup
+    ? `<span class="pill err" style="margin-left:4px" title="${esc((o.duplicates || []).join(', '))}">⚠ ${(o.duplicates || o.pdfs || []).length} PDFs claim this order</span>`
+    : '';
+  return `<tr${o.dup ? ' class="pp-dup"' : ''}>
     <td class="mono">${esc(o.orderId)}</td>
-    <td><span class="pill ${tone}">${esc(o.state)}</span></td>
+    <td><span class="pill ${tone}">${esc(o.state)}</span>${dupBadge}</td>
     <td>${pdfs}</td>
     <td>${csvs}</td>
     <td class="muted" style="font-size:11.5px">${o.note ? esc(o.note) : ''}</td>

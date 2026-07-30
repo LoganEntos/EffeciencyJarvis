@@ -51,6 +51,12 @@ async function renderProjectDetail(id) {
       <div class="dropzone" id="pDrop" style="margin-top:8px">Drop files here or click to add<br><span class="muted" style="font-size:11.5px">50 MB per upload · grouped under data/inbox/${esc(p.slug)}/</span></div>
       <input type="file" id="pFileIn" multiple class="hidden">
       <div id="pUpStatus" class="badgebar" role="status" aria-live="polite" style="margin:8px 0"></div>
+      ${files.length ? `<div class="flex" id="pBulkBar" style="gap:10px;align-items:center;margin:8px 0 0;font-size:11.5px">
+        <label class="muted" style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="pSelAll"> select all</label>
+        <span class="muted" id="pSelCount">0 selected</span>
+        <button id="pMoveOut" class="ghost" disabled style="padding:4px 10px;font-size:11px">Move out of project</button>
+        <span id="pBulkStatus" class="muted" role="status" aria-live="polite"></span>
+      </div>` : ''}
       <div id="pFiles">${files.length ? `<div class="pfiles-grid">${files.map(projFileTile).join('')}</div>` : '<div class="muted">No files yet.</div>'}</div>
     </div>`;
 
@@ -204,6 +210,12 @@ async function renderProjectDetail(id) {
     renderProjectDetail(id);
   });
 
+  // Bulk-select attached files → move a batch back out to the inbox root (the
+  // inverse of the root-Files "move into project"). Sequential calls to the
+  // existing /api/files/move (move-out mode = empty project); per-file errors
+  // are surfaced, the button disables while running, and the list refreshes.
+  wireBulkFiles(el, id);
+
   // recent-runs rows → open the run in the Sessions/history view if available
   wireRunRows(el);
 
@@ -259,12 +271,50 @@ async function refreshProjectRuns(id, preRuns) {
   sec.innerHTML = runsSection(runs);
   wireRunRows(sec);
 }
+// Bulk file selection → move-out. Keeps a live selected-count, toggles the
+// Move button, and on click walks the selection through /api/files/move in
+// move-out mode, tallying successes/failures before refreshing the detail.
+function wireBulkFiles(el, id) {
+  const boxes = [...el.querySelectorAll('.pFileSel')];
+  if (!boxes.length) return;
+  const selAll = el.querySelector('#pSelAll');
+  const count = el.querySelector('#pSelCount');
+  const btn = el.querySelector('#pMoveOut');
+  const status = el.querySelector('#pBulkStatus');
+  const selected = () => boxes.filter(b => b.checked);
+  const sync = () => {
+    const n = selected().length;
+    if (count) count.textContent = `${n} selected`;
+    if (btn) btn.disabled = !n;
+    if (selAll) selAll.checked = n > 0 && n === boxes.length;
+  };
+  boxes.forEach(b => b.onchange = sync);
+  if (selAll) selAll.onchange = () => { boxes.forEach(b => b.checked = selAll.checked); sync(); };
+  if (btn) btn.onclick = async () => {
+    const names = selected().map(b => b.dataset.name);
+    if (!names.length) return;
+    btn.disabled = true; boxes.forEach(b => b.disabled = true);
+    let ok = 0; const fails = [];
+    for (const name of names) {
+      try {
+        const r = await api('/api/files/move', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, project: '' }) });
+        if (r && r.error) fails.push(`${name.split('/').pop()}: ${r.error}`); else ok++;
+      } catch (e) { fails.push(`${name.split('/').pop()}: ${e.message || 'failed'}`); }
+    }
+    if (status) status.textContent = `moved ${ok} out${fails.length ? ` · ${fails.length} failed (${fails[0]})` : ''}`;
+    if (fails.length) { boxes.forEach(b => b.disabled = false); btn.disabled = false; setTimeout(() => renderProjectDetail(id), 1400); }
+    else renderProjectDetail(id);
+  };
+  sync();
+}
+
 // Recent-runs rows → open the run in the Sessions/history view if available.
 function wireRunRows(root) {
   (root || document).querySelectorAll('tr.prun[data-id]').forEach(tr => tr.onclick = () => {
-    const rid = tr.dataset.id;
-    if (typeof openRun === 'function') openRun(rid);
-    else if (typeof showTab === 'function') showTab('sessions');
+    // openRun (run.js) loads before this module, so it's always available; the
+    // old `showTab` fallback referenced a function renamed to goTab long ago and
+    // could never fire — removed.
+    if (typeof openRun === 'function') openRun(tr.dataset.id);
   });
 }
 function runsTable(runs) {
@@ -314,7 +364,8 @@ function projFileTile(f) {
   const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
   const openAttrs = isImg ? ` class="projTile" data-img="1" data-name="${esc(f.name)}"`
     : canOpen ? ` class="projTile" data-doc="1" data-name="${esc(f.name)}"` : '';
-  return `<div style="${P_TILE}${isImg || canOpen ? ';cursor:pointer' : ''}"${openAttrs}>
+  return `<div style="${P_TILE}${isImg || canOpen ? ';cursor:pointer' : ''};position:relative"${openAttrs}>
+    <input type="checkbox" class="pFileSel" data-name="${esc(f.name)}" title="Select for bulk actions" aria-label="Select ${esc(f.base)}" onclick="event.stopPropagation()" style="position:absolute;top:6px;left:6px;z-index:1;accent-color:var(--accent)">
     ${isImg ? `<img style="${P_THUMB}" src="/api/files/view?name=${encodeURIComponent(f.name)}" alt="" loading="lazy">`
             : `<div style="${P_THUMB_DOC}"><span class="mono">${esc(((pn ? pn.file : f.base).split('.').pop() || '?').toUpperCase()).slice(0, 4)}</span></div>`}
     <div style="padding:8px 10px">

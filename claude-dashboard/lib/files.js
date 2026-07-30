@@ -218,6 +218,25 @@ async function handle(req, res, url) {
     try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
     const src = inboxFile((b.name || '').toString());
     if (!src || !src.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    // Move-OUT: an explicit empty/absent project moves a file from its project
+    // folder back to the inbox root (the inverse of move-in). Only valid for a
+    // file that IS in a project folder; a root file has nowhere to move out to.
+    const wantsOut = !(b.project || '').toString().trim();
+    if (wantsOut) {
+      if (!src.safe.includes('/')) { U.sendJson(res, { error: 'file is already at the inbox root' }, 400); return true; }
+      const base = src.safe.slice(src.safe.lastIndexOf('/') + 1);
+      const dst = inboxFile(base);
+      if (!dst) { U.sendJson(res, { error: 'invalid destination' }, 400); return true; }
+      if (dst.exists) { U.sendJson(res, { error: 'a file with that name already exists at the inbox root' }, 409); return true; }
+      try {
+        fs.renameSync(src.full, dst.full);
+        // don't leave an empty project folder behind (rmdir refuses non-empty)
+        const dir = path.dirname(src.full);
+        if (path.resolve(dir) !== path.resolve(INBOX)) { try { fs.rmdirSync(dir); } catch {} }
+        U.sendJson(res, { ok: true, name: dst.safe });
+      } catch (e) { U.sendJson(res, { error: e.message }, 500); }
+      return true;
+    }
     if (src.safe.includes('/')) { U.sendJson(res, { error: 'already in a project folder' }, 400); return true; }
     const project = sanitizeName(b.project || '');
     if (!project) { U.sendJson(res, { error: 'invalid project name' }, 400); return true; }
