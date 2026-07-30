@@ -117,9 +117,11 @@ async function sendPrompt() {
     } else {
       const tr = jarvisTransform(prompt); if (tr) displayPrompt = prompt = tr.buffered;
     }
-    // If the user hasn't pinned a model, route on the (now refined) prompt.
+    // Jarvis is pinned to sonnet-5, full stop — tier auto-routing (haiku for
+    // "simple" turns) was undermining deliberation quality. Only kicks in if
+    // the user hasn't manually pinned a different model in the dropdown.
     const userModel = $('#runModel').value;
-    if (userModel === 'auto' || userModel === '') $('#runModel').value = analyzePromptComplexity(prompt);
+    if (userModel === 'auto' || userModel === '') $('#runModel').value = 'claude-sonnet-5';
   }
 
   let r;
