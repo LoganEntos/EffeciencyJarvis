@@ -9,6 +9,10 @@
 
 // ------------------------------------------------------------- file tiles etc.
 const P_IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
+// Tracking/status documents — markdown checklists, review notes, etc. Grouped
+// into their own "Docs" section (projFilesHtml below) and badged on the tile
+// so they don't get lost once a project has dozens of source PDFs/CSVs.
+const P_DOC_RE = /\.(md|markdown)$/i;
 const P_TILE = 'background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);overflow:hidden';
 const P_THUMB = 'width:100%;height:78px;object-fit:cover;display:block;background:var(--bg)';
 const P_THUMB_DOC = 'width:100%;height:78px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:16px';
@@ -32,11 +36,18 @@ function projFileTile(f) {
   // grid, files.js) — same traversal-guarded endpoints. 'other' stays
   // download-only, matching the Files tab.
   const canOpen = !isImg && kind !== 'other';
+  const isDoc = P_DOC_RE.test(f.base);
   const pn = prettyBase(f.base);
   const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
-  const openAttrs = isImg ? ` class="projTile" data-img="1" data-name="${esc(f.name)}"`
-    : canOpen ? ` class="projTile" data-doc="1" data-name="${esc(f.name)}"` : '';
-  return `<div style="${P_TILE}${isImg || canOpen ? ';cursor:pointer' : ''};position:relative"${openAttrs}>
+  // pFileTile is the stable hook the search filter (wireFileFilter) and bulk
+  // select (wireBulkFiles) key off; projTile stays the a11y CLICKABLE_SEL hook
+  // for the image/doc open behavior, unchanged from before.
+  const cls = ['pFileTile'];
+  if (isImg || canOpen) cls.push('projTile');
+  const dataAttrs = (isImg ? ` data-img="1" data-name="${esc(f.name)}"` : canOpen ? ` data-doc="1" data-name="${esc(f.name)}"` : '');
+  const searchKey = `${pn ? pn.file : ''} ${f.base}`.toLowerCase();
+  return `<div class="${cls.join(' ')}" data-fname="${esc(searchKey)}" style="${P_TILE}${isDoc ? ';border-color:var(--accent-dim)' : ''}${isImg || canOpen ? ';cursor:pointer' : ''};position:relative"${dataAttrs}>
+    ${isDoc ? '<span class="pill accent" style="position:absolute;top:6px;right:6px;z-index:1;font-size:9px;padding:2px 6px;pointer-events:none">Doc</span>' : ''}
     <input type="checkbox" class="pFileSel" data-name="${esc(f.name)}" title="Select for bulk actions" aria-label="Select ${esc(f.base)}" onclick="event.stopPropagation()" style="position:absolute;top:6px;left:6px;z-index:1;accent-color:var(--accent)">
     ${isImg ? `<img style="${P_THUMB}" src="/api/files/view?name=${encodeURIComponent(f.name)}" alt="" loading="lazy">`
             : `<div style="${P_THUMB_DOC}"><span class="mono">${esc(((pn ? pn.file : f.base).split('.').pop() || '?').toUpperCase()).slice(0, 4)}</span></div>`}
@@ -51,6 +62,67 @@ function projFileTile(f) {
     </div>
   </div>`;
 }
+// Attached-files body: docs (.md/.markdown — trackers, checklists, review
+// notes) render in their own labeled section above the general grid so they
+// stay unmissable once a project has dozens of source PDFs/CSVs; each doc
+// tile also gets an accent border + "Doc" pill for a second, redundant cue.
+// Grid ids are the hooks wireFileFilter uses to hide/show a whole section
+// once every tile inside it is filtered out.
+function projFilesHtml(files) {
+  const docs = files.filter(f => P_DOC_RE.test(f.base));
+  const rest = files.filter(f => !P_DOC_RE.test(f.base));
+  const subhead = label => `<div class="muted mono" style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;margin:12px 0 6px;font-weight:600">${esc(label)}</div>`;
+  const docsHtml = docs.length ? subhead(`◆ Docs — ${docs.length}`) + `<div class="pfiles-grid" id="pFilesDocsGrid">${docs.map(projFileTile).join('')}</div>` : '';
+  const restHtml = rest.length ? (docs.length ? subhead('Other files') : '') + `<div class="pfiles-grid" id="pFilesRestGrid">${rest.map(projFileTile).join('')}</div>` : '';
+  return docsHtml + restHtml;
+}
+// Client-side filename filter above the file grid (no new endpoint — the file
+// list is already fetched whole). Filters by hiding non-matching tiles rather
+// than removing them from the DOM, so bulk-select checkboxes on filtered-out
+// files keep their checked state; a section's sub-header hides too once every
+// tile inside it is filtered out. Calls back into bulkSync (wireBulkFiles'
+// returned sync fn) so the "select all" checkbox/count stay honest about what's
+// actually visible.
+function wireFileFilter(el, bulkSync) {
+  const input = el.querySelector('#pFileSearch');
+  if (!input) return;
+  const tiles = [...el.querySelectorAll('.pFileTile')];
+  const groups = [...el.querySelectorAll('.pfiles-grid')];
+  const apply = () => {
+    const q = input.value.trim().toLowerCase();
+    let any = false;
+    tiles.forEach(t => {
+      const match = !q || (t.dataset.fname || '').includes(q);
+      t.style.display = match ? '' : 'none';
+      if (match) any = true;
+    });
+    groups.forEach(g => {
+      const has = [...g.children].some(c => c.style.display !== 'none');
+      g.style.display = has ? '' : 'none';
+      // #pFiles only ever contains [subhead?, grid, subhead?, grid] (see
+      // projFilesHtml) so a grid's previousElementSibling is either its own
+      // subhead label or nothing — never another grid or unrelated element.
+      const head = g.previousElementSibling;
+      if (head) head.style.display = has ? '' : 'none';
+    });
+    let empty = el.querySelector('#pFilesEmpty');
+    if (!any && q) {
+      if (!empty) {
+        empty = document.createElement('div');
+        empty.id = 'pFilesEmpty';
+        empty.className = 'muted';
+        empty.setAttribute('role', 'status');
+        empty.setAttribute('aria-live', 'polite');
+        empty.style.marginTop = '10px';
+        const box = el.querySelector('#pFiles'); if (box) box.appendChild(empty);
+      }
+      empty.textContent = `No files match "${input.value.trim()}".`;
+    } else if (empty) empty.remove();
+    if (bulkSync) bulkSync();
+  };
+  input.oninput = apply;
+  input.onkeydown = e => { if (e.key === 'Escape' && input.value) { input.value = ''; apply(); } };
+}
 function memTile(m) {
   return `<div class="row" style="margin-bottom:8px;padding:10px 12px">
     <div class="flex" style="justify-content:space-between;align-items:center"><span class="name" style="font-size:12.5px">${esc(m.title || '(untitled)')}</span>
@@ -63,22 +135,28 @@ function memTile(m) {
 // Bulk file selection → move-out. Keeps a live selected-count, toggles the
 // Move button, and on click walks the selection through /api/files/move in
 // move-out mode, tallying successes/failures before refreshing the detail.
+// Returns its `sync` fn so wireFileFilter can re-run it after hiding tiles —
+// the selected-count/move button must stay honest, and "select all" only
+// ever touches what's currently visible so filtering can't silently bulk-
+// select files the user can't see.
 function wireBulkFiles(el, id) {
   const boxes = [...el.querySelectorAll('.pFileSel')];
-  if (!boxes.length) return;
+  if (!boxes.length) return null;
   const selAll = el.querySelector('#pSelAll');
   const count = el.querySelector('#pSelCount');
   const btn = el.querySelector('#pMoveOut');
   const status = el.querySelector('#pBulkStatus');
+  const visible = () => boxes.filter(b => { const t = b.closest('.pFileTile'); return !t || t.style.display !== 'none'; });
   const selected = () => boxes.filter(b => b.checked);
   const sync = () => {
     const n = selected().length;
+    const vis = visible();
     if (count) count.textContent = `${n} selected`;
     if (btn) btn.disabled = !n;
-    if (selAll) selAll.checked = n > 0 && n === boxes.length;
+    if (selAll) selAll.checked = vis.length > 0 && vis.every(b => b.checked);
   };
   boxes.forEach(b => b.onchange = sync);
-  if (selAll) selAll.onchange = () => { boxes.forEach(b => b.checked = selAll.checked); sync(); };
+  if (selAll) selAll.onchange = () => { visible().forEach(b => b.checked = selAll.checked); sync(); };
   if (btn) btn.onclick = async () => {
     const names = selected().map(b => b.dataset.name);
     if (!names.length) return;
@@ -95,6 +173,7 @@ function wireBulkFiles(el, id) {
     else renderProjectDetail(id);
   };
   sync();
+  return sync;
 }
 
 // Upload status pill (#pUpStatus): info/progress messages auto-clear after

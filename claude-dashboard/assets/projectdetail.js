@@ -34,7 +34,7 @@ async function renderProjectDetail(id) {
   if (d.error) { projSel = null; return renderers.projects(); }
   const p = d.project, files = d.files || [], mem = (d.memory && d.memory.items) || [], runs = d.runs || [];
   const sessions = d.sessions || [], claude = p.kind === 'claude';
-  const sf = p.sharepointFolder || null; // manual-sync binding (storage-only field; no UI sets it yet — see wireSync below)
+  const sf = p.sharepointFolder || null; // manual-sync binding — set/cleared via the SharePoint link panel below (projectsp.js)
 
   const secInstr = `
     <div class="row">
@@ -54,13 +54,14 @@ async function renderProjectDetail(id) {
       <div class="dropzone" id="pDrop" style="margin-top:8px">Drop files here or click to add<br><span class="muted" style="font-size:11.5px">50 MB per upload · grouped under data/inbox/${esc(p.slug)}/</span></div>
       <input type="file" id="pFileIn" multiple class="hidden">
       <div id="pUpStatus" class="badgebar" role="status" aria-live="polite" style="margin:8px 0"></div>
+      ${files.length ? `<input class="search" id="pFileSearch" placeholder="Filter files by name…" aria-label="Filter attached files by name" style="max-width:360px;margin:8px 0 0">` : ''}
       ${files.length ? `<div class="flex" id="pBulkBar" style="gap:10px;align-items:center;margin:8px 0 0;font-size:11.5px">
         <label class="muted" style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="pSelAll"> select all</label>
         <span class="muted" id="pSelCount">0 selected</span>
         <button id="pMoveOut" class="ghost" disabled style="padding:4px 10px;font-size:11px">Move out of project</button>
         <span id="pBulkStatus" class="muted" role="status" aria-live="polite"></span>
       </div>` : ''}
-      <div id="pFiles">${files.length ? `<div class="pfiles-grid">${files.map(projFileTile).join('')}</div>` : '<div class="muted">No files yet.</div>'}</div>
+      <div id="pFiles">${files.length ? projFilesHtml(files) : '<div class="muted">No files yet.</div>'}</div>
     </div>`;
 
   // Imported Claude-workspace projects (p.kind === 'claude') never mount the
@@ -85,6 +86,12 @@ async function renderProjectDetail(id) {
     <div class="row">
       <div class="psection"><span class="name">◫ File pairing <span class="muted" style="font-weight:400;font-size:11.5px">— PDFs matched to their converted CSVs, per order</span></span></div>
       <div id="pPairing" style="margin-top:8px"></div>
+    </div>`;
+
+  const secSpLink = `
+    <div class="row">
+      <div class="psection"><span class="name">⛓ SharePoint link <span class="muted" style="font-weight:400;font-size:11.5px">— live view of the SharePoint folder linked to this project, separate from the files attached above</span></span></div>
+      <div id="pSpBody" style="margin-top:8px"></div>
     </div>`;
 
   // Empty-state UX: a brand-new project with no files and no instructions
@@ -124,6 +131,7 @@ async function renderProjectDetail(id) {
       <div id="pSessions" style="display:grid;gap:8px;margin-top:6px">${sessions.length ? sessions.map(sessionRow).join('') : '<div class="muted">No sessions in this workspace.</div>'}</div>
     </div>` : ''}
     ${setupSections}
+    ${secSpLink}
     ${secPairing}
 
     <div class="row" id="pRunsSection">${runsSection(runs)}</div>
@@ -199,6 +207,9 @@ async function renderProjectDetail(id) {
   // load order (or an older server build without the route) can't crash the view
   if (typeof renderPairingPanel === 'function') renderPairingPanel(p.slug, $('#pPairing'));
 
+  // SharePoint-linked-folder panel — bind/browse/pull, separate module (projectsp.js)
+  if (typeof renderSpPanel === 'function') renderSpPanel(p, files, $('#pSpBody'));
+
   // file manifest — what the model actually sees as paths
   if ($('#pManifest')) $('#pManifest').onclick = () => {
     const box = $('#pManifestBox'), btn = $('#pManifest');
@@ -228,7 +239,11 @@ async function renderProjectDetail(id) {
   // inverse of the root-Files "move into project"). Sequential calls to the
   // existing /api/files/move (move-out mode = empty project); per-file errors
   // are surfaced, the button disables while running, and the list refreshes.
-  wireBulkFiles(el, id);
+  const bulkSync = wireBulkFiles(el, id);
+  // Filename filter above the grid — client-side only, hides (never removes)
+  // non-matching tiles so bulk-select state survives a filtered view; re-syncs
+  // the bulk toolbar so "select all"/count stay scoped to what's visible.
+  wireFileFilter(el, bulkSync);
 
   // recent-runs rows → open the run in the Sessions/history view if available
   wireRunRows(el);
@@ -255,12 +270,13 @@ async function renderProjectDetail(id) {
   };
 }
 
-// Manual "Sync now" — pulls the bound SharePoint folder's files into this
-// project's inbox (see syncSharepointFolder, lib/projects.js). The button is
-// pre-disabled by the render above when no sharepointFolder binding exists
-// (there is no UI to set that binding yet — storage-only field, set via
-// /api/projects/update{sharepointFolder} directly for now), but guard here
-// too in case a stale render or a11y activation path ever calls through.
+// Manual "Sync now" — bulk-pulls every file in the bound SharePoint folder
+// into this project's inbox in one go (see syncSharepointFolder, lib/projects.js).
+// The binding itself is set/changed/cleared in the SharePoint link panel
+// (secSpLink above, projectsp.js), which also lets you pull one file at a
+// time instead of everything. The button is pre-disabled by the render above
+// when no binding exists; guard here too in case a stale render or a11y
+// activation path ever calls through.
 function wireSync(p) {
   const btn = $('#pSync');
   if (!btn || !p.sharepointFolder) return;
