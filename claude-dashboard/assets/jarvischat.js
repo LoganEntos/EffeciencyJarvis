@@ -199,11 +199,24 @@
     } catch (e) { S.sending = false; setBubble('✗ run failed to start: ' + (e.message || 'network error'), false); return false; }
     if (r.error) { S.sending = false; setBubble('✗ ' + r.error, false); return false; }
     if (window.jarvisAttach) jarvisAttach.clear();
-    S.running = true; S.sending = false; S.runId = r.id; S.seen = -1;
+    S.running = true; S.sending = false; S.seen = -1;
     setRunningUI(true);
     setBubble('', true);
     try { if (window.HubVoice && HubVoice.onRunStart) HubVoice.onRunStart(); } catch {}
-    const es = new EventSource(`/api/run/stream?id=${encodeURIComponent(r.id)}`);
+    attachRun(r.id);
+    return true;
+  }
+
+  // Attach the SSE stream for run `id`. Factored out of send() so a probe (or
+  // a server auto-resume continuation) can re-attach mid-thread. A dropped
+  // stream is NOT a dead run — phone screen off / laptop sleep lands here —
+  // EventSource auto-reconnects and the server replays via Last-Event-ID
+  // (S.seen dedupes); only a probe that says the run truly ended (or a hub
+  // unreachable ~5min) settles the bubble.
+  function attachRun(id) {
+    if (S.es) { try { S.es.close(); } catch {} }
+    S.runId = id;
+    const es = new EventSource(`/api/run/stream?id=${encodeURIComponent(id)}`);
     S.es = es;
     es.addEventListener('line', ev => {
       const idx = parseInt(ev.lastEventId, 10);
@@ -212,28 +225,50 @@
       renderLine(o);
     });
     es.addEventListener('done', ev => {
-      es.close(); S.es = null; S.running = false;
+      es.close(); S.es = null;
       let meta = {}; try { meta = JSON.parse(ev.data); } catch {}
-      if (meta.sessionId) setSessionId(meta.sessionId);
-      setBubble(S.buf || '(no reply)', false);
-      try { if (window.HubVoice && HubVoice.onRunDone) HubVoice.onRunDone(S.buf); } catch {}
-      setRunningUI(false);
-      renderSessBadge();
-      if (window.jarvisHooks && window.jarvisHooks.renderHolding) window.jarvisHooks.renderHolding();
+      settle(meta);
     });
+    es.onopen = () => { if (S.probe) { clearTimeout(S.probe); S.probe = null; } S.probeFails = 0; };
     es.onerror = () => {
-      // A stream that drops mid-run (server restart, network blip) never sends
-      // a 'done', so recover here instead of hanging: stop, keep whatever
-      // streamed, and re-enable send.
-      if (S.running) {
-        S.running = false;
-        try { es.close(); } catch {}
-        S.es = null;
-        setBubble(S.buf || '✗ connection lost — see transcript', false);
-        setRunningUI(false);
-      }
+      if (!S.running) { if (S.es) { try { S.es.close(); } catch {} S.es = null; } return; }
+      if (!S.probe) S.probe = setTimeout(() => probeRun(id), 8000);
     };
-    return true;
+  }
+
+  async function probeRun(id) {
+    S.probe = null;
+    if (!S.running || S.runId !== id) return;
+    try {
+      const rows = await api('/api/runs');
+      const m = (Array.isArray(rows) ? rows : []).find(x => x.id === id);
+      S.probeFails = 0;
+      if (m && m.status !== 'running' && m.status !== 'queued') {
+        if (S.es) { try { S.es.close(); } catch {} S.es = null; }
+        settle(m);
+        return;
+      }
+    } catch {
+      if ((S.probeFails = (S.probeFails || 0) + 1) >= 40) { // hub gone ~5min
+        if (S.es) { try { S.es.close(); } catch {} S.es = null; }
+        settle({ status: 'connection lost' });
+        return;
+      }
+    }
+    S.probe = setTimeout(() => probeRun(id), 8000);
+  }
+
+  // Terminal handling — or a hop onto the server's auto-resume continuation
+  // (sleep safeguard: the engine sets meta.continuedBy when it revived a run).
+  function settle(meta) {
+    if (meta.continuedBy && S.running) { S.seen = -1; attachRun(meta.continuedBy); return; }
+    S.running = false;
+    if (meta.sessionId) setSessionId(meta.sessionId);
+    setBubble(S.buf || (meta.status === 'done' ? '(no reply)' : '✗ ' + (meta.status || 'connection lost — see transcript')), false);
+    try { if (window.HubVoice && HubVoice.onRunDone) HubVoice.onRunDone(S.buf); } catch {}
+    setRunningUI(false);
+    renderSessBadge();
+    if (window.jarvisHooks && window.jarvisHooks.renderHolding) window.jarvisHooks.renderHolding();
   }
   function newChat() {
     if (S.running) cancel(); // don't orphan a live run when starting fresh

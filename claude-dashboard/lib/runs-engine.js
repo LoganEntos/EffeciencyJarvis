@@ -11,10 +11,17 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const liveness = require('./liveness');
+const keepawake = require('./keepawake');
 const hermes = require('./hermes');
 const memory = require('./memory');
 const { diagnose } = require('./diagnose');
 const { countArtifacts } = require('./artifacts');
+
+// Connection-death signature: what a claude child prints when the machine
+// sleeps mid-run (screen-off → Modern Standby) or the network drops. Drives
+// auto-resume for ANY run source in finalizeRun — distinct from a real model/
+// tool failure, which must NOT auto-retry for user runs.
+const CONN_RE = /connection (lost|error|closed|refused|reset)|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|other side closed|fetch failed|Unable to connect to API|network (error|timeout)|premature close|\bterminated\b/i;
 
 function createEngine({ active, queue, MAX_ACTIVE, runningCount, claudeExe, PROJECT_DIR, HERMES_EXE, continueRun }) {
   // Every line event carries `id:` = its index in the run, so EventSource
@@ -62,6 +69,12 @@ function createEngine({ active, queue, MAX_ACTIVE, runningCount, claudeExe, PROJ
     // absent. Flush them now so the history replay matches the live stream.
     if (st.lines.length) st.out.write(st.lines.join('\n') + '\n');
     liveness.startHeartbeat(st, broadcast);
+    // Keep-awake: pin the SYSTEM power state while anything runs — the screen
+    // may sleep, the machine may not (laptop sleep was killing live runs with
+    // "connection lost"; see lib/keepawake.js).
+    if (keepawake.sync(runningCount()) === 'on') {
+      pushLine(st, JSON.stringify({ type: 'hub_status', text: '⚡ keep-awake armed — system sleep is blocked while runs are active (screen may still turn off)' }));
+    }
   }
 
   // Common terminal handling for a finished run (both engines): error excerpt,
@@ -102,19 +115,32 @@ function createEngine({ active, queue, MAX_ACTIVE, runningCount, claudeExe, PROJ
     try { st.meta.artifactCount = countArtifacts(st.meta.id); } catch {}
     writeMeta(st);
     try { memory.captureRun(st.meta); } catch {} // engram-style episodic capture (rule-based, no LLM)
+    // A5 + sleep safeguard — a run that died mid-work with a resumable session
+    // gets ONE auto-continuation: unattended sources on any error (context/
+    // length cutoff), and ANY source — user runs included — when the death
+    // matches the connection-loss signature (machine slept / network dropped;
+    // user report 2026-07-30). Runs BEFORE the done broadcast so
+    // meta.continuedBy rides the SSE done event and open clients follow the
+    // continuation instead of showing a dead thread. Cap unchanged (2 per
+    // chain); user-cancelled runs are status 'cancelled', not 'error'.
+    if (continueRun && st.meta.status === 'error' && st.meta.sessionId
+        && (st.meta.continuations || 0) < 2) {
+      const connLost = CONN_RE.test(st.stderr + ' ' + (st.meta.errorExcerpt || ''));
+      if (connLost) st.meta.connLost = true;
+      if (connLost || ['task', 'schedule', 'autopilot'].includes(st.meta.source)) {
+        try {
+          const r = continueRun(st.meta, connLost ? 'conn' : 'context');
+          if (r && r.id) st.meta.continuedBy = r.id;
+        } catch {}
+      }
+      writeMeta(st);
+    }
     broadcast(st, 'done', JSON.stringify(st.meta));
     for (const res of st.listeners) { try { res.end(); } catch {} }
     st.listeners.clear();
-    // A5 — an autonomous run that died mid-item (error + resumable session) gets
-    // ONE auto-continuation so a context/length cutoff doesn't strand the work.
-    // Cap at 2 per chain; user-cancelled runs are status 'cancelled', not 'error'.
-    if (continueRun && st.meta.status === 'error' && st.meta.sessionId
-        && ['task', 'schedule', 'autopilot'].includes(st.meta.source)
-        && (st.meta.continuations || 0) < 2) {
-      try { continueRun(st.meta); } catch {}
-    }
     setTimeout(() => active.delete(st.meta.id), 30000); // grace for late SSE attach
     dequeueNext();
+    keepawake.sync(runningCount()); // after dequeue/continuation so the hold never flickers off-on
   }
 
   // One complete stdout line from the claude CLI. Sniff the terminal `result`

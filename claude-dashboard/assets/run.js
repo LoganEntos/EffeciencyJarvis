@@ -3,7 +3,7 @@
    and render run-produced artifacts (HTML/SVG/PNG) inline. */
 'use strict';
 
-const chat = { sessionId: null, runId: null, es: null, running: false, t0: 0, timer: null, seen: -1 };
+const chat = { sessionId: null, runId: null, es: null, running: false, t0: 0, timer: null, seen: -1, probe: null, probeFails: 0 };
 // renderUsageGauge() lives in assets/rungauge.js (loaded just before this file).
 
 // The CLI session id is the only thread continuity there is, and app.js reloads
@@ -297,19 +297,73 @@ function attachStream(id) {
   });
   es.addEventListener('done', async e => {
     es.close(); chat.es = null;
+    clearProbe();
     let meta = {}; try { meta = JSON.parse(e.data); } catch {}
+    // Sleep safeguard: the server auto-resumed this dead run (connection loss /
+    // context cutoff) — follow the continuation instead of showing a dead thread.
+    if (meta.continuedBy && chat.running) { followContinuation(meta); return; }
     if (meta.sessionId) setSession(meta.sessionId);
     finishRun(meta);
     await showArtifacts(id);
     renderDelegations(id); // any subagents this run dispatched, once it's finished
     refreshHistory();
   });
-  // Mirror projectchat's onerror: a mid-run drop (network blip, server restart)
-  // must still close es + finishRun() or the composer stays disabled forever.
+  // A dropped stream is NOT a dead run: EventSource auto-reconnects and the
+  // server replays via Last-Event-ID (the line handler dedupes). Screen-off /
+  // sleep used to land here and insta-kill the thread as "connection lost".
+  // Now: keep the stream retrying, show "reconnecting", and probe run state as
+  // a backstop — only a probe that says the run truly ended (or a hub that
+  // stays unreachable ~5min) finishes the UI.
+  es.onopen = () => { clearProbe(); chat.probeFails = 0; };
   es.onerror = () => {
-    if (chat.es) { try { chat.es.close(); } catch {} chat.es = null; }
-    if (chat.running) finishRun({ id: chat.runId, status: 'connection lost' });
+    if (!chat.running) { if (chat.es) { try { chat.es.close(); } catch {} chat.es = null; } return; }
+    const el = $('#runStatus');
+    if (el) el.innerHTML = '<span class="pill warn">reconnecting…</span>';
+    if (!chat.probe) chat.probe = setTimeout(() => probeRun(id), 8000);
   };
+}
+
+function clearProbe() { if (chat.probe) { clearTimeout(chat.probe); chat.probe = null; } }
+
+// Backstop while the stream is down: ask the hub what the run's real status is.
+// Still running → keep waiting (the ES retry will replay everything missed).
+// Ended → finish with the REAL meta; ended-and-continued → follow the chain.
+async function probeRun(id) {
+  chat.probe = null;
+  if (!chat.running || chat.runId !== id) return;
+  let meta = null;
+  try {
+    const rows = await api('/api/runs');
+    meta = (Array.isArray(rows) ? rows : []).find(r => r.id === id) || null;
+    chat.probeFails = 0;
+  } catch {
+    if (++chat.probeFails >= 40) { // hub gone ~5min — give up honestly
+      if (chat.es) { try { chat.es.close(); } catch {} chat.es = null; }
+      finishRun({ id, status: 'connection lost' });
+      return;
+    }
+  }
+  if (meta && meta.status !== 'running' && meta.status !== 'queued') {
+    if (chat.es) { try { chat.es.close(); } catch {} chat.es = null; }
+    if (meta.continuedBy) { followContinuation(meta); return; }
+    if (meta.sessionId) setSession(meta.sessionId);
+    finishRun(meta);
+    await showArtifacts(id);
+    renderDelegations(id);
+    refreshHistory();
+    return;
+  }
+  chat.probe = setTimeout(() => probeRun(id), 8000);
+}
+
+// The server auto-resumed a dead run (lib/runs.js continueRun) — hop this
+// chat onto the continuation run so the thread just keeps going.
+function followContinuation(meta) {
+  renderLine({ type: 'hub_status', text: `⟲ ${meta.connLost ? 'connection lost mid-run (machine slept?)' : 'run was cut off'} — auto-resumed, continuing in run ${meta.continuedBy}` });
+  chat.runId = meta.continuedBy;
+  chat.seen = -1; // fresh run, line ids restart at 0
+  attachStream(meta.continuedBy);
+  refreshHistory();
 }
 
 function finishRun(meta) {

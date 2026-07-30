@@ -54,8 +54,16 @@ const queue = [];         // ids waiting for a free slot, FIFO
 
 // Reap crash/restart orphans on boot + every 60s: any run left "running" on
 // disk that isn't in `active` had its process die without a close event, so
-// history would otherwise show it running forever.
-liveness.startReaper(RUNS_DIR, active);
+// history would otherwise show it running forever. The PRIMARY hub (default
+// port) also auto-resumes recent orphans that left a resumable session — the
+// "Hub restarted, please reactivate" class of death (laptop slept/rebooted
+// mid-run). setImmediate defers past module load: the boot sweep fires here,
+// before the engine bindings below exist. Throwaway verify instances (:5758)
+// pass no callback so they can never fire runs.
+const IS_PRIMARY = String(parseInt(process.argv[2] || process.env.PORT || '5757', 10)) === '5757';
+liveness.startReaper(RUNS_DIR, active, IS_PRIMARY
+  ? meta => setImmediate(() => { try { continueRun(meta, 'conn'); } catch {} })
+  : null);
 
 const okId = id => typeof id === 'string' && /^[a-z0-9-]+$/.test(id) && id.length < 64;
 function newId() {
@@ -97,8 +105,15 @@ const {
 // ONE resumed run that reads the log/diff and finishes only the current item.
 // Capped (meta.continuations ≤ 2 per chain) so a genuinely broken item can't
 // resume forever; user-cancelled runs never reach here (status is 'cancelled').
-function continueRun(meta) {
-  const prompt = `[Continuation — the previous ${meta.source} run (${meta.id}) was cut off before finishing, most likely a context/length limit rather than a real failure.]
+function continueRun(meta, kind) {
+  // kind 'conn' = connection-loss death (machine slept / network dropped /
+  // hub restarted) — any source, including user runs. Default = context/length
+  // cutoff on an unattended source. Same resume mechanics, different framing.
+  const prompt = kind === 'conn'
+    ? `[Auto-resume — the previous run (${meta.id}) died mid-run with a connection-loss error: the machine most likely went to sleep, the network dropped, or the hub restarted. This was NOT a model or task failure.]
+
+Read that run's transcript and the current \`git status\`/\`git diff\` to see exactly where it stopped, then pick up and finish ONLY what it was already working on — do NOT start new work or broaden scope. If everything was already finished, verify that and stop. Give a one-line status when done.`
+    : `[Continuation — the previous ${meta.source} run (${meta.id}) was cut off before finishing, most likely a context/length limit rather than a real failure.]
 
 Read that run's transcript and the current \`git status\`/\`git diff\` to see exactly where it stopped, then finish ONLY the single item it was working on — do NOT start new work or broaden scope. If the item was already completed and committed, verify that and stop. Commit any remaining change (no Co-Authored-By trailer) and give a one-line status.`;
   const r = startRun({
@@ -116,6 +131,13 @@ Read that run's transcript and the current \`git status\`/\`git diff\` to see ex
   if (!r.error && r.id) {
     try { require('./tasks').relinkRun(meta.id, r.id); } catch {}
     if (meta.scheduleId) { try { require('./schedules').relinkRun(meta.id, r.id); } catch {} }
+    // Point the dead run at its continuation ON DISK too — the reaper path
+    // (hub-restart orphans) has no live engine state, and clients use
+    // meta.continuedBy to follow the chain instead of showing a dead thread.
+    try {
+      meta.continuedBy = r.id;
+      fs.writeFileSync(path.join(RUNS_DIR, meta.id, 'meta.json'), JSON.stringify(meta, null, 2));
+    } catch {}
   }
   return r;
 }

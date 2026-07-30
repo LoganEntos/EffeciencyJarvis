@@ -30,6 +30,13 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
 - **Runs**: bypassPermissions default (acceptEdits silently denies in headless);
   Fable-5 god prompt on opus-tier runs; 5-tier `--effort` selector (tier 5 =
   ULTRA CODE); Jarvis distiller (`lib/distill.js`) shapes >25-word prompts.
+- **Sleep-proof runs** (2026-07-30): `lib/keepawake.js` pins the system awake
+  (hidden PowerShell child, ES_SYSTEM_REQUIRED) while any run is active — the
+  screen may turn off, the machine may not. If a run still dies on a
+  connection-loss signature (lid close, network drop, hub restart) the engine/
+  reaper auto-resume it once or twice (`meta.continuedBy` chain, primary hub
+  only) and all three chat clients follow the continuation instead of showing
+  "connection lost" — SSE `onerror` no longer insta-kills a live thread.
 - **Git**: private `origin` = github.com/LoganEntos/EffeciencyJarvis;
   `scripts/sync.ps1`; user drives push — never push unprompted.
 - Everything shipped through 2026-07-19 (F1 split, Jarvis chat parity, voice orb

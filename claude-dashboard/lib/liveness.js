@@ -36,7 +36,7 @@ function pidAlive(pid) {
   try { process.kill(pid, 0); return true; } catch (e) { return e && e.code === 'EPERM'; }
 }
 
-function reapOrphans(runsDir, active) {
+function reapOrphans(runsDir, active, onOrphan) {
   let reaped = 0;
   for (const e of U.listDir(runsDir)) {
     if (!e.isDirectory()) continue;
@@ -57,14 +57,24 @@ function reapOrphans(runsDir, active) {
     meta.endedAt = meta.endedAt || new Date().toISOString();
     meta.orphaned = true;
     meta.errorExcerpt = 'orphaned — the hub restarted or the process died while this run was active';
-    try { fs.writeFileSync(mp, JSON.stringify(meta, null, 2)); reaped++; } catch {}
+    let wrote = false;
+    try { fs.writeFileSync(mp, JSON.stringify(meta, null, 2)); wrote = true; reaped++; } catch {}
+    // Sleep/restart safeguard: a RECENT orphan (≤12h) with a resumable session
+    // is handed to the caller to auto-continue (primary hub only — runs.js).
+    // Only after the terminal status hit disk: a second instance sweeping the
+    // same dir sees error (not running/queued) and can never double-fire.
+    if (wrote && onOrphan && meta.sessionId && !meta.continuedBy
+        && (meta.continuations || 0) < 2
+        && Date.now() - (Date.parse(meta.startedAt || meta.queuedAt || 0) || 0) < 12 * 3600000) {
+      try { onOrphan(meta); } catch {}
+    }
   }
   return reaped;
 }
 
-function startReaper(runsDir, active) {
-  reapOrphans(runsDir, active); // sweep once at boot
-  const t = setInterval(() => reapOrphans(runsDir, active), REAP_MS);
+function startReaper(runsDir, active, onOrphan) {
+  reapOrphans(runsDir, active, onOrphan); // sweep once at boot
+  const t = setInterval(() => reapOrphans(runsDir, active, onOrphan), REAP_MS);
   if (t.unref) t.unref();
   return t;
 }
