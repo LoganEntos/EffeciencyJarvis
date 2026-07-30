@@ -14,6 +14,29 @@ const fmtTok = n => {
   if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
   return String(n);
 };
+// Shared run-status rendering — one copy for the Run tab's history list AND
+// the Live tab's active-tasks board, so a run's real liveness (from the
+// server heartbeat: procAlive/stalled/idleMs, see lib/liveness.js annotate())
+// reads identically everywhere instead of two divergent heuristics.
+const runStatusPill = s => s === 'done' ? 'ok' : (s === 'running' || s === 'queued' || s === 'cancelled' ? 'warn' : 'err');
+const runLiveBadge = m => {
+  if (m.status !== 'running') return '';
+  if (m.procAlive === false) return '<span class="pill err">process gone</span>';
+  if (m.stalled) return `<span class="pill err">stalled ${Math.round((m.idleMs || 0) / 1000)}s</span>`;
+  return '<span class="pill live">◉ live</span>';
+};
+const EFFORT_TIERS = ['low', 'medium', 'high', 'xhigh', 'max'];
+const runBadges = m => {
+  let h = '';
+  if (m.effort) {
+    const tier = EFFORT_TIERS.indexOf(m.effort) + 1;
+    h += m.effort === 'max'
+      ? '<span class="pill accent" style="font-size:10px" title="run at effort tier 5 — ULTRA CODE (deepest reasoning, longest turns)">⚡ ULTRA CODE</span>'
+      : `<span class="pill neutral" style="font-size:10px" title="run at effort tier ${tier}/5 (${esc(m.effort)})">▲ effort ${tier}/5</span>`;
+  }
+  if (m.fable5) h += '<span class="pill neutral" style="font-size:10px" title="opus-tier run steered by the Fable 5 god prompt">⟡ fable5</span>';
+  return h;
+};
 const HUB_TOKEN = (document.querySelector('meta[name="hub-token"]') || {}).content || '';
 const renderers = {}; // tab -> async render fn; other scripts register into this
 
