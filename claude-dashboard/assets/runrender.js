@@ -165,3 +165,43 @@ function renderLine(o) {
   }
   return null;
 }
+
+// ---- project-run file manifest (data/todos/projects.md, 2026-07-30) ----
+// Every project-bound run's meta.json carries meta.projectFiles ({name,ext,
+// size}[], up to 50) captured at dispatch time — the same list the manifest
+// text handed to Claude. Surface it as a click-to-expand toggle appended onto
+// the "▤ project: …" hub_status line already replayed above (lib/runs.js),
+// reusing the Projects tab's .pmanifest visual language (projects.css)
+// instead of a new panel. Gate visibility on meta.project (not
+// projectFiles.length — that array is [] both when no project is bound AND
+// when one is bound with an empty manifest); undefined projectFiles
+// (pre-2026-07-30 runs) renders nothing, and a missing anchor line (older
+// runs, or non-project runs) is a silent no-op — never throws.
+function appendProjectFilesToggle(meta) {
+  if (!meta || !meta.project || !Array.isArray(meta.projectFiles)) return;
+  const log = $('#chatLog');
+  if (!log) return;
+  let host = null;
+  for (const el of log.querySelectorAll('.msg.sys')) {
+    if (el.textContent.startsWith('▤ project:')) host = el; // last match wins (there's only ever one)
+  }
+  if (!host || host.querySelector('.pf-toggle')) return; // no anchor line, or already attached
+  const files = meta.projectFiles, n = files.length;
+  const btn = document.createElement('button');
+  btn.className = 'ghost pf-toggle';
+  btn.style.cssText = 'padding:2px 8px;font-size:10px;margin-left:8px;vertical-align:1px';
+  btn.textContent = n ? `${n} file${n === 1 ? '' : 's'}` : '0 files';
+  btn.setAttribute('aria-expanded', 'false');
+  const box = document.createElement('div');
+  box.className = 'pmanifest hidden';
+  // textContent, not innerHTML — no esc() needed, and no markup can leak through file names.
+  box.textContent = n
+    ? files.map(f => `${f.name || '(unnamed)'} · ${fmtBytes(f.size)}`).join('\n')
+    : '(project manifest was empty at dispatch time)';
+  btn.onclick = () => {
+    const hidden = box.classList.toggle('hidden');
+    btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+  };
+  host.appendChild(btn);
+  host.appendChild(box);
+}

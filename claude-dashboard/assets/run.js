@@ -395,6 +395,7 @@ async function openRun(id) {
     let o; try { o = JSON.parse(line); } catch { continue; }
     renderLine(o);
   }
+  appendProjectFilesToggle(t.meta); // no-op when unbound/undefined/no anchor line — see runrender.js
   if (t.meta && (t.meta.status === 'running' || t.meta.status === 'queued')) {
     // still-active run (e.g. opened from another tab) — attach live
     attachLiveRun(id, {
