@@ -301,6 +301,7 @@ function attachStream(id) {
     if (meta.sessionId) setSession(meta.sessionId);
     finishRun(meta);
     await showArtifacts(id);
+    renderDelegations(id); // any subagents this run dispatched, once it's finished
     refreshHistory();
   });
   // Mirror projectchat's onerror: a mid-run drop (network blip, server restart)
@@ -388,6 +389,7 @@ async function openRun(id) {
   if (t.error) { addMsg(t.error, 'errmsg'); return; }
   newChat();
   addMsg(`replaying run ${id}${t.truncated ? ' (long transcript truncated)' : ''}`, 'sys');
+  renderDelegations(id); // aggregated subagent dispatches, above the transcript (fire-and-forget)
   if (t.prompt) addMsg(t.prompt, 'user');
   for (const line of t.lines || []) {
     let o; try { o = JSON.parse(line); } catch { continue; }

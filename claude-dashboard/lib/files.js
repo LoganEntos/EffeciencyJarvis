@@ -114,9 +114,13 @@ async function handle(req, res, url) {
     const f = inboxFile(url.searchParams.get('name') || '');
     if (!f || !f.exists) { U.sendJson(res, { error: 'not found' }, 404); return true; }
     const ext = (f.safe.split('.').pop() || '').toLowerCase();
-    // PDFs render inline via the browser's native viewer (<iframe>/<embed>), so
-    // they need a page-render context, not the images' bare `sandbox` (which
-    // blanks the viewer). nosniff + inline disposition keep them non-executable.
+    // PDFs render inline via the browser's native viewer (<iframe>/<embed>).
+    // nosniff + explicit application/pdf Content-Type already keep this
+    // non-executable, so no CSP is set here: Chrome's built-in PDF viewer
+    // enforces a response's CSP against its OWN internal rendering (not just
+    // page content), and a restrictive policy like the images' `sandbox` one
+    // silently blanks the viewer — no console error reaches the parent page,
+    // which is why this shipped once and looked "fixed" until reopened.
     const isPdf = ext === 'pdf';
     const ctype = isPdf ? 'application/pdf' : IMAGE_TYPES[ext];
     if (!ctype) { U.sendJson(res, { error: 'not a previewable image or pdf' }, 400); return true; }
@@ -124,7 +128,7 @@ async function handle(req, res, url) {
     // SVG can carry inline <script>; on direct navigation (not <img>) it would
     // run in the hub's own origin. Sandbox it via CSP — harmless to <img> use.
     const headers = isPdf
-      ? { 'Content-Type': ctype, 'Content-Length': st.size, 'Content-Disposition': `inline; filename="${f.safe}"`, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60', 'Content-Security-Policy': "default-src 'none'; img-src 'self' blob: data:" }
+      ? { 'Content-Type': ctype, 'Content-Length': st.size, 'Content-Disposition': `inline; filename="${f.safe}"`, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60' }
       : { 'Content-Type': ctype, 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, max-age=60', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" };
     res.writeHead(200, headers);
     const rs = fs.createReadStream(f.full);

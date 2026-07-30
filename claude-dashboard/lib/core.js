@@ -39,14 +39,69 @@ function overview() {
   };
 }
 
+// Claude Code's own built-in dispatch targets — not project files under
+// .claude/agents/, so agentList() used to silently omit them even though run
+// history shows they're dispatched constantly (Explore/general-purpose/Plan).
+const BUILTIN_AGENTS = [
+  { name: 'general-purpose', model: 'inherit', builtin: true,
+    description: 'General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks.' },
+  { name: 'Explore', model: 'inherit', builtin: true,
+    description: 'Fast read-only search agent for locating code by pattern, symbol, or keyword ("where is X defined").' },
+  { name: 'Plan', model: 'inherit', builtin: true,
+    description: 'Software architect agent for designing implementation plans — step-by-step, critical files, trade-offs.' },
+  { name: 'statusline-setup', model: 'inherit', builtin: true,
+    description: "Configures the user's Claude Code status line — a one-time config agent, not a work dispatch target." },
+];
+
 function agentList() {
   const local = U.collectMd(path.join(DOT_CLAUDE, 'agents')).map(f => {
     const fm = U.frontmatter(f);
-    return { file: path.basename(f), name: fm.name || path.basename(f, '.md'), description: fm.description || '', model: fm.model || '' };
+    return { file: path.basename(f), name: fm.name || path.basename(f, '.md'), description: fm.description || '', model: fm.model || '', builtin: false };
   }).sort((a, b) => a.name.localeCompare(b.name));
   // Claude-only by default (the lean stack). hermes roles appear only when the
   // deprecated paid engine is explicitly re-enabled in Config.
-  return (settings.load().hermesEnabled ? hermesAgents() : []).concat(local);
+  // A real project file always wins a name collision with a reserved built-in.
+  const localNames = new Set(local.map(a => a.name));
+  const roster = (settings.load().hermesEnabled ? hermesAgents() : [])
+    .concat(BUILTIN_AGENTS.filter(a => !localNames.has(a.name))).concat(local);
+  const usage = agentUsage();
+  return roster.map(a => {
+    const u = usage.get(a.name);
+    return Object.assign({}, a, { active: !!u, usageCount: u ? u.count : 0, lastUsed: u ? u.lastUsed : null });
+  });
+}
+
+// ---------- agent usage: active vs dormant, mined from run history ----------
+// Bounded + cached scan (mirrors agentgraph.js's C76 pattern) so an
+// ever-growing data/runs can't turn an Agents-tab open into an O(all history)
+// readFileSync stall. subagent_type is pulled with a cheap regex — no need to
+// JSON-parse every stream-json line just to count dispatches.
+const RUNS_DIR = path.join(DASH_DIR, 'data', 'runs');
+const okRunId = id => typeof id === 'string' && /^[a-z0-9-]+$/.test(id) && id.length < 64;
+const USAGE_SCAN_CAP = 300;
+const USAGE_CACHE_MS = 60 * 1000;
+let usageCache = null, usageCacheAt = 0;
+function scanAgentUsage() {
+  const usage = new Map(); // name -> { count, lastUsed } (dir names are ISO timestamps, so lexical max = newest)
+  const dirs = U.listDir(RUNS_DIR).filter(e => e.isDirectory() && okRunId(e.name))
+    .map(e => e.name).sort().reverse().slice(0, USAGE_SCAN_CAP);
+  for (const id of dirs) {
+    const raw = U.safeRead(path.join(RUNS_DIR, id, 'output.jsonl'));
+    if (!raw) continue;
+    const re = /"subagent_type":"([a-zA-Z0-9_-]+)"/g;
+    let m;
+    while ((m = re.exec(raw))) {
+      const e = usage.get(m[1]) || { count: 0, lastUsed: '' };
+      e.count++;
+      if (id > e.lastUsed) e.lastUsed = id;
+      usage.set(m[1], e);
+    }
+  }
+  return usage;
+}
+function agentUsage() {
+  if (!usageCache || Date.now() - usageCacheAt > USAGE_CACHE_MS) { usageCache = scanAgentUsage(); usageCacheAt = Date.now(); }
+  return usageCache;
 }
 
 // The hermes stack's working roles ARE the agent roster now (persona names
@@ -292,6 +347,18 @@ function assets() {
 
 // Serve the raw markdown of one agent/skill/command definition (path-traversal safe).
 function detail(type, name) {
+  // A real project file always wins a name collision with a reserved built-in
+  // (matches the same precedence agentList() applies to the roster above — a
+  // display name comes from frontmatter `name:` when present, not just the
+  // filename, so this must check the same way or the two guards can disagree).
+  const localAgentHit = type === 'agents' && U.collectMd(path.join(DOT_CLAUDE, 'agents'))
+    .some(f => (U.frontmatter(f).name || path.basename(f, '.md')) === name);
+  if (type === 'agents' && !localAgentHit && BUILTIN_AGENTS.some(a => a.name === name)) {
+    const a = BUILTIN_AGENTS.find(x => x.name === name);
+    const u = agentUsage().get(a.name);
+    return `# ${a.name}\n\n${a.description}\n\nBuilt into Claude Code — not a project .claude/agents/*.md file, so there's nothing here to rename or edit; model inherits the session's routed model.\n\n`
+      + (u ? `Dispatched ${u.count} time${u.count === 1 ? '' : 's'} in run history, most recently in run ${u.lastUsed}.\n` : 'Never dispatched in this project\'s run history yet.\n');
+  }
   if (type === 'agents' && /^hermes:/.test(name || '')) {
     const a = hermesAgents().find(x => x.name === name);
     if (!a) return null;

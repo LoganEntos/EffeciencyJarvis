@@ -182,3 +182,11 @@ Status map of what's already done vs missing is in that handoff. **Fire it next.
 `docs/roadmap.md` remains the broader status doc (NOW queue: N2 mobile pass, N8
 iPhone polish; pending USER verifications: real-mic, persona-card, Q1 Playwright)
 — but the VPP workstream above takes priority until the core flow is stable.
+
+**2026-07-30 — orchestrator-work deferral lifted (user directive).** Jarvis
+overseeing Projects (reviewing output quality, tracking PDF→CSV conversion
+completion against SharePoint) is now active work, alongside VPP — not queued
+behind it. Plan: `docs/jarvis-orchestrator-plan.md`. Sequencing: prototype the
+oversight flow as one-off manual test runs first (no autopilot code yet);
+harden into `lib/autopilot.js`/`lib/tasks.js` only after a live test confirms
+the approach.

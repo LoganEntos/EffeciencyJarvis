@@ -35,6 +35,25 @@ function addEl(html, cls) {
 const addMsg = (text, cls) => addEl(esc(text), 'msg ' + cls);
 
 const toolEls = {}; // tool_use id -> <pre> that receives the tool result
+
+// Copy button — hover-visible, positioned absolute inside .msg.assistant.
+// getTextFn is either a string (static) or () => string (live for streaming).
+const _COPY_ICON = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const _CHK_ICON  = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+function addCopyBtn(el, getTextFn) {
+  const btn = document.createElement('button');
+  btn.className = 'msg-copy'; btn.title = 'Copy';
+  btn.innerHTML = _COPY_ICON;
+  btn.onclick = () => {
+    const txt = typeof getTextFn === 'function' ? getTextFn() : String(getTextFn || '');
+    navigator.clipboard.writeText(txt).then(() => {
+      btn.innerHTML = _CHK_ICON; btn.title = 'Copied!';
+      setTimeout(() => { btn.innerHTML = _COPY_ICON; btn.title = 'Copy'; }, 1500);
+    }).catch(() => {});
+  };
+  el.appendChild(btn);
+  return btn;
+}
 function excerpt(v, n) { const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n) + '…' : s; }
 
 // Turn a raw CLI stderr/crash dump into a one-line plain-English headline +
@@ -71,7 +90,9 @@ function renderLine(o) {
     for (const b of o.message.content) {
       if (!b) continue;
       if (b.type === 'text' && b.text && b.text.trim()) {
-        chat.lastText = b.text.trim(); addEl(mdToHtml(chat.lastText), 'msg assistant');
+        const rawTxt = b.text.trim(); chat.lastText = rawTxt;
+        const msgEl = addEl(mdToHtml(rawTxt), 'msg assistant');
+        addCopyBtn(msgEl, rawTxt);
         // live runs only (never history replays): voice the reply as it streams
         if (chat.running && window.HubVoice && HubVoice.onAssistantText) HubVoice.onAssistantText(chat.lastText);
       }
@@ -118,9 +139,15 @@ function renderLine(o) {
     // hermes agent text — grow into ONE assistant bubble. -z (hermes_out) sent
     // whole lines; ACP (hermes_text) sends streaming chunks, so concatenate raw
     // for chunks and newline-join for legacy lines.
-    if (!chat.hermesEl || !chat.hermesEl.isConnected) { chat.hermesEl = addEl('', 'msg assistant'); chat.hermesText = ''; }
+    if (!chat.hermesEl || !chat.hermesEl.isConnected) {
+      chat.hermesEl = addEl('', 'msg assistant'); chat.hermesText = ''; chat.hermesCpBtn = null;
+    }
     chat.hermesText += o.type === 'hermes_text' ? o.text : ((chat.hermesText ? '\n' : '') + o.text);
     chat.hermesEl.innerHTML = mdToHtml(chat.hermesText);
+    // Re-append copy button after each innerHTML reset (streaming overwrites it);
+    // create it once and reuse the same element so onclick captures hermesText live.
+    if (!chat.hermesCpBtn) chat.hermesCpBtn = addCopyBtn(chat.hermesEl, () => chat.hermesText);
+    else chat.hermesEl.appendChild(chat.hermesCpBtn);
     chat.lastText = chat.hermesText.trim(); // feeds voice talk-back like claude runs
     return null;
   }

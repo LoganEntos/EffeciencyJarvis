@@ -63,8 +63,13 @@ function renderAttachStrip() {
 // ---- send flow ----
 async function sendPrompt() {
   const ta = $('#promptIn');
-  let prompt = ta.value.trim();
   if (chat.running || chat.sending) return; // sending = mid-distill (async gap below)
+  // Stop any active mic dictation before reading the textarea — otherwise the
+  // SR's onresult keeps firing during the distill/API await and overwrites the
+  // ta.value='' clear at the bottom, leaving the field non-empty and the mic
+  // button stuck in "listening" state.
+  if (dict) { try { dict.stop(); } catch {} }
+  let prompt = ta.value.trim();
   // Attachments: block while any is still uploading; allow an attachment-only
   // send by supplying a default instruction.
   if (chat.pendingFiles.some(c => c.pending)) { addMsg('Still uploading an attachment — try again in a moment.', 'sys'); return; }

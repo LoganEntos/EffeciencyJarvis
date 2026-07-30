@@ -131,8 +131,9 @@ async function listView(sel, title, endpoint, type, extraHtml = '') {
       return `<div class="lib-group"><button class="lib-ghead" data-g="${esc(k)}" aria-expanded="${open}">
         <span class="fold">${open ? '▾' : '▸'}</span> ${esc(k)} <span class="muted">${items.length}</span></button>
         <div class="lib-gbody"${open ? '' : ' hidden'}>${items.map(d => `<div class="row clickable" data-i="${data.indexOf(d)}">
-          <div class="flex" style="justify-content:space-between"><span class="name mono">${esc(d.name)}</span>
-            ${d.model ? `<span class="pill ${/haiku|flash|cheap/i.test(d.model) ? 'ok' : /opus|fable/i.test(d.model) ? 'err' : 'neutral'}">${esc(d.model)}${type === 'agents' ? (/opus/i.test(d.model) ? ' · heavy' : /haiku/i.test(d.model) ? ' · cheap' : '') : ''}</span>` : ''}</div>
+          <div class="flex" style="justify-content:space-between"><span class="name mono">${esc(d.name)}${type === 'agents' && d.builtin ? ' <span class="muted" style="font-weight:400;font-size:11px">· built-in</span>' : ''}</span>
+            <span>${type === 'agents' ? `<span class="pill ${d.active ? 'ok' : ''}" title="${d.usageCount || 0} dispatch${d.usageCount === 1 ? '' : 'es'} in run history${d.lastUsed ? ' · last ' + esc(d.lastUsed.slice(0, 10)) : ''}">${d.active ? '● active' : '○ dormant'}</span>` : ''}
+            ${d.model ? `<span class="pill ${/haiku|flash|cheap/i.test(d.model) ? 'ok' : /opus|fable/i.test(d.model) ? 'err' : 'neutral'}">${esc(d.model)}${type === 'agents' ? (/opus/i.test(d.model) ? ' · heavy' : /haiku/i.test(d.model) ? ' · cheap' : '') : ''}</span>` : ''}</span></div>
           ${d.description ? `<div class="desc">${esc(d.description)}</div>` : ''}</div>`).join('')}</div></div>`;
     }).join('') || '<div class="muted">No matches.</div>';
     listEl.querySelectorAll('.row.clickable').forEach(r => r.onclick = () => {

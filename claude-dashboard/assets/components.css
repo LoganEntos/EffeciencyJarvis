@@ -163,7 +163,7 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .msg.user{align-self:flex-end;background:var(--accent-soft);border:1px solid var(--accent-dim);
   border-bottom-right-radius:4px}
 .msg.assistant{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);
-  border-bottom-left-radius:4px}
+  border-bottom-left-radius:4px;position:relative;padding-right:36px}
 .msg.sys{align-self:center;background:transparent;border:none;color:var(--dim);font-size:11.5px;
   padding:2px 8px;max-width:100%;font-family:var(--font-mono)}
 .msg.result{align-self:center;background:#4bc47a0d;border:1px solid #4bc47a33;color:var(--muted);
@@ -200,6 +200,12 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .msg.assistant code{background:#ffffff10;border:1px solid var(--line);border-radius:4px;
   padding:1px 5px;font-family:var(--font-mono);font-size:12px}
 .msg.assistant .mdh{display:block;margin:6px 0 2px;font-size:13.5px;color:var(--txt)}
+.msg-copy{position:absolute;top:7px;right:8px;background:none;border:none;cursor:pointer;
+  color:var(--dim);padding:3px;border-radius:5px;opacity:0;transition:opacity .15s,color .12s,background .12s;
+  line-height:1;display:flex;align-items:center;justify-content:center}
+.msg.assistant:hover .msg-copy{opacity:1}
+.msg-copy:hover{color:var(--accent);background:var(--accent-soft)}
+.msg-copy .icon{width:13px;height:13px;flex-shrink:0}
 .composer{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;border-radius:12px;transition:box-shadow .15s}
 .composer.drag{box-shadow:0 0 0 2px var(--accent) inset;outline:none}
 .composer textarea{flex:1;margin:0;min-height:64px;max-height:220px;resize:vertical;
