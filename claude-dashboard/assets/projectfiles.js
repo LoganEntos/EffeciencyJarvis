@@ -113,6 +113,24 @@ function setUpStatus(inner, isError) {
     pUpStatusTimer = setTimeout(() => setUpStatus(''), 5000);
   }
 }
+// SharePoint sync status pill (#pSyncStatus) — same auto-clear/persist
+// convention as setUpStatus above: a normal result auto-clears after ~5s,
+// a "sticky" one (in-progress message, or any result carrying errors) stays
+// until dismissed or the next sync overwrites it, so a failure can't just
+// silently vanish while you're looking elsewhere.
+let pSyncStatusTimer = null;
+function setSyncStatus(inner, sticky) {
+  const st = $('#pSyncStatus'); if (!st) return;
+  if (pSyncStatusTimer) { clearTimeout(pSyncStatusTimer); pSyncStatusTimer = null; }
+  if (!inner) { st.innerHTML = ''; return; }
+  if (sticky) {
+    st.innerHTML = `${inner} <button class="pSyncStatusX" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0" aria-label="Dismiss">✕</button>`;
+    const x = st.querySelector('.pSyncStatusX'); if (x) x.onclick = () => setSyncStatus('');
+  } else {
+    st.innerHTML = inner;
+    pSyncStatusTimer = setTimeout(() => setSyncStatus(''), 5000);
+  }
+}
 async function projUpload(slug, fileList, overwrite) {
   const files = [...fileList];
   if (!files.length) return;

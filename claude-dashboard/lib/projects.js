@@ -17,6 +17,11 @@ const crypto = require('crypto');
 const U = require('./util');
 const memory = require('./memory');
 const pairing = require('./pairing');
+// Manual SharePoint sync (see syncSharepointFolder below) reuses the existing
+// offline browseIndex + pull — no new Graph surface. Not circular: sharepoint.js
+// never requires this module, so a plain top-level require is safe here (unlike
+// runs.js below, which IS circular and stays a lazy require).
+const sharepoint = require('./sharepoint');
 // Claude Code CLI workspace import (~/.claude/projects/*) — split into its
 // own module to keep this file under the 500-line budget. See lib/project-claude.js.
 const claudeImport = require('./project-claude');
@@ -86,6 +91,7 @@ function shape(p, stats) {
   }
   return { id: p.id, name: p.name, slug: p.slug, kind: p.kind || 'standard', cwd: p.cwd || '',
     description: p.description || '', instructions: p.instructions || '', archived: !!p.archived,
+    sourceNote: p.sourceNote || '',
     createdAt: p.createdAt, updatedAt: p.updatedAt,
     fileCount,
     sessionCount: claude ? countSessions(p.claudeDir) : 0,
@@ -97,9 +103,8 @@ function shape(p, stats) {
 // Validate a patch.sharepointFolder value: null clears the binding; otherwise
 // must be an object with non-empty string driveId + path (name optional —
 // display label only, not used to resolve anything). No itemId: this binds a
-// FOLDER (browseIndex(driveId, prefix) addresses folders by path, not id), and
-// no sync logic lives here — see the task note in data/todos/projects.md, this
-// is storage-only groundwork for whatever pulls/pushes against it later.
+// FOLDER (browseIndex(driveId, prefix) addresses folders by path, not id).
+// The manual sync trigger against this binding is syncSharepointFolder() below.
 function validSharepointFolder(v) {
   if (v === null) return null;
   if (!v || typeof v !== 'object') return undefined; // reject silently — caller drops the field
@@ -107,6 +112,52 @@ function validSharepointFolder(v) {
   const folderPath = (typeof v.path === 'string' ? v.path : '').trim();
   if (!driveId || !folderPath) return undefined;
   return { driveId: driveId.slice(0, 300), path: folderPath.slice(0, 1000), name: (v.name || '').toString().trim().slice(0, 200) };
+}
+
+// Manual "Sync now" (project detail button) — pulls every file in the project's
+// bound SharePoint folder into its inbox, skipping names already present.
+// Deliberately NOT wired to run automatically (not on every run, not on a
+// timer): a silent per-run pull would touch SharePoint content without an
+// explicit-in-conversation prompt, which the hub's data-handling rule forbids;
+// a manual click IS that explicit prompt. Non-recursive for v1 — only the bound
+// folder's immediate files, matching browseIndex's own shape (folders listed,
+// never descended into).
+const SYNC_FILE_CAP = 300; // bound one sync call the same way shape()'s pairing scan is bounded
+async function syncSharepointFolder(id) {
+  const list = load();
+  const p = list.find(x => x.id === id);
+  if (!p) return { error: 'not found' };
+  const sf = p.sharepointFolder;
+  if (!sf || !sf.driveId || !sf.path) return { error: 'no SharePoint folder is bound to this project yet' };
+  if (!sharepoint.isAuthed()) return { error: 'not signed in to SharePoint — connect Microsoft 365 in the SharePoint tab first' };
+  let listing;
+  try { listing = sharepoint.browseIndex(sf.driveId, sf.path); }
+  catch (e) { return { error: e.message || 'could not browse the bound folder' }; }
+  if (listing.error) return { error: listing.error };
+  let files = listing.files || [];
+  const truncated = files.length > SYNC_FILE_CAP;
+  if (truncated) files = files.slice(0, SYNC_FILE_CAP);
+  if (!files.length) return { ok: true, pulled: 0, skipped: 0, errors: [] }; // empty folder — client renders "nothing to sync"
+  // Case-insensitive: the inbox folder is on a case-insensitive filesystem in
+  // the common case (Windows), so an exact-case compare could re-pull a file
+  // that only differs by case and silently duplicate it.
+  const existing = new Set(projectFiles(p.slug).map(f => f.base.toLowerCase()));
+  let pulled = 0, skipped = 0; const errors = [];
+  for (const f of files) {
+    if (existing.has((f.name || '').toLowerCase())) { skipped++; continue; }
+    try {
+      const r = await sharepoint.pull(f.driveId || sf.driveId, f.id, p.slug);
+      if (r.error) { errors.push(`${f.name}: ${r.error}`); continue; }
+      pulled++; existing.add((f.name || '').toLowerCase());
+    } catch (e) {
+      // A 401 mid-loop (token expired between the isAuthed() check and here)
+      // would otherwise repeat the same failure for every remaining file —
+      // surface it once and stop instead of one error line per file.
+      if (e.status === 401) { errors.push('sign-in expired mid-sync — reconnect in the SharePoint tab and try again'); break; }
+      errors.push(`${f.name}: ${e.message || 'pull failed'}`);
+    }
+  }
+  return { ok: true, pulled, skipped, errors, ...(truncated ? { truncated: true } : {}) };
 }
 
 // Lazy, memoized-per-call fetch of the full run list. require('./runs') is
@@ -214,6 +265,12 @@ function update(id, patch) {
   if (!p) return { error: 'not found' };
   if (typeof patch.name === 'string' && patch.name.trim()) p.name = patch.name.trim().slice(0, 80);
   if (typeof patch.description === 'string') p.description = patch.description.slice(0, 300);
+  // sourceNote: a cosmetic, freeform reference label ("where these files really
+  // live") — deliberately NOT a path the server reads/lists/resolves. Same
+  // sanitize-by-slice as description; no validation beyond length, since it is
+  // never used for filesystem access (see the directory-tracker scope note in
+  // docs/handoffs/projects-tab-revamp-2026-07-30.md — option A, cosmetic only).
+  if (typeof patch.sourceNote === 'string') p.sourceNote = patch.sourceNote.slice(0, 200);
   if (typeof patch.instructions === 'string') p.instructions = patch.instructions.slice(0, 12000);
   if (typeof patch.archived === 'boolean') p.archived = patch.archived;
   if ('sharepointFolder' in patch) {
@@ -294,6 +351,12 @@ async function handle(req, res, url) {
   if (p === '/api/projects/update' && req.method === 'POST') {
     let b = {}; try { b = JSON.parse(await U.readBody(req, 32 * 1024) || '{}'); } catch {}
     const r = update((b.id || '').toString(), b);
+    U.sendJson(res, r, r.error ? 400 : 200);
+    return true;
+  }
+  if (p === '/api/projects/sync-sharepoint' && req.method === 'POST') {
+    let b = {}; try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
+    const r = await syncSharepointFolder((b.id || '').toString());
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;
   }

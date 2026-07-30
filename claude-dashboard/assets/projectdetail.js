@@ -34,6 +34,7 @@ async function renderProjectDetail(id) {
   if (d.error) { projSel = null; return renderers.projects(); }
   const p = d.project, files = d.files || [], mem = (d.memory && d.memory.items) || [], runs = d.runs || [];
   const sessions = d.sessions || [], claude = p.kind === 'claude';
+  const sf = p.sharepointFolder || null; // manual-sync binding (storage-only field; no UI sets it yet — see wireSync below)
 
   const secInstr = `
     <div class="row">
@@ -97,12 +98,19 @@ async function renderProjectDetail(id) {
       <button id="pBack" class="ghost" style="padding:5px 11px;font-size:11.5px">← All projects</button>
       <span class="flex" style="gap:8px">
         <button id="pRefresh" class="ghost" style="padding:5px 11px;font-size:11.5px" title="Re-fetch files, runs, pairing and memory">↻ Refresh</button>
+        <button id="pSync" class="ghost" style="padding:5px 11px;font-size:11.5px" ${sf ? '' : 'disabled'}
+          title="${sf ? `Pull every file in the bound SharePoint folder (${esc(sf.name || sf.path)}) into this project — skips files already here` : 'No SharePoint folder is bound to this project yet'}">⟲ Sync now</button>
         <button id="pArch" class="ghost" style="padding:5px 11px;font-size:11.5px" title="${p.archived ? 'Bring this project back into the grid' : 'Hide from the grid — files, memory and history all stay'}">${p.archived ? '⤒ Unarchive' : '⤓ Archive'}</button>
         <button id="pDel" class="danger" style="padding:5px 11px;font-size:11px">Delete project</button>
       </span>
     </div>
     <input id="pName" value="${esc(p.name)}" style="font-family:var(--font-body);font-size:24px;font-weight:800;letter-spacing:-.02em;background:none;border:none;padding:0;margin:2px 0;width:100%">
     <input class="search" id="pDesc" value="${esc(p.description)}" placeholder="Short description (optional)" style="max-width:560px;margin:4px 0 10px">
+    <div class="flex" style="gap:6px;align-items:center;margin:0 0 10px" title="Reference label only — not linked to any real folder or drive; the hub never reads or lists it.">
+      <span class="muted" style="font-size:11px;white-space:nowrap">⌁ files really live at</span>
+      <input class="search" id="pSourceNote" value="${esc(p.sourceNote || '')}" placeholder="e.g. a network path or SharePoint site name — reference only, not linked" maxlength="200" style="max-width:480px;margin:0;font-size:11.5px">
+    </div>
+    <div id="pSyncStatus" class="badgebar" role="status" aria-live="polite" style="margin:0 0 8px"></div>
     <div class="badgebar" style="margin:0 0 10px">
       ${p.archived ? '<span class="pill meta">archived</span>' : ''}
       ${claude ? `<span class="pill accent">Claude Code</span><span class="pill neutral">${sessions.length} session${sessions.length === 1 ? '' : 's'}</span>`
@@ -146,6 +154,7 @@ async function renderProjectDetail(id) {
     projSel = null; renderers.projects();
   };
   wireDelete(p);
+  wireSync(p);
   const saveMeta = async (patch, note) => {
     const s = $('#pSaved'); if (s && note) s.textContent = 'saving…';
     try { await api('/api/projects/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id: p.id }, patch)) }); if (s && note) s.textContent = note; }
@@ -154,6 +163,9 @@ async function renderProjectDetail(id) {
   // Name/description save on blur — surface a brief "saved ✓" so it's clear it stuck.
   $('#pName').onchange = e => { const v = e.target.value.trim(); if (v) saveMeta({ name: v }, 'saved ✓'); };
   $('#pDesc').onchange = e => saveMeta({ description: e.target.value }, 'saved ✓');
+  // Directory tracker (cosmetic-only; see the comment on wireSync/sf above) —
+  // a plain reference label, never read/listed/resolved server-side.
+  $('#pSourceNote').onchange = e => saveMeta({ sourceNote: e.target.value }, 'saved ✓');
 
   // instructions: live char count + preset chips + save + dirty tracking
   const instr = $('#pInstr'), saved = $('#pSaved');
@@ -240,6 +252,39 @@ async function renderProjectDetail(id) {
     try { await api('/api/projects/note', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, text: t }) }); } catch {}
     $('#pNote').value = '';
     renderProjectDetail(id);
+  };
+}
+
+// Manual "Sync now" — pulls the bound SharePoint folder's files into this
+// project's inbox (see syncSharepointFolder, lib/projects.js). The button is
+// pre-disabled by the render above when no sharepointFolder binding exists
+// (there is no UI to set that binding yet — storage-only field, set via
+// /api/projects/update{sharepointFolder} directly for now), but guard here
+// too in case a stale render or a11y activation path ever calls through.
+function wireSync(p) {
+  const btn = $('#pSync');
+  if (!btn || !p.sharepointFolder) return;
+  btn.onclick = async () => {
+    btn.disabled = true; const was = btn.textContent; btn.textContent = '…';
+    setSyncStatus('<span class="pill warn">syncing from SharePoint…</span>', true);
+    let r;
+    try {
+      r = await api('/api/projects/sync-sharepoint', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id }), timeoutMs: 300000 });
+    } catch (e) { r = { error: e.message || 'network error' }; }
+    btn.disabled = false; btn.textContent = was;
+    if (r.error) { setSyncStatus(`<span class="pill err">sync failed — ${esc(r.error)}</span>`, true); return; }
+    const bits = [];
+    if (r.pulled) bits.push(`${r.pulled} new file${r.pulled === 1 ? '' : 's'}`);
+    if (r.skipped) bits.push(`${r.skipped} already present`);
+    if (r.errors && r.errors.length) bits.push(`${r.errors.length} error${r.errors.length === 1 ? '' : 's'}`);
+    const allFailed = r.errors && r.errors.length && !r.pulled && !r.skipped;
+    const cls = allFailed ? 'err' : (r.errors && r.errors.length ? 'warn' : (bits.length ? 'ok' : 'neutral'));
+    const msg = bits.length ? `synced — ${bits.join(', ')}` : 'nothing to sync — the bound folder is empty';
+    const detail = r.errors && r.errors.length ? ` title="${esc(r.errors.join('; '))}"` : '';
+    const trunc = r.truncated ? ' <span class="muted" style="font-size:11px">(folder has 300+ files — synced the first 300)</span>' : '';
+    setSyncStatus(`<span class="pill ${cls}"${detail}>${esc(msg)}</span>${trunc}`, allFailed || (r.errors && r.errors.length));
+    if (r.pulled) renderProjectDetail(p.id); // refresh so the new files/count show immediately
   };
 }
 

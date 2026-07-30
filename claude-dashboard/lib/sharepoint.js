@@ -83,6 +83,10 @@ function download(urlStr, cap, redirects = 0) {
 // ---- token cache + device-code flow ----------------------------------------
 let device = null; // in-flight device login: { user_code, verification_uri, expiresAt, timer, error }
 const loadAuth = () => U.safeJson(AUTH_FILE);
+// Cheap "are we signed in" check for callers (e.g. lib/projects.js's manual
+// sync) that want to fail fast with a clear message instead of discovering
+// it mid-loop via a thrown 401 from g(). Mirrors the same check /status uses.
+function isAuthed() { const a = loadAuth(); return !!(a && a.refresh_token); }
 function saveAuth(tok) {
   fs.mkdirSync(DATA, { recursive: true });
   fs.writeFileSync(AUTH_FILE, JSON.stringify(tok, null, 2));
@@ -423,4 +427,7 @@ async function handle(req, res, url) {
   return true;
 }
 
-module.exports = { handle };
+// browseIndex/pull/isAuthed are also consumed by lib/projects.js's manual
+// "Sync now" (see syncSharepointFolder there) — offline enumerate + per-file
+// pull, no new Graph surface added for it.
+module.exports = { handle, browseIndex, pull, isAuthed };

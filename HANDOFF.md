@@ -190,3 +190,37 @@ behind it. Plan: `docs/jarvis-orchestrator-plan.md`. Sequencing: prototype the
 oversight flow as one-off manual test runs first (no autopilot code yet);
 harden into `lib/autopilot.js`/`lib/tasks.js` only after a live test confirms
 the approach.
+
+**2026-07-30 — Projects-tab todo clearout + VPP SharePoint scoping.**
+Two-thread orchestration cleared nearly every item in `data/todos/projects.md`
+(both 500-line-cap splits, project-run manifest surfaced in run replay,
+files.js jitter fix, slug-guard a11y — commits `ac9a9d1`, `8ac4820`). Live
+SharePoint index scoping found VPP's real historical-order archive
+(`/Operations/Orders/Orders VPP/Closed Order History/`, 54 closed orders,
+2022-2026, 5 already converted) and ruled out several false leads. Four items
+remain explicitly blocked on user decisions (tab ownership, destructive
+controls, the directory-tracker security boundary, SharePoint-binding UI/
+sync-trigger design) plus the tiered VPP batch-conversion rollout. Full
+orchestration order, standing verification constraints, and the "don't
+re-derive this" evidence trail: `docs/handoffs/projects-tab-revamp-2026-07-30.md`.
+**Fire that next** for any further Projects/VPP work.
+
+**2026-07-30 (later) — the four blocked items resolved; VPP Tier 1 attempted and stalled on a real method gap.**
+User explicitly delegated all four decisions plus a VPP Tier-1 go-ahead in one
+turn. Resolved: tab ownership (Proposal C — Files = intake-only, Projects =
+workspace owner, Run = execution), directory tracker (option A, cosmetic
+`sourceNote` field only, never touches fs), SharePoint binding (manual
+"⟲ Sync now" button + `/api/projects/sync-sharepoint`, not auto-sync-on-every-run
+— that would violate the no-silent-business-data rule). All three
+code-reviewed (SHIP) and verified on :5758 (100 checks, 0 failures). Step 7
+(destructive cleanup) stays sequenced last, but its blocker cleared — the
+synthetic dup-detection test found its first live-positive case with no bug.
+**VPP Tier 1 (the next 4 historical orders) ran and every one came back
+NEEDS-REVIEW — 0/4 converted, progress stays 5/54.** Two need a human pick
+among ambiguous source PDFs; two exposed a real method gap (PIs print
+2-decimal unit prices, true per-piece price is 3 decimals, so the proven
+`qty × displayed_price` check fails by design even though quantities tie out
+exactly). **"Tier 1 is lowest-risk / can run unattended" is now known false**
+— the 3-decimal-price handling needs a fix and re-proof before any further
+batch, tiered or not. Full per-order detail: `claude-dashboard/data/todos/projects.md`
+Step 9. Nothing was force-converted or guessed on live financial data.

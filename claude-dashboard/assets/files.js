@@ -10,6 +10,7 @@ renderers.files = async function () {
         <h2 style="margin-bottom:0">File inbox <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— uploads land in claude-dashboard/data/inbox/ for runs to use</span></h2>
         <button id="fileRefresh" class="ghost">↻ Refresh</button>
       </div>
+      <div id="filesUnfiledRow" class="muted" style="font-size:11.5px;margin:6px 0 2px"></div>
       <div class="dropzone" id="dropzone" style="margin-top:10px">Drop files here or click to browse<br>
         <span class="muted" style="font-size:11.5px">50 MB per upload · xlsx, csv, pdf, docs, anything</span></div>
       <input type="file" id="fileIn" multiple class="hidden">
@@ -88,6 +89,26 @@ function dayLabel(iso) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
 }
 
+// Small, non-blocking pointer at the top of the tab: Files is intake-only now
+// (Projects owns everything once a file is attached), so a root inbox with
+// stray files needs a way out that isn't "notice the empty move-to select on
+// each card". At 0 unfiled this mirrors the Projects "0 archived" pill — a
+// quiet, non-interactive neutral pill, never a scary badge for nothing wrong.
+function paintUnfiledRow(unfiledN, total) {
+  const row = $('#filesUnfiledRow');
+  if (!row) return;
+  if (!total) { row.innerHTML = ''; return; }
+  if (!unfiledN) {
+    row.innerHTML = '<span class="pill neutral" style="cursor:default" title="Every inbox file is attached to a project">all filed</span>';
+    return;
+  }
+  row.innerHTML = `<a class="link" id="filesUnfiledLink" role="button" tabindex="0">${unfiledN} file${unfiledN === 1 ? '' : 's'} unfiled — organize in Projects →</a>`;
+  const go = () => goTab('projects');
+  const a = $('#filesUnfiledLink');
+  a.onclick = go;
+  a.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+}
+
 async function refreshFiles() {
   const el = $('#fileList');
   if (!el) return;
@@ -107,8 +128,12 @@ async function refreshFiles() {
       api('/api/files'),
       api('/api/projects').then(d => (d.projects || []).filter(p => p.kind !== 'claude'), () => []),
     ]);
-  } catch { el.innerHTML = '<div class="muted">Inbox unavailable.</div>'; return; }
-  if (!Array.isArray(list) || !list.length) { el.innerHTML = '<div class="muted">Inbox is empty — drop a workbook or document above.</div>'; return; }
+  } catch { el.innerHTML = '<div class="muted">Inbox unavailable.</div>'; paintUnfiledRow(0, 0); return; }
+  if (!Array.isArray(list) || !list.length) { el.innerHTML = '<div class="muted">Inbox is empty — drop a workbook or document above.</div>'; paintUnfiledRow(0, 0); return; }
+  // Same root-vs-project distinction the "move to project…" select already
+  // relies on (f.project is only set for files inside data/inbox/<slug>/) —
+  // reused here, not re-derived, so this can't drift from that logic.
+  paintUnfiledRow(list.filter(f => !f.project).length, list.length);
   const projOpts = projs.map(p => `<option value="${esc(p.slug)}">${esc(p.name || p.slug)}</option>`).join('');
   const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');
   let lastGroup = null, html = '';
