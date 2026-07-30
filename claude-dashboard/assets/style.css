@@ -111,11 +111,13 @@ header .badge{font-size:11px;color:var(--muted);border:1px solid var(--line);bor
 .dot.warn{background:var(--amber);box-shadow:0 0 8px #e0a63f99}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 header .spacer{flex:1}
-header .iconbtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;
-  width:32px;height:32px;padding:0;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+header .iconbtn{background:transparent;border:1px solid var(--line2);color:var(--txt);border-radius:3px;
+  width:48px;height:48px;padding:0;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+  transition:color .15s,border-color .15s,background .15s}
 header .iconbtn:hover{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-soft)}
-#navToggle{display:none;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;
-  width:32px;height:32px;padding:0;font-size:16px;line-height:1;cursor:pointer;align-items:center;justify-content:center}
+#navToggle{display:none;background:transparent;border:1px solid var(--line2);color:var(--txt);border-radius:3px;
+  width:48px;height:48px;padding:0;line-height:1;cursor:pointer;align-items:center;justify-content:center;
+  transition:color .15s,border-color .15s,background .15s}
 #navToggle:hover{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-soft)}
 
 /* ---- shell / nav ---- */
@@ -131,10 +133,23 @@ nav a .ico{width:17px;height:17px;flex:0 0 17px;opacity:.85;stroke:currentColor;
   stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 nav a.active .ico,nav a:hover .ico{opacity:1}
 /* header icon buttons (theme / restart / refresh / nav toggle) */
-header .btnico{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;
+header .btnico{width:42px;height:42px;stroke:currentColor;fill:none;stroke-width:2;
   stroke-linecap:round;stroke-linejoin:round;display:block}
-nav a kbd{margin-left:auto;font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:4px;
-  padding:1px 5px;background:#ffffff05}
+/* nav kbd doubles as the TODO-drawer trigger (todos.js). Always shows the
+   tab's sequential number; when data-todos > 0 it turns amber and shows a
+   small count pip in the corner. Hover is clickable-affordance amber. */
+nav a kbd{position:relative;margin-left:auto;font-size:10px;color:var(--dim);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;background:#ffffff05;
+  cursor:pointer;transition:color .15s,border-color .15s,background .15s;user-select:none}
+nav a kbd:hover,nav a kbd:focus-visible{color:var(--accent);border-color:var(--accent);
+  background:var(--accent-soft);outline:none}
+nav a kbd[data-todos]:not([data-todos="0"]){color:var(--accent);border-color:var(--accent-dim);
+  background:var(--accent-soft)}
+nav a kbd[data-todos]:not([data-todos="0"])::after{content:attr(data-todos);
+  position:absolute;top:-6px;right:-8px;min-width:12px;height:12px;padding:0 3px;
+  border-radius:999px;background:var(--accent);color:#0e0d0b;font-family:var(--font-mono);
+  font-size:8.5px;font-weight:800;line-height:12px;text-align:center;
+  box-shadow:0 0 6px var(--accent-dim)}
 nav a:hover{color:var(--txt);background:#ffffff08}
 nav a:active{background:#ffffff10}
 nav a.active{color:var(--accent);background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
@@ -221,3 +236,93 @@ main section > h2:first-of-type .muted{display:inline-block;font-size:13px;font-
    ok/warn/err/neutral/accent). */
 .pill.cool{background:#6fa6a018;color:var(--cool);border:1px solid #6fa6a045}
 :root[data-theme="light"] .pill.cool{color:#2c6a63}
+
+/* todo-panel — right-side drawer for the per-tab TODO tracker (todos.js).
+   Same overlay pattern as .hlth-overlay/.hlth-modal, but slides in from the
+   edge rather than centering, so it reads as a tool drawer, not a dialog. */
+.todo-panel{position:fixed;inset:0;z-index:70;pointer-events:none}
+.todo-panel-backdrop{position:absolute;inset:0;background:#000000aa;opacity:0;transition:opacity .2s ease}
+.todo-panel-body{position:absolute;top:0;right:0;bottom:0;width:360px;max-width:92vw;
+  background:var(--panel);border-left:1px solid var(--accent-dim);box-shadow:var(--shadow);
+  display:flex;flex-direction:column;padding:18px 18px 20px;transform:translateX(100%);
+  transition:transform .28s cubic-bezier(.16,1,.3,1)}
+.todo-panel.open{pointer-events:auto}
+.todo-panel.open .todo-panel-backdrop{opacity:1}
+.todo-panel.open .todo-panel-body{transform:translateX(0)}
+@media (prefers-reduced-motion:reduce){
+  .todo-panel-backdrop,.todo-panel-body{transition:none}
+}
+.todo-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.todo-panel-title{font-family:var(--font-mono);font-size:12.5px;font-weight:800;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--accent)}
+.todo-panel-actions{display:flex;gap:6px;flex-shrink:0}
+.todo-panel-actions button{padding:6px 11px;font-size:11px}
+.todo-panel-content{flex:1;overflow:auto}
+.todo-item{display:flex;align-items:flex-start;gap:9px;padding:6px 2px;cursor:pointer}
+.todo-item span{border-bottom:1px solid transparent}
+.todo-item:hover span{border-color:var(--accent-dim)}
+.todo-item.checked span{color:var(--muted);text-decoration:line-through;opacity:.75}
+.todo-item input[type=checkbox]{margin-top:3px;accent-color:var(--accent)}
+.todo-h{font-family:var(--font-mono);font-size:11.5px;font-weight:800;color:var(--accent);
+  text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
+.todo-h:first-child{margin-top:0}
+.todo-p{font-size:12.5px;color:var(--txt);margin:4px 0;line-height:1.5}
+.todo-edit-area{width:100%;min-height:280px;background:var(--bg);border:1px solid var(--line);
+  color:var(--txt);font-family:var(--font-mono);font-size:12px;line-height:1.5;padding:10px;
+  border-radius:var(--r);resize:vertical}
+.todo-edit-actions{display:flex;gap:8px;margin-top:10px}
+/* structured rows: grip · checkbox · text · hover actions; note block under */
+.todo-row{display:flex;align-items:flex-start;gap:4px;border-radius:var(--r);padding:0 2px}
+.todo-row .todo-item{flex:1;min-width:0;padding:6px 0}
+.todo-row:hover{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.todo-row.dragging{opacity:.45}
+.todo-row.dropmark{box-shadow:0 -2px 0 0 var(--accent)}
+.todo-grip{cursor:grab;color:var(--muted);font-size:11px;letter-spacing:-2px;
+  padding:7px 2px 0 0;user-select:none;opacity:0;transition:opacity .12s ease}
+.todo-row:hover .todo-grip{opacity:.7}
+.todo-acts{display:flex;gap:2px;flex-shrink:0;padding-top:4px;opacity:0;transition:opacity .12s ease}
+.todo-row:hover .todo-acts,.todo-row:focus-within .todo-acts{opacity:1}
+.todo-act{background:none;border:1px solid transparent;color:var(--muted);cursor:pointer;
+  font-size:10px;line-height:1;padding:4px 5px;border-radius:var(--r)}
+.todo-act:hover{color:var(--accent);border-color:var(--accent-dim)}
+.todo-del:hover{color:#e05b4f;border-color:#e05b4f66}
+.todo-note{margin:0 0 6px 40px}
+.todo-note-view{font-size:11.5px;color:var(--muted);line-height:1.45;cursor:pointer;
+  border-left:2px solid var(--accent-dim);padding:2px 8px;border-radius:0 var(--r) var(--r) 0}
+.todo-note-view:hover{color:var(--txt);background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.todo-note-area{width:100%;min-height:54px;background:var(--bg);border:1px solid var(--line);
+  color:var(--txt);font-family:var(--font-mono);font-size:11.5px;line-height:1.45;padding:7px 9px;
+  border-radius:var(--r);resize:vertical}
+.todo-add{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.todo-add-input{width:100%;background:var(--bg);border:1px dashed var(--line);color:var(--txt);
+  font-size:12.5px;padding:8px 10px;border-radius:var(--r)}
+.todo-add-input:focus{border-style:solid;border-color:var(--accent-dim);outline:none}
+@media (prefers-reduced-motion:reduce){.todo-grip,.todo-acts{transition:none}}
+@media (pointer:coarse){.todo-grip,.todo-acts{opacity:1}}
+
+/* Delegations section (assets/delegations.js) — aggregated subagent-dispatch
+   scoreboard rendered inline in the Run tab's chat log, above the transcript
+   (see openRun/attachStream). Modeled on .artifact (full-width block, not the
+   82%-capped .msg bubbles) since it's structured data, not a chat turn. */
+.delegsection{align-self:stretch;max-width:100%}
+.delegwrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.delegwrap summary{cursor:pointer;padding:9px 13px;font-size:12px;color:var(--amber);
+  font-family:var(--font-mono);user-select:none;list-style:none;display:flex;align-items:center;gap:8px}
+.delegwrap summary::before{content:'▸ ';color:var(--dim)}
+.delegwrap[open] summary::before{content:'▾ '}
+.delegbody{border-top:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:8px}
+.delegrow{margin-bottom:0;padding:9px 12px}
+.delegrow .flex{flex-wrap:wrap}
+.delegpreview{color:var(--muted);font-size:12px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.delegrow.expanded .delegpreview{white-space:normal;overflow:visible;text-overflow:clip}
+.delegdetail{display:none;margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+.delegrow.expanded .delegdetail{display:block}
+.delegfield{margin-bottom:6px}
+.delegfield:last-child{margin-bottom:0}
+.delegfield > span{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);
+  display:block;margin-bottom:3px}
+.delegfield pre{margin:0;background:#0b0a08;border:1px solid var(--line);border-radius:6px;
+  padding:8px 10px;font-size:11.5px;max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+:root[data-theme="light"] .delegfield pre{background:#efe9dc}

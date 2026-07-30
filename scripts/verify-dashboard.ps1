@@ -30,6 +30,23 @@ function CheckPost($name, $url, $body, [int]$expect) {
     else { Write-Host ("  FAIL {0,-28} got {1}, expected {2}" -f $name, $code, $expect) -ForegroundColor Red; $script:fails++ }
 }
 
+function CheckPut($name, $url, $body, [int]$expect, $headers = $null) {
+    try {
+        if ($headers) {
+            $r = Invoke-WebRequest -Uri $url -Method PUT -Body $body -ContentType 'application/json' -Headers $headers `
+                -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
+        } else {
+            $r = Invoke-WebRequest -Uri $url -Method PUT -Body $body -ContentType 'application/json' `
+                -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
+        }
+        $code = [int]$r.StatusCode
+    } catch {
+        if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode } else { $code = -1 }
+    }
+    if ($code -eq $expect) { Write-Host ("  OK   {0,-28} {1}" -f $name, $code) }
+    else { Write-Host ("  FAIL {0,-28} got {1}, expected {2}" -f $name, $code, $expect) -ForegroundColor Red; $script:fails++ }
+}
+
 Write-Host "Smoke-testing hub at $base"
 Check "GET /"                  "$base/"
 Check "GET /assets/style.css"  "$base/assets/style.css"
@@ -57,6 +74,31 @@ Check "GET /api/stats/today"   "$base/api/stats/today"
 Check "GET /api/files"         "$base/api/files"
 Check "GET /api/tasks"         "$base/api/tasks"
 Check "GET /api/schedules"     "$base/api/schedules"
+Check "GET /api/todos/counts"  "$base/api/todos/counts"
+Check "GET /assets/todos.js"   "$base/assets/todos.js"
+CheckPut "PUT /api/todos/run w/o token (403)" "$base/api/todos/run" '{"md":"- [ ] x"}' 403
+
+# Authenticated todo checks need the per-boot X-Hub-Token, which is injected
+# into the served page's <meta name="hub-token"> — scrape it from GET /.
+$hubToken = $null
+try {
+    $home = Invoke-WebRequest -Uri "$base/" -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
+    if ($home.Content -match 'name="hub-token" content="([0-9a-f]+)"') { $hubToken = $Matches[1] }
+} catch {}
+if ($hubToken) {
+    $hdr = @{ 'X-Hub-Token' = $hubToken }
+    CheckPut "PUT /api/todos/run w/ token (200)" "$base/api/todos/run" '{"md":"- [ ] smoke-test-item\n- [x] done-item"}' 200 $hdr
+    try {
+        $get = Invoke-WebRequest -Uri "$base/api/todos/run" -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
+        if ($get.Content -match 'smoke-test-item') { Write-Host ("  OK   {0,-28} {1}" -f "GET /api/todos/run (md round-trip)", 200) }
+        else { Write-Host ("  FAIL {0,-28} md not persisted" -f "GET /api/todos/run (md round-trip)") -ForegroundColor Red; $script:fails++ }
+    } catch { Write-Host ("  FAIL {0,-28} request error" -f "GET /api/todos/run (md round-trip)") -ForegroundColor Red; $script:fails++ }
+    CheckPut "PUT /api/todos/..%2Fetc%2Fpasswd (400 traversal)" "$base/api/todos/..%2Fetc%2Fpasswd" '{"md":"x"}' 400 $hdr
+    CheckPut "PUT /api/todos/nope-tab (400 unknown tab)" "$base/api/todos/nope-tab" '{"md":"x"}' 400 $hdr
+    CheckPut "PUT /api/todos/run cleanup (200)" "$base/api/todos/run" '{"md":""}' 200 $hdr
+} else {
+    Write-Host "  SKIP  could not read hub token from GET / - skipping authenticated todo checks" -ForegroundColor Yellow
+}
 Check "GET /api/assets"        "$base/api/assets"
 Check "GET /api/sources"       "$base/api/sources"
 Check "GET /api/personas"      "$base/api/personas"
@@ -78,6 +120,8 @@ Check "GET /api/projects/pairs"      "$base/api/projects/pairs?slug=vpp-historic
 Check "GET /api/projects/pairs (traversal 404)" "$base/api/projects/pairs?slug=..%2F..%2Fx" 404
 Check "GET /api/projects/pairs (no slug 404)"   "$base/api/projects/pairs" 404
 Check "GET /api/agentgraph"    "$base/api/agentgraph"
+Check "GET /api/delegations"   "$base/api/delegations"
+Check "GET /api/delegations (bad id 404)" "$base/api/delegations?runId=..%2F..%2Fserver" 404
 Check "GET /api/hermes"        "$base/api/hermes"
 Check "GET /vendor/css/fonts.css" "$base/vendor/css/fonts.css"
 Check "GET vendor traversal blocked" "$base/vendor/..%2Fserver.js" 404
