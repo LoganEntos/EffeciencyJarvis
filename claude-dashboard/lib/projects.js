@@ -17,6 +17,7 @@ const path = require('path');
 const crypto = require('crypto');
 const U = require('./util');
 const memory = require('./memory');
+const pairing = require('./pairing');
 
 const DATA_DIR = path.resolve(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'projects.json');
@@ -75,12 +76,23 @@ function fileCountFor(slug) {
 function shape(p, stats) {
   const s = stats || {};
   const claude = p.kind === 'claude';
+  const fileCount = claude ? 0 : fileCountFor(p.slug);
+  // Grid-level PDF↔CSV pairing summary for the tile badge. BOUNDED: pairSummary
+  // re-scans the folder (no cache), so only for standard projects with a
+  // workable file count — skip claude workspaces and anything over 300 files so
+  // a big folder can't make the list route walk it on every poll. Omitted (not
+  // {}) when unavailable, so the UI degrades by simply not rendering the badge.
+  let pairs;
+  if (!claude && fileCount > 0 && fileCount <= 300) {
+    try { pairs = pairing.pairSummary(p.slug) || undefined; } catch { pairs = undefined; }
+  }
   return { id: p.id, name: p.name, slug: p.slug, kind: p.kind || 'standard', cwd: p.cwd || '',
     description: p.description || '', instructions: p.instructions || '', archived: !!p.archived,
     createdAt: p.createdAt, updatedAt: p.updatedAt,
-    fileCount: claude ? 0 : fileCountFor(p.slug),
+    fileCount,
     sessionCount: claude ? countSessions(p.claudeDir) : 0,
-    runCount: s.count || 0, lastRunAt: s.last || null };
+    runCount: s.count || 0, lastRunAt: s.last || null,
+    ...(pairs ? { pairs } : {}) };
 }
 
 // Lazy, memoized-per-call fetch of the full run list. require('./runs') is

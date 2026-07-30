@@ -78,10 +78,13 @@ function paintCards() {
   const grid = list.length
     ? `<div class="cards">${list.map(projCard).join('')}</div>`
     : (total ? '<div class="note">No projects match that search.</div>'
-             : '<div class="note">No projects yet. Create one, drop in its files, and write the instructions Claude should follow every time you work in it — or Import inbox to adopt existing folders.</div>');
+             : '<div class="note">No projects yet. Create one, drop in its files, and write the instructions Claude should follow every time you work in it — or drop files in the Files tab first and use "Move into project" once one exists.</div>');
+  // 0-state: the toggle link only makes sense once there's something to reveal,
+  // but a bare neutral pill keeps "archiving exists" discoverable even at 0 —
+  // non-interactive on purpose (no handler, no pointer cursor).
   const archLine = archivedN
     ? `<div class="muted" style="font-size:11.5px;margin-top:10px"><a class="link" id="pArchToggle" role="button" tabindex="0">${projShowArchived ? 'hide' : 'show'} ${archivedN} archived project${archivedN === 1 ? '' : 's'}</a></div>`
-    : '';
+    : `<div class="muted" style="font-size:11.5px;margin-top:10px"><span class="pill neutral" style="cursor:default" title="No archived projects yet">0 archived</span></div>`;
   wrap.innerHTML = grid + archLine;
   wrap.querySelectorAll('.card.clickable[data-id]').forEach(c => c.onclick = () => { projSel = c.dataset.id; renderProjectDetail(projSel); });
   const at = $('#pArchToggle');
@@ -92,6 +95,21 @@ function paintCards() {
   }
 }
 
+// Compact pairing summary badge for a project tile. Returns '' when there's
+// nothing to show so the tile degrades cleanly on the older response shape.
+function pairPill(s) {
+  if (!s || typeof s !== 'object') return '';
+  const bits = [];
+  if (s.complete) bits.push(`${s.complete} ✓`);
+  if (s.pdfOnly) bits.push(`${s.pdfOnly} pdf-only`);
+  if (s.csvOnly) bits.push(`${s.csvOnly} csv-only`);
+  let html = bits.length
+    ? `<span class="pill neutral" title="PDF↔CSV pairing: ${esc(bits.join(' · '))}">⛓ ${esc(bits.join(' · '))}</span>`
+    : '';
+  if (s.dups) html += `<span class="pill err" title="${s.dups} order${s.dups === 1 ? '' : 's'} with 2+ PDFs claiming the same id — needs review">⚠ ${s.dups} dup${s.dups === 1 ? '' : 's'}</span>`;
+  return html;
+}
+
 function projCard(p) {
   const claude = p.kind === 'claude';
   const runs = `${p.runCount || 0} run${p.runCount === 1 ? '' : 's'}`;
@@ -100,9 +118,13 @@ function projCard(p) {
     ? `<div class="pcard-cwd">${esc(p.cwd || '')}</div>`
     : (p.description ? `<div class="pcard-desc">${esc(p.description)}</div>` : '<div class="pcard-desc empty">No description</div>');
   const arch = p.archived ? '<span class="pill warn">archived</span>' : '';
+  // PDF↔CSV pairing badge — server sends p.pairs only for standard projects with
+  // a workable file count (see lib/projects.js shape()); absent for claude-kind,
+  // empty, or oversized folders, so guard and render nothing when it's missing.
+  const pairBadge = pairPill(p.pairs);
   const pills = claude
     ? `${arch}<span class="pill accent">Claude Code</span><span class="pill neutral">${p.sessionCount} session${p.sessionCount === 1 ? '' : 's'}</span>`
-    : `${arch}<span class="pill neutral">${p.fileCount} file${p.fileCount === 1 ? '' : 's'}</span><span class="pill neutral">${runs}</span>${p.instructions ? '<span class="pill ok">instructions</span>' : '<span class="pill warn">no instructions</span>'}`;
+    : `${arch}<span class="pill neutral">${p.fileCount} file${p.fileCount === 1 ? '' : 's'}</span><span class="pill neutral">${runs}</span>${pairBadge}${p.instructions ? '<span class="pill ok">instructions</span>' : '<span class="pill warn">no instructions</span>'}`;
   return `<div class="card clickable${p.archived ? ' pcard-archived' : ''}" data-id="${esc(p.id)}">
     <div class="pcard-name">${esc(p.name)}</div>
     ${desc}

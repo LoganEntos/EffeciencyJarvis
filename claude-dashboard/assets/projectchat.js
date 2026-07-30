@@ -204,6 +204,7 @@
     const feed = $('#pchatConv');
     if (feed && S.log.length === 0) feed.innerHTML = '';
     ta.value = ''; ta.style.height = 'auto'; S.buf = '';
+    savePref('draft', ''); // committed to a run — drop the saved draft
     convAppend('jmsg user', () => jmsgHtml('user', esc(prompt)));
     S.bubbleEntry = addAssistantBubble('thinking…');
     if (btn) btn.disabled = true;
@@ -258,8 +259,14 @@
   function wire() {
     const ta = $('#pchatIn');
     if (ta) {
-      ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
+      // Restore the unsent compose buffer for THIS project so switching away and
+      // back (or a remount) doesn't lose a half-typed prompt. Saved per-project,
+      // cleared on a successful send.
+      try { const d = localStorage.getItem(lsKey(S.project.id, 'draft')); if (d) ta.value = d; } catch {}
+      const autosize = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
+      ta.oninput = () => { autosize(); savePref('draft', ta.value); };
       ta.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+      if (ta.value) autosize();
     }
     const sb = $('#pchatSend'); if (sb) sb.onclick = send;
     const nb = $('#pchatNew'); if (nb) nb.onclick = newChat;

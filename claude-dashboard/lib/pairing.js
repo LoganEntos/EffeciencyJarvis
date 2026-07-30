@@ -106,7 +106,11 @@ function pickAuthoritative(orderId, pdfs, manifestMap) {
     return { name: sorted[0].name, note: `multi-part PI set (${sorted.map(p => p.part).join(', ')}); ${rest.map(r => r.name).join(', ')} noted as additional part(s)` };
   }
 
-  return { error: `${pdfs.length} PDFs for order ${orderId} with no clear authority (${pdfs.map(p => `${p.name} [${p.kind}${p.part ? ', ' + p.part : ''}]`).join('; ')})` };
+  // Genuinely ambiguous: 2+ PDFs for one order that aren't resolved by a
+  // manifest, a single signed PI, or a valid multi-part set. These are real
+  // duplicates — the caller must not silently pick one and pair it to the
+  // CSV, so flag dup:true and let pairProject() surface it on the row.
+  return { error: `${pdfs.length} PDFs for order ${orderId} with no clear authority (${pdfs.map(p => `${p.name} [${p.kind}${p.part ? ', ' + p.part : ''}]`).join('; ')})`, dup: true };
 }
 
 function pairProject(slug) {
@@ -146,7 +150,7 @@ function pairProject(slug) {
 
   const orderList = Object.keys(orders).sort().map(orderId => {
     const { pdfs, csvs } = orders[orderId];
-    let state, authoritativePdf = null, note = '';
+    let state, authoritativePdf = null, note = '', dup = false, duplicates;
     if (csvs.length > 1) {
       state = 'review';
       note = `multiple CSVs for order ${orderId}: ${csvs.join(', ')}`;
@@ -154,13 +158,36 @@ function pairProject(slug) {
       state = 'csv-only';
     } else {
       const picked = pickAuthoritative(orderId, pdfs, manifestMap);
-      if (picked.error) { state = 'review'; note = picked.error; }
-      else { authoritativePdf = picked.name; note = picked.note || ''; state = csvs.length ? 'complete' : 'pdf-only'; }
+      if (picked.error) {
+        state = 'review'; note = picked.error;
+        // pickAuthoritative flags genuine duplicates (2+ unresolvable PDFs for
+        // one order). Surface every contesting filename so the UI can render a
+        // review row instead of silently pairing one to the CSV.
+        if (picked.dup) { dup = true; duplicates = pdfs.map(p => p.name); }
+      } else { authoritativePdf = picked.name; note = picked.note || ''; state = csvs.length ? 'complete' : 'pdf-only'; }
     }
-    return { orderId, state, pdfs, csvs, authoritativePdf, note };
+    return { orderId, state, pdfs, csvs, authoritativePdf, note, dup, duplicates };
   });
 
   return { slug, dir: path.join(INBOX, slug), orders: orderList, support, unparsed };
+}
+
+// Grid-level counts for a project tile, without shipping the whole order list.
+// BOUNDED: pairProject re-scans the folder on every call (no cache), so a caller
+// that runs this per-project on a list route must cap it — callers pass the file
+// count and skip large folders. Returns null when there are no order rows.
+function pairSummary(slug) {
+  const { orders } = pairProject(slug);
+  if (!orders.length) return null;
+  const s = { complete: 0, pdfOnly: 0, csvOnly: 0, review: 0, dups: 0 };
+  for (const o of orders) {
+    if (o.state === 'complete') s.complete++;
+    else if (o.state === 'pdf-only') s.pdfOnly++;
+    else if (o.state === 'csv-only') s.csvOnly++;
+    else if (o.state === 'review') s.review++;
+    if (o.dup) s.dups++;
+  }
+  return s;
 }
 
 async function handle(req, res, url) {
@@ -175,4 +202,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, pairProject };
+module.exports = { handle, pairProject, pairSummary };
