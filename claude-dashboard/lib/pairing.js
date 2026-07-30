@@ -1,10 +1,18 @@
 /*
  * PDF <-> CSV order pairing for a project's inbox folder (VPP-style historical
  * imports: order-<id>.csv line-item exports paired against their source PI /
- * commercial-invoice PDFs). Read-only, no persistent state — every call
- * re-scans the folder. This module reads FILENAMES only (and, optionally,
- * manifest.csv's own text) — it never opens a PDF or parses business data out
- * of one, per the hub's "no client/business data" rule.
+ * commercial-invoice PDFs). The scan itself is read-only, stateless — every
+ * call re-scans the folder from filenames only (never opens a PDF or parses
+ * business data out of one, per the hub's "no client/business data" rule).
+ *
+ * One deliberate exception: a HUMAN DECISION overlay (skip/flag/assign a
+ * note on an order — architect proposal 2026-07-30, "Option A: sidecar
+ * overlay"). The scan can't know an order is intentionally skipped or who's
+ * chasing it down, and that judgment must survive a re-scan/SharePoint
+ * re-pull. Persisted as `<slug>/.decisions.json`, a dotfile sibling to
+ * manifest.csv — already excluded from the unparsed list by isSupport()
+ * below (the `.json` clause), and never touched by sharepoint.js pull()
+ * (which only ever writes the one named file it downloads).
  */
 'use strict';
 const fs = require('fs');
@@ -32,6 +40,41 @@ function safeSlug(raw) {
   if (/[\\/]/.test(s) || s.includes('..') || s.startsWith('.')) return null;
   if (!/^[A-Za-z0-9 ._()\-\[\]]+$/.test(s)) return null;
   return s;
+}
+
+// ---- human decision overlay (skip/flag/assign, survives re-scans) --------
+const DECISION_KINDS = ['skip', 'flag', 'assign'];
+const decisionsFile = slug => path.join(INBOX, slug, '.decisions.json');
+
+function loadDecisions(slug) {
+  const d = U.safeJson(decisionsFile(slug));
+  return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
+}
+
+// decision === null clears any existing entry for that order. orderId isn't
+// filesystem-derived here (it's a JSON object key) but IS used as a raw
+// object key, so __proto__/constructor/prototype are rejected — writing
+// those would silently reassign map's prototype instead of adding an own
+// property, making the save a no-op that still reports ok:true.
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+function saveDecision(slug, orderId, decision, note, assignee) {
+  if (!orderId || UNSAFE_KEYS.has(orderId)) return { error: 'orderId required' };
+  if (decision !== null && !DECISION_KINDS.includes(decision)) return { error: 'bad decision kind' };
+  const map = loadDecisions(slug);
+  if (decision === null) delete map[orderId];
+  else map[orderId] = { decision, note: (note || '').toString().slice(0, 500), assignee: (assignee || '').toString().slice(0, 100), at: new Date().toISOString() };
+  // tmp + rename (not a direct writeFileSync) — same pattern as tasks.js/
+  // settings.js/projects.js — so a crash or AV lock mid-write can never leave
+  // .decisions.json truncated. A torn file would JSON.parse-fail on the next
+  // load, loadDecisions() would silently fall back to {}, and the next save
+  // would then permanently discard every other order's decision in this
+  // project — exactly the "must survive a re-scan" guarantee this exists for.
+  try {
+    const file = decisionsFile(slug), tmp = file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(map, null, 2));
+    fs.renameSync(tmp, file);
+  } catch (e) { return { error: e.message }; }
+  return { ok: true, record: map[orderId] || null };
 }
 
 function isSupport(name) {
@@ -169,6 +212,16 @@ function pairProject(slug) {
     return { orderId, state, pdfs, csvs, authoritativePdf, note, dup, duplicates };
   });
 
+  // Overlay human decisions last, ON TOP of the computed state — a decision
+  // never changes what the scan found (pdfs/csvs/authoritativePdf stay
+  // accurate), it just annotates the row so the UI can show/filter it
+  // distinctly and it survives the next re-scan untouched.
+  const decisions = loadDecisions(slug);
+  for (const o of orderList) {
+    const dec = decisions[o.orderId];
+    if (dec) { o.decision = dec.decision; o.decisionNote = dec.note; o.decisionAssignee = dec.assignee; o.decisionAt = dec.at; }
+  }
+
   return { slug, dir: path.join(INBOX, slug), orders: orderList, support, unparsed };
 }
 
@@ -197,6 +250,18 @@ async function handle(req, res, url) {
     let st; try { st = fs.statSync(path.join(INBOX, slug)); } catch { st = null; }
     if (!st || !st.isDirectory()) { U.sendJson(res, { error: 'not found' }, 404); return true; }
     U.sendJson(res, pairProject(slug));
+    return true;
+  }
+  if (url.pathname === '/api/projects/pairs/decision' && req.method === 'POST') {
+    let b = {}; try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
+    const slug = safeSlug((b.slug || '').toString());
+    if (!slug) { U.sendJson(res, { error: 'invalid slug' }, 404); return true; }
+    let st; try { st = fs.statSync(path.join(INBOX, slug)); } catch { st = null; }
+    if (!st || !st.isDirectory()) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    const orderId = (b.orderId || '').toString().trim().slice(0, 60);
+    const decision = b.decision === null ? null : (b.decision || '').toString();
+    const r = saveDecision(slug, orderId, decision, b.note, b.assignee);
+    U.sendJson(res, r, r.error ? 400 : 200);
     return true;
   }
   return false;

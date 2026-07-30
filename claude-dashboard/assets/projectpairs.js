@@ -11,6 +11,11 @@
 
 const PP_RANK = { review: 0, 'pdf-only': 1, 'csv-only': 2, complete: 3 };
 const PP_TONE = { complete: 'ok', 'pdf-only': 'warn', 'csv-only': 'cool', review: 'err' };
+// Human decision overlay (architect proposal 2026-07-30, Option A — sidecar
+// manifest, server side: lib/pairing.js .decisions.json). A decision never
+// changes the computed state; it's an annotation that survives a re-scan.
+const PP_DEC_TONE = { skip: 'neutral', flag: 'err', assign: 'accent' };
+const PP_DEC_LABEL = { skip: '⊘ skip', flag: '⚑ flag', assign: '◐ assign' };
 
 // Entry point — loads (or reloads) the panel into containerEl.
 function renderPairingPanel(slug, containerEl) {
@@ -53,7 +58,7 @@ function ppRender(slug, containerEl, d) {
   const dir = typeof d.dir === 'string' ? d.dir : '';
   const table = orders.length
     ? `<table class="hlth-table"><thead><tr><th>Order</th><th>State</th><th>PDF</th><th>CSV</th><th>Note</th><th></th></tr></thead>
-      <tbody>${orders.map(o => ppRow(slug, o, dir)).join('')}</tbody></table>`
+      <tbody>${orders.map(o => ppRow(slug, o, dir) + ppDecideFormRow(slug, o)).join('')}</tbody></table>`
     : '<div class="muted">No orders matched yet.</div>';
   containerEl.innerHTML = ppShell(
     `<div class="muted" style="font-size:11.5px;margin-bottom:8px">${ppCounts(orders)}</div>${table}${ppExtraLine(support, unparsed)}`
@@ -109,14 +114,48 @@ function ppRow(slug, o, dir) {
   const dupBadge = o.dup
     ? `<span class="pill err" style="margin-left:4px" title="${esc((o.duplicates || []).join(', '))}">⚠ ${(o.duplicates || o.pdfs || []).length} PDFs claim this order</span>`
     : '';
+  // Decision badge — a human judgment call (skip/flag/assign) that persisted
+  // across the last re-scan (lib/pairing.js overlays it onto the computed
+  // row). Note/assignee shown as hover-title so the row stays compact.
+  const decBadge = o.decision
+    ? `<span class="pill ${PP_DEC_TONE[o.decision] || 'neutral'}" style="margin-left:4px" title="${esc([o.decisionAssignee ? 'assignee: ' + o.decisionAssignee : '', o.decisionNote || ''].filter(Boolean).join(' — '))}">${PP_DEC_LABEL[o.decision] || o.decision}${o.decisionAssignee ? ': ' + esc(o.decisionAssignee) : ''}</span>`
+    : '';
+  const decideBtn = `<button type="button" class="ghost pp-decide-toggle" data-order="${esc(o.orderId)}"
+      aria-expanded="false" aria-controls="ppdec-${esc(o.orderId)}" style="padding:4px 10px;font-size:11px;white-space:nowrap">${o.decision ? 'edit' : 'decide'}</button>`;
   return `<tr${o.dup ? ' class="pp-dup"' : ''}>
     <td class="mono">${esc(o.orderId)}</td>
-    <td><span class="pill ${tone}">${esc(o.state)}</span>${dupBadge}</td>
+    <td><span class="pill ${tone}">${esc(o.state)}</span>${dupBadge}${decBadge}</td>
     <td>${pdfs}</td>
     <td>${csvs}</td>
     <td class="muted" style="font-size:11.5px">${o.note ? esc(o.note) : ''}</td>
-    <td style="text-align:right">${convertBtn}</td>
+    <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">${convertBtn}${decideBtn}</td>
   </tr>`;
+}
+
+// Hidden-by-default inline form row (toggled by the "decide"/"edit" button in
+// ppRow) — set/change/clear a decision for one order. Mirrors the plain
+// input+button convention used for project notes (projectdetail.js #pNote),
+// not a modal — this codebase has no modal component and one isn't worth
+// building for a 3-field form.
+function ppDecideFormRow(slug, o) {
+  const cur = o.decision || '';
+  return `<tr class="pp-decide-row hidden" id="ppdec-${esc(o.orderId)}"><td colspan="6">
+    <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center;padding:6px 0">
+      <label class="muted" style="font-size:11px" for="ppdk-${esc(o.orderId)}">Decision</label>
+      <select id="ppdk-${esc(o.orderId)}" style="width:auto;min-width:110px">
+        <option value="skip"${cur === 'skip' ? ' selected' : ''}>⊘ skip</option>
+        <option value="flag"${cur === 'flag' ? ' selected' : ''}>⚑ flag</option>
+        <option value="assign"${cur === 'assign' ? ' selected' : ''}>◐ assign</option>
+      </select>
+      <input class="search pp-dec-assignee" id="ppda-${esc(o.orderId)}" placeholder="assignee" value="${esc(o.decisionAssignee || '')}"
+        style="width:auto;max-width:140px;margin:0;${cur === 'assign' ? '' : 'display:none'}">
+      <input class="search" id="ppdn-${esc(o.orderId)}" placeholder="note (optional)" value="${esc(o.decisionNote || '')}" style="width:auto;flex:1;min-width:160px;margin:0">
+      <button type="button" class="ghost pp-decide-save" data-order="${esc(o.orderId)}" style="padding:4px 10px;font-size:11px">Save</button>
+      ${o.decision ? `<button type="button" class="ghost pp-decide-clear" data-order="${esc(o.orderId)}" style="padding:4px 10px;font-size:11px">Clear</button>` : ''}
+      <button type="button" class="ghost pp-decide-cancel" data-order="${esc(o.orderId)}" style="padding:4px 10px;font-size:11px">Cancel</button>
+      <span class="muted pp-decide-status" id="ppds-${esc(o.orderId)}" style="font-size:11px"></span>
+    </div>
+  </td></tr>`;
 }
 
 // support/unparsed: one muted summary line, full names on title-hover — not
@@ -141,5 +180,60 @@ function ppWireRows(slug, containerEl) {
     const paths = (b.dataset.pdfs || '').split('|').filter(Boolean);
     if (!paths.length || typeof prefillRun !== 'function') return;
     prefillRun(`Process the PDF${paths.length > 1 ? 's' : ''} at ${paths.join(', ')} — convert to CSV, matching the paired commercial invoice format if present — `);
+  });
+  ppWireDecide(slug, containerEl);
+}
+
+// Skip/flag/assign a note on an order (POST /api/projects/pairs/decision,
+// lib/pairing.js) — persists to <slug>/.decisions.json server-side, survives
+// the next re-scan/SharePoint pull. One inline form per row, toggled open.
+function ppWireDecide(slug, containerEl) {
+  const closeAll = except => containerEl.querySelectorAll('.pp-decide-row').forEach(r => {
+    if (r.id !== except) r.classList.add('hidden');
+  });
+  containerEl.querySelectorAll('.pp-decide-toggle').forEach(b => b.onclick = () => {
+    const row = containerEl.querySelector('#ppdec-' + CSS.escape(b.dataset.order));
+    if (!row) return;
+    const opening = row.classList.contains('hidden');
+    closeAll(opening ? row.id : null);
+    row.classList.toggle('hidden', !opening);
+    b.setAttribute('aria-expanded', String(opening));
+    if (opening) { const sel = row.querySelector('select'); if (sel) sel.focus(); }
+  });
+  containerEl.querySelectorAll('.pp-decide-cancel').forEach(b => b.onclick = () => {
+    const row = containerEl.querySelector('#ppdec-' + CSS.escape(b.dataset.order));
+    if (row) row.classList.add('hidden');
+  });
+  // Kind select toggles the assignee field's visibility live, no round-trip.
+  containerEl.querySelectorAll('.pp-decide-row select').forEach(sel => sel.onchange = () => {
+    const row = sel.closest('.pp-decide-row');
+    const af = row && row.querySelector('.pp-dec-assignee');
+    if (af) af.style.display = sel.value === 'assign' ? '' : 'none';
+  });
+  containerEl.querySelectorAll('.pp-decide-save').forEach(b => b.onclick = async () => {
+    const orderId = b.dataset.order;
+    const sel = containerEl.querySelector('#ppdk-' + CSS.escape(orderId));
+    const noteEl = containerEl.querySelector('#ppdn-' + CSS.escape(orderId));
+    const assEl = containerEl.querySelector('#ppda-' + CSS.escape(orderId));
+    const statusEl = containerEl.querySelector('#ppds-' + CSS.escape(orderId));
+    if (!sel) return;
+    b.disabled = true; if (statusEl) statusEl.textContent = 'saving…';
+    try {
+      const r = await api('/api/projects/pairs/decision', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, orderId, decision: sel.value, note: noteEl ? noteEl.value : '', assignee: assEl ? assEl.value : '' }) });
+      if (r && r.error) { if (statusEl) statusEl.textContent = '✗ ' + r.error; b.disabled = false; return; }
+      renderPairingPanel(slug, containerEl); // full re-render from the server's overlaid state
+    } catch (e) { if (statusEl) statusEl.textContent = '✗ ' + (e.message || 'save failed'); b.disabled = false; }
+  });
+  containerEl.querySelectorAll('.pp-decide-clear').forEach(b => b.onclick = async () => {
+    const orderId = b.dataset.order;
+    const statusEl = containerEl.querySelector('#ppds-' + CSS.escape(orderId));
+    b.disabled = true; if (statusEl) statusEl.textContent = 'clearing…';
+    try {
+      const r = await api('/api/projects/pairs/decision', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, orderId, decision: null }) });
+      if (r && r.error) { if (statusEl) statusEl.textContent = '✗ ' + r.error; b.disabled = false; return; }
+      renderPairingPanel(slug, containerEl);
+    } catch (e) { if (statusEl) statusEl.textContent = '✗ ' + (e.message || 'clear failed'); b.disabled = false; }
   });
 }
