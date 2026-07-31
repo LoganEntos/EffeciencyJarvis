@@ -4,6 +4,13 @@
    esc, rel, load, goTab) at runtime — loads right after app.js. */
 'use strict';
 
+// Module-level (not per-render): resummarizing costs a real Claude debrief
+// run, so the in-flight guard must survive renderers.sessions() re-running
+// (tab refresh, or a re-render firing while an old request is still
+// outstanding) — a Set recreated inside the render closure would reset to
+// empty on every re-render and stop guarding anything but the very next click.
+const resumInFlight = new Set();
+
 renderers.agents = async function () {
   let hermesOn = false;
   try { hermesOn = (await api('/api/settings')).hermesEnabled === true; } catch {}
@@ -84,13 +91,41 @@ renderers.sessions = async function () {
   const missing = list.filter(s => !(summaries[s.id] && summaries[s.id].summary)).map(s => s.id);
   if (missing.length) buildSummaries(missing.slice(0, 12), false);
 
-  async function buildSummaries(ids, spin) {
-    ids.forEach(id => { const el = $(`.sessSum[data-id="${cssq(id)}"]`); if (el) { el.textContent = 'Summarizing…'; el.style.fontStyle = 'italic'; el.style.opacity = '.6'; } });
+  async function buildSummaries(ids, force) {
+    // In-flight guard lives in buildSummaries itself (module-level
+    // resumInFlight, not a per-render Set — see its declaration), so both
+    // call sites above (a manual click AND the zero-click auto-fill) are
+    // covered uniformly, and — critically — it survives renderers.sessions()
+    // re-running (e.g. the header's Refresh button): re-summarizing costs a
+    // real Claude debrief, so a stale render firing a second request for an
+    // id already building elsewhere must never happen, not just within one
+    // render's lifetime.
+    const fresh = ids.filter(id => !resumInFlight.has(id));
+    if (!fresh.length) return;
+    fresh.forEach(id => {
+      resumInFlight.add(id);
+      const btn = $(`.resumBtn[data-id="${cssq(id)}"]`);
+      if (btn) btn.disabled = true;
+      const el = $(`.sessSum[data-id="${cssq(id)}"]`); if (el) { el.textContent = 'Summarizing…'; el.style.fontStyle = 'italic'; el.style.opacity = '.6'; }
+    });
     let r;
-    try { r = await api('/api/session-summaries/build', { method: 'POST', body: JSON.stringify({ ids }) }); }
-    catch { ids.forEach(id => { const el = $(`.sessSum[data-id="${cssq(id)}"]`); if (el) el.textContent = '(summary unavailable)'; }); return; }
+    // force: true for an explicit "↻ Re-summarize" click, bypassing the
+    // server's cache-if-size-unchanged check (lib/sessionsum.js) — without
+    // this the button silently redisplayed the identical cached summary and
+    // looked like it worked while never actually re-running anything.
+    try { r = await api('/api/session-summaries/build', { method: 'POST', body: JSON.stringify({ ids: fresh, force: !!force }) }); }
+    catch {
+      fresh.forEach(id => { const el = $(`.sessSum[data-id="${cssq(id)}"]`); if (el) el.textContent = '(summary unavailable)'; });
+    } finally {
+      fresh.forEach(id => {
+        resumInFlight.delete(id);
+        const btn = $(`.resumBtn[data-id="${cssq(id)}"]`);
+        if (btn) btn.disabled = false;
+      });
+    }
+    if (!r) return;
     summaries = (r && r.summaries) || summaries;
-    ids.forEach(id => {
+    fresh.forEach(id => {
       const el = $(`.sessSum[data-id="${cssq(id)}"]`);
       if (!el) return;
       const c = summaries[id];

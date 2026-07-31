@@ -6,13 +6,16 @@
  * pays to re-summarize an unchanged session.
  *
  *   GET  /api/session-summaries          -> { summaries: { id: {summary,size,at} } }
- *   POST /api/session-summaries/build    { ids } -> summarize those ids, return map
+ *   POST /api/session-summaries/build    { ids, force? } -> summarize those ids, return map
  *
  * Two fill paths:
  *   - low-frequency background sweep (startSweep) warms the cache for IDLE
  *     sessions only, so we never burn tokens re-summarizing the live one on a timer;
- *   - the Sessions tab explicitly POSTs the ids currently missing a summary,
- *     which forces a build (including the active session's state-so-far).
+ *   - the Sessions tab explicitly POSTs the ids currently missing a summary
+ *     (zero-click auto-fill, force omitted — skips ids already cached at the
+ *     current size), or a single id with force:true for an explicit
+ *     "↻ Re-summarize" click, which bypasses the cache-if-size-unchanged
+ *     check in runSweep()'s filter below.
  *
  * Spawn shape mirrors lib/distill.js: argv array (no shell), stdin ignored,
  * Haiku model, headless -p so the child can only ever emit text. Zero deps.
@@ -159,12 +162,20 @@ async function handle(req, res, url) {
     return true;
   }
   if (url.pathname === '/api/session-summaries/build' && req.method === 'POST') {
-    let ids = [];
+    let ids = [], force = false;
     try {
       const b = JSON.parse(await U.readBody(req, 16 * 1024) || '{}');
       if (Array.isArray(b.ids)) ids = b.ids.filter(x => typeof x === 'string' && /^[a-f0-9-]+$/.test(x)).slice(0, 12);
+      force = b.force === true;
     } catch {}
-    const summaries = ids.length ? await sweep({ ids, max: 12 }) : load();
+    // force bypasses runSweep()'s size-unchanged cache check — this is the
+    // "↻ Re-summarize" button's whole point (re-run the debrief even though
+    // the transcript is the same size as last time). Without it, the client
+    // was sending {ids} only, so runSweep() always took the `!c || c.size
+    // !== s.sizeKb` early-out and silently returned the cached text — the
+    // button flashed "Summarizing…" then redisplayed the identical summary,
+    // looking like it worked while never actually re-running anything.
+    const summaries = ids.length ? await sweep({ ids, max: 12, force }) : load();
     U.sendJson(res, { summaries });
     return true;
   }
