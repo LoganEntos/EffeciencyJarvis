@@ -24,7 +24,12 @@ const INBOX = path.join(DASH_DIR, 'data', 'inbox');
 
 // Extraction patterns (derived from the real VPP historical-import files —
 // see data/inbox/vpp-historical-import-test/ for the canonical examples).
-const CSV_RE = /^order-(\d+(?:-\d+)?)\.csv$/i;
+// Order id is normally numeric (invoice #) but not always -- SPL002/010763
+// (2026-07-30, a confirmed no-PI order converted from a plain invoice
+// template instead) has an alphanumeric one, so this accepts letters+digits,
+// not just digits. The optional "-<digits>" suffix (multi-PI orders like
+// 22610/22610-2) is unchanged.
+const CSV_RE = /^order-([A-Za-z0-9]+(?:-\d+)?)\.csv$/i;
 const INVOICE_RE = /invoice[\s_-]+(\d{4,6})/i;
 const SIGNED_PI_RE = /\bPI[\s_]/i;
 const SIGNED_PI_RE2 = /signed[\s_-]*PI/i;
@@ -95,14 +100,18 @@ function classifyPdf(name) {
 }
 
 // manifest.csv is a fixed-shape export (no embedded commas in the columns we
-// read), so a plain split is fine — see header: order,invoice,po,source_doc,...
+// read), so a plain split is fine. Header column naming has drifted across
+// generators -- build.js (the real, in-use one, see vpp-historical-import-test)
+// emits 'order_invoice', not the bare 'order' this originally only looked
+// for, which silently made this function return null (no manifest override
+// ever active) for every project using that script. Accept either.
 function parseManifest(dir) {
   const text = U.safeRead(path.join(dir, 'manifest.csv'));
   if (!text) return null;
   const lines = text.split(/\r?\n/).filter(l => l.trim().length);
   if (lines.length < 2) return null;
   const header = lines[0].split(',').map(h => h.trim().toLowerCase());
-  const orderIdx = header.indexOf('order');
+  const orderIdx = header.indexOf('order') !== -1 ? header.indexOf('order') : header.indexOf('order_invoice');
   const docIdx = header.indexOf('source_doc');
   if (orderIdx === -1 || docIdx === -1) return null;
   const map = {}; // orderId -> confirmed source_doc filename
@@ -165,7 +174,14 @@ function pairProject(slug) {
   const manifestByFile = {};
   if (manifestMap) for (const [orderId, doc] of Object.entries(manifestMap)) manifestByFile[doc.toLowerCase()] = orderId;
 
-  const orders = {};
+  // Object.create(null) -- orders is keyed by attacker/data-controlled ids
+  // (a CSV filename's own text, or a manifest.csv column value, now that
+  // both accept alphanumeric ids, not just digits). A plain {} lets an id
+  // like "constructor" or "toString" read the inherited Object.prototype
+  // member instead of creating a bucket, so `.csvs.push` throws and takes
+  // down the whole /api/projects/pairs response. Same class of bug the
+  // decision overlay's UNSAFE_KEYS guard (above) exists for.
+  const orders = Object.create(null);
   const bucket = id => orders[id] || (orders[id] = { pdfs: [], csvs: [] });
   const support = [];
   const unparsed = [];
@@ -181,9 +197,17 @@ function pairProject(slug) {
     }
     if (/\.pdf$/i.test(name)) {
       const info = classifyPdf(name);
-      if (info) {
-        const orderId = manifestByFile[name.toLowerCase()] || info.orderId;
-        bucket(orderId).pdfs.push({ name, kind: info.kind, part: info.part });
+      // manifest.csv is checked FIRST regardless of classifyPdf's own regex --
+      // a source doc explicitly named there (build.js's authoritative record
+      // of what it actually converted) must bucket correctly even when its
+      // filename doesn't look like the usual "Invoice <digits>" pattern (e.g.
+      // "...June Re-Order.pdf" has no "Invoice" in it at all, and an IV-style
+      // commercial-invoice filename for an alphanumeric order id like SPL002
+      // doesn't match INVOICE_RE's digits-only capture either).
+      const manifestOrderId = manifestByFile[name.toLowerCase()];
+      if (info || manifestOrderId) {
+        const orderId = manifestOrderId || info.orderId;
+        bucket(orderId).pdfs.push({ name, kind: info ? info.kind : 'unknown', part: info ? info.part : null });
         continue;
       }
       unparsed.push(name); continue;
