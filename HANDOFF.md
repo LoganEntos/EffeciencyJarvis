@@ -131,6 +131,26 @@ unprompted.
 
 ## Latest work shipped
 
+**2026-07-31 — Jarvis-orchestrator Phases 0-2 + gap G shipped, plus a long
+tail of 19-tab UX-sweep bug fixes (13 commits).** Full detail, exact commit
+list, and the operating-mode lesson from this session (don't wait for
+"continue" 20 times on a genuinely safe backlog — keep moving; DO stop for
+destructive actions, client data, or a decision only the user can make):
+`docs/handoffs/orchestrator-shipped-plus-sweep-fixes-2026-07-31.md`. In
+brief: the Escalate-to-Run-tab hazard is closed client+server; SharePoint
+reconciliation (`lib/reconcile.js`, `GET /api/projects/reconcile`) is live —
+the literal mechanism for "track conversion completion against SharePoint";
+autopilot Phase 2 (a second, still-off-by-default queue source reading
+`data/todos/projects.md`) shipped provably inert; the api()-error-shape bug
+is fixed on the four tabs it was actually filed against; and eight further
+small, real bugs (SharePoint Graphify double-click cost risk, Sessions
+re-summarize silent no-op, Memory tab's silent 100-item cap, Live tab
+freezing forever on a first-load failure, three missing delete
+confirmations) are fixed and code-reviewed. Every fix in that session had at
+least one real defect caught by an independent review pass on the first
+attempt — read that handoff's §2 "Bugs review actually caught" before
+skipping the review step to move faster.
+
 **2026-07-28 — contamination cleanup + Health tab.** (1) Quarantined a 15-file
 foreign "Personal Jarvis"/crypto-trading package out of `data/inbox/` into a
 gitignored `_quarantine-personal-jarvis-package/`; repo-wide re-scan clean;
@@ -170,6 +190,21 @@ Backlog fully burned; size guard clear; smoke 100-check green.
 Everything older is archived verbatim in `docs/archive/handoff-shipped-log-2026-07.md` and `docs/archive/roadmap-2026-07-19-full.md`.
 
 ## What's next
+
+**2026-07-31 update — read this pointer first, the VPP note below it is now
+partly superseded.** Current actual blockers, none of them code work:
+(1) VPP Step 9 needs the user to pick the authoritative source PDF for two
+specific ambiguous orders (22359, `SPL002`/010763) before Tier 1 can finish,
+and an explicit go-ahead before Tier 2/3 (47 more orders) starts; (2) the
+Projects pairing panel's destructive cleanup control ("archive/delete-all")
+needs the user to specify exactly what it should delete before it's built;
+(3) the second planned opus agent needs the user to name its role. None of
+these are guessable — see `docs/handoffs/orchestrator-shipped-plus-sweep-fixes-2026-07-31.md`
+§3 for the full list of open items and why each is blocked. If none of
+those move, the next safe, ready-to-pick-up work is continuing the same
+19-tab UX-sweep bug fixes (Files/Skills/Commands/Assets/Sources/Tools/Config
+tabs still have similar small, safe, no-invention bugs filed in their
+`data/todos/*.md`) — same shape as everything already fixed this session.
 
 **→ PRIMARY WORKSTREAM (user directive 2026-07-28): the VPP front-end
 workflow.** Make the hub reliable for high-volume VPP PDF→CSV order processing —
