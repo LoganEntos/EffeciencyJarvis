@@ -79,7 +79,10 @@ function fileCountFor(slug) {
 function shape(p, stats) {
   const s = stats || {};
   const claude = p.kind === 'claude';
-  const fileCount = claude ? 0 : fileCountFor(p.slug);
+  // Claude-kind projects use the same data/inbox/<slug>/ convention as every other
+  // project for attached files (upload/SharePoint/pairing all work on it normally) —
+  // only the pairing summary below is gated on kind, not the raw count.
+  const fileCount = fileCountFor(p.slug);
   // Grid-level PDF↔CSV pairing summary for the tile badge. BOUNDED: pairSummary
   // re-scans the folder (no cache), so only for standard projects with a
   // workable file count — skip claude workspaces and anything over 300 files so

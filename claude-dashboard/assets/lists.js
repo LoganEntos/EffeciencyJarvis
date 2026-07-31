@@ -87,11 +87,12 @@ renderers.sessions = async function () {
 const cssq = s => (s || '').replace(/["\\]/g, '\\$&');
 
 // R2: bucket a library item — agents by model tier, skills/commands by first letter.
-const AGENT_TIER_ORDER = { 'Haiku · cheap': 0, 'Sonnet · standard': 1, 'Opus · heavy': 2, 'Other': 3 };
+const AGENT_TIER_ORDER = { 'Fable · top': 0, 'Haiku · cheap': 1, 'Sonnet · standard': 2, 'Opus · heavy': 3, 'Other': 4 };
 function libGroup(type, d) {
   if (type === 'agents') {
     const m = (d.model || '').toLowerCase();
-    if (/opus|fable/.test(m)) return 'Opus · heavy';
+    if (/fable/.test(m)) return 'Fable · top';
+    if (/opus/.test(m)) return 'Opus · heavy';
     if (/sonnet/.test(m)) return 'Sonnet · standard';
     if (/haiku|flash|cheap/.test(m)) return 'Haiku · cheap';
     return 'Other';
@@ -133,7 +134,7 @@ async function listView(sel, title, endpoint, type, extraHtml = '') {
         <div class="lib-gbody"${open ? '' : ' hidden'}>${items.map(d => `<div class="row clickable" data-i="${data.indexOf(d)}">
           <div class="flex" style="justify-content:space-between"><span class="name mono">${esc(d.name)}${type === 'agents' && d.builtin ? ' <span class="muted" style="font-weight:400;font-size:11px">· built-in</span>' : ''}</span>
             <span>${type === 'agents' ? `<span class="pill ${d.active ? 'ok' : ''}" title="${d.usageCount || 0} dispatch${d.usageCount === 1 ? '' : 'es'} in run history${d.lastUsed ? ' · last ' + esc(d.lastUsed.slice(0, 10)) : ''}">${d.active ? '● active' : '○ dormant'}</span>` : ''}
-            ${d.model ? `<span class="pill ${/haiku|flash|cheap/i.test(d.model) ? 'ok' : /opus|fable/i.test(d.model) ? 'err' : 'neutral'}">${esc(d.model)}${type === 'agents' ? (/opus/i.test(d.model) ? ' · heavy' : /haiku/i.test(d.model) ? ' · cheap' : '') : ''}</span>` : ''}</span></div>
+            ${d.model ? `<span class="pill ${/haiku|flash|cheap/i.test(d.model) ? 'ok' : /opus|fable/i.test(d.model) ? 'err' : 'neutral'}">${esc(d.model)}${type === 'agents' ? (/fable/i.test(d.model) ? ' · top' : /opus/i.test(d.model) ? ' · heavy' : /haiku/i.test(d.model) ? ' · cheap' : '') : ''}</span>` : ''}</span></div>
           ${d.description ? `<div class="desc">${esc(d.description)}</div>` : ''}</div>`).join('')}</div></div>`;
     }).join('') || '<div class="muted">No matches.</div>';
     listEl.querySelectorAll('.row.clickable').forEach(r => r.onclick = () => {

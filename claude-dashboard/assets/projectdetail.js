@@ -43,7 +43,8 @@ async function renderProjectDetail(id) {
       <div class="presetrow">${P_PRESETS.map((x, i) => `<span class="presetchip" data-preset="${i}">+ ${esc(x.label)}</span>`).join('')}</div>
       <textarea id="pInstr" style="min-height:120px;margin:8px 0 0;resize:vertical" placeholder="e.g. You are working on the Jarvis persona. Prefer the donor patterns in the attached files. Keep replies short…">${esc(p.instructions)}</textarea>
       <div class="flex" style="margin-top:8px"><button id="pSave" class="ghost">Save instructions</button>
-        <button id="pChat" class="ghost" style="margin-left:auto">⤴ Escalate to Run tab</button></div>
+        ${claude ? '' : '<button id="pChat" class="ghost" style="margin-left:auto">⤴ Escalate to Run tab</button>'}</div>
+      ${claude ? '<div class="muted" style="margin-top:6px;font-size:11.5px">No Escalate button for imported workspace projects — binding one to the Run tab would inject its files/instructions into a run that still executes in the hub\'s own directory. Use the Run tab unbound, or the terminal, instead.</div>' : ''}
     </div>`;
 
   const secFiles = `
@@ -195,7 +196,12 @@ async function renderProjectDetail(id) {
     document.querySelectorAll('nav a').forEach(a => a.addEventListener('click', () => { if (projInstrFlush) projInstrFlush(); }));
     window.addEventListener('beforeunload', e => { if (projInstrDirty) { e.preventDefault(); e.returnValue = ''; } });
   }
-  $('#pChat').onclick = () => { if (typeof bindRunProject === 'function') bindRunProject({ id: p.id, name: p.name }); if (typeof prefillRun === 'function') prefillRun(''); };
+  // Escalate button is never rendered for claude-kind projects (secInstr above) —
+  // binding one into the Run tab would inject its files/instructions into a run
+  // that still executes in the hub's own directory, the same hazard the inline
+  // chat panel is disabled to prevent (see secChat).
+  const pChatBtn = $('#pChat');
+  if (pChatBtn) pChatBtn.onclick = () => { if (typeof bindRunProject === 'function') bindRunProject({ id: p.id, name: p.name }); if (typeof prefillRun === 'function') prefillRun(''); };
 
   // inline chat panel — instructions/file-manifest/memory above ride every
   // message via projectSlug (file contents ride only when attached). Never

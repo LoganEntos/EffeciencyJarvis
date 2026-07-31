@@ -137,13 +137,25 @@ cost" against — same reasoning as gap F above.
 
 ## Build order (each phase independently shippable + browser-verified before the next)
 
-**Phase 0 — already queued, ships regardless.** The delegation-visibility
-scoreboard (gap E) — cheap, uses data that already exists on disk, and every
-later phase is easier to evaluate once it's live.
+**Phase 0 — SHIPPED 2026-07-31.** Delegation-visibility scoreboard (gap E).
+Per-run view already existed (`lib/delegations.js` + `assets/delegations.js`,
+mounted in the run transcript). The cross-run aggregate (`listRecent()`'s
+`byType` breakdown) existed server-side but had no UI consumer — added
+`renderDelegScoreboard()`/`mountJarvisDelegScoreboard()`, a collapsed-by-
+default strip in the Jarvis tab. Verified live on :5758 (real data), smoke
+script green, code-reviewed. No browser click-test — no browser automation
+tool available this session; verified via API-level checks instead.
 
-**Phase 1 — plumbing (gap B).** Thread `projectId` through
-`tasks.js`. Zero behavior change on its own — an inert field until phase 2
-uses it. Low risk, one file + call sites, mechanical.
+**Phase 1 — SHIPPED 2026-07-31 (plumbing, gap B).** `projectId` now threads
+through `tasks.js`'s `enqueue()`/`runTask()`/`runAll()` into
+`runs.startRun()`. `enqueue()` validates against `projects.get()` — an
+unknown id is silently dropped, not stored. Deliberately does NOT gate on
+project `kind` here (that hazard guard lives in `runs.js`'s `startRun()`,
+added the same session — see `data/todos/projects.md`'s Escalate-hazard
+entry). Verified live: a claude-kind projectId stores fine (kind-gating is
+dispatch-time, not storage-time), a bogus id is dropped. Still genuinely
+inert — nothing in the Tasks tab UI sets `projectId` yet; that's Phase 2+
+territory and needs its own go-ahead per the standing plan-mode discipline.
 
 **Phase 2 — second queue source (gap A).** Teach `pickNext()` to also read
 `data/todos/projects.md` as pickable items. Ships behind its **own** enable

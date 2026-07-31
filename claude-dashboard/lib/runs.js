@@ -220,7 +220,14 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   if (engine === 'claude' && projectId) {
     try {
       const pr = projects.get(projectId);
-      if (pr) {
+      // Server-side backstop: claude-kind projects (imported Claude Code workspaces)
+      // never bind here, regardless of what the client sends. A run always executes
+      // in the hub's own directory, not the imported workspace's real path, so
+      // injecting that project's instructions/manifest would silently affect the
+      // wrong repo — the same hazard the Run-tab UI no longer exposes a path to
+      // (see assets/projectdetail.js), now closed at the source instead of relying
+      // on the client never asking.
+      if (pr && pr.kind !== 'claude') {
         projectName = pr.name; projectSlug = pr.slug;
         const parts = [];
         if (pr.instructions && pr.instructions.trim()) parts.push(pr.instructions.trim());

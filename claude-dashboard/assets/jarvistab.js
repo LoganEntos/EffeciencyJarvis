@@ -445,6 +445,8 @@
     // jarvischat.js's turn counter survives a tab switch — reflect it.
     if (window.jarvisTimeline) jarvisTimeline.render(window.jarvisChat ? jarvisChat.turnCount() : 0);
 
+    if (window.jarvisDelegScoreboard) jarvisDelegScoreboard.mount();
+
     await loadPersonas();
     orbSetPersona();
     wsMeta();

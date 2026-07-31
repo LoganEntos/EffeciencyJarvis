@@ -106,3 +106,58 @@ async function renderDelegations(runId) {
   body.innerHTML = items.map(delegRowHtml).join('');
   wireDelegRows(body);
 }
+
+// ---------------------------------------------------------------------------
+// Aggregate scoreboard (Jarvis-orchestrator Phase 0 / gap E, cross-run view):
+// distinct from renderDelegations() above (per-run, mounted in the transcript)
+// — this is "is Jarvis actually delegating well" across recent history, the
+// signal the deliberation doc wanted on record before evaluating any
+// god-prompt/persona/team-hint wording change. GET /api/delegations with no
+// runId returns { items, byType } across the newest 60 run dirs.
+// Mounted into the Jarvis tab by pure DOM insertion after #jactivity (not a
+// template-string edit) so assets/jarvistab.js doesn't grow past its
+// already-flagged 430-line watch line — this file owns all the new markup.
+async function renderDelegScoreboard(body) {
+  body.innerHTML = '<div class="muted" style="padding:4px">loading…</div>';
+  let data;
+  try {
+    data = await api('/api/delegations');
+    if (data && data.error) throw new Error(data.error);
+  } catch (e) {
+    console.error('delegation scoreboard fetch failed', e);
+    body.innerHTML = `<div class="errhead">✗ Couldn't load the scoreboard.</div>
+      <button class="ghost jdelegRetry" style="margin-top:6px">Retry</button>`;
+    body.querySelector('.jdelegRetry').onclick = () => renderDelegScoreboard(body);
+    return;
+  }
+  const items = (data && Array.isArray(data.items)) ? data.items : [];
+  const byType = (data && data.byType) || {};
+  if (!items.length) {
+    body.innerHTML = '<div class="muted" style="padding:4px">No subagent dispatches in recent run history yet.</div>';
+    return;
+  }
+  const types = Object.keys(byType).sort((a, b) => byType[b].count - byType[a].count);
+  const typeRow = types.length ? `<div class="flex" style="padding:2px 0 8px">${types.map(t =>
+    `<span class="pill neutral" title="${esc(t)} across the newest 60 runs">${esc(t)} × ${byType[t].count} <span class="muted">avg ${byType[t].avgToolCalls} calls</span></span>`).join('')}</div>` : '';
+  body.innerHTML = typeRow + items.slice(0, 15).map(delegRowHtml).join('');
+  wireDelegRows(body);
+}
+
+function mountJarvisDelegScoreboard() {
+  const host = document.querySelector('#jarvis .jconv-panel .jactivity');
+  if (!host || document.getElementById('jdelegToggle')) return; // not built yet, or already mounted
+  const wrap = document.createElement('div');
+  wrap.className = 'jactivity jhair-t';
+  wrap.innerHTML = `<button class="jact-toggle" id="jdelegToggle">▸ delegation scoreboard</button>
+    <div class="jact-body hidden" id="jdelegBody"><div class="jmsg-meta" style="padding:4px">loading…</div></div>`;
+  host.after(wrap);
+  const btn = wrap.querySelector('#jdelegToggle'), body = wrap.querySelector('#jdelegBody');
+  btn.onclick = () => {
+    const opening = body.classList.contains('hidden');
+    body.classList.toggle('hidden');
+    btn.classList.toggle('open', opening);
+    btn.textContent = opening ? '▾ delegation scoreboard' : '▸ delegation scoreboard';
+    if (opening) renderDelegScoreboard(body);
+  };
+}
+window.jarvisDelegScoreboard = { mount: mountJarvisDelegScoreboard };

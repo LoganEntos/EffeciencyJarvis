@@ -10,6 +10,7 @@ const path = require('path');
 const crypto = require('crypto');
 const U = require('./util');
 const runs = require('./runs');
+const projects = require('./projects');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(DASH_DIR, 'data');
@@ -61,7 +62,7 @@ function runTask(id) {
     if (m && !settled(m.status)) return { error: 'task already running' };
   }
   const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions',
-    effort: t.effort || '', source: t.source === 'autopilot' ? 'autopilot' : 'task' });
+    effort: t.effort || '', source: t.source === 'autopilot' ? 'autopilot' : 'task', projectId: t.projectId || undefined });
   if (r.error) return r;
   t.runId = r.id;
   t.startedAt = new Date().toISOString();
@@ -80,7 +81,7 @@ function runAll() {
     // run tasks that never ran, or that failed/cancelled (retry); leave done/active ones
     if (!t.runId || !m || (settled(m.status) && m.status !== 'done')) {
       const r = runs.startRun({ prompt: t.prompt, model: t.model || 'auto', permissionMode: 'bypassPermissions',
-        effort: t.effort || '', source: t.source === 'autopilot' ? 'autopilot' : 'task' });
+        effort: t.effort || '', source: t.source === 'autopilot' ? 'autopilot' : 'task', projectId: t.projectId || undefined });
       if (!r.error) { t.runId = r.id; t.startedAt = new Date().toISOString(); started++; }
     }
   }
@@ -92,12 +93,19 @@ function runAll() {
 // AND by the autopilot loop (lib/autopilot.js) to seed itself from the
 // improvement backlog. `source` marks autopilot-created tasks so the UI can
 // badge them distinctly from user-typed ones.
-function enqueue({ title, prompt, model, source, effort }) {
+function enqueue({ title, prompt, model, source, effort, projectId }) {
   const list = load();
   const t = { id: newId(), title: title || prompt.slice(0, 60), prompt, model: model || 'auto',
     createdAt: new Date().toISOString(), runId: null, startedAt: null };
   if (source) t.source = source;
   if (runs.EFFORTS.includes(effort)) t.effort = effort; // optional utilization tier (A4)
+  // Project binding (Jarvis-as-orchestrator plan, gap B): plumbing only — nothing
+  // in the Tasks tab UI sets this yet, so this stays inert until a caller passes
+  // one. runTask()/runAll() forward it to runs.startRun(), which already knows how
+  // to inject a project's instructions/manifest (and already refuses to for
+  // claude-kind projects — see lib/runs.js's projectPrefix block). Validated
+  // against a real project here so a bad id can't silently ride along.
+  if (projectId && projects.get(projectId)) t.projectId = projectId;
   list.unshift(t);
   save(list);
   return t;
@@ -156,7 +164,8 @@ async function handle(req, res, url) {
     const model = U.SIMPLE_MODELS.includes(b.model) ? b.model : 'auto';
     if (!prompt) { U.sendJson(res, { error: 'prompt required' }, 400); return true; }
     const effort = runs.EFFORTS.includes(b.effort) ? b.effort : undefined;
-    enqueue({ title, prompt, model, effort });
+    const projectId = (b.projectId || '').toString().trim() || undefined;
+    enqueue({ title, prompt, model, effort, projectId });
     U.sendJson(res, { ok: true });
     return true;
   }
