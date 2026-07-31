@@ -46,6 +46,17 @@ function ppWireRefresh(slug, containerEl) {
   if (b) b.onclick = () => renderPairingPanel(slug, containerEl);
 }
 
+// Step 7 "organize" (safe half — see data/todos/projects.md): once a project
+// has run for a while, `complete` orders pile up and dominate a table nobody
+// needs to re-check. Rather than move files anywhere (the destructive half,
+// "archive/delete-all", stays undesigned — nothing pins down exactly what it
+// should delete, so it's not built here), split them into a collapsed-by-
+// default group, same pattern as the Run tab's history <details> (run.js).
+function ppTableHtml(slug, orders, dir) {
+  return `<table class="hlth-table"><thead><tr><th>Order</th><th>State</th><th>PDF</th><th>CSV</th><th>Note</th><th></th></tr></thead>
+    <tbody>${orders.map(o => ppRow(slug, o, dir) + ppDecideFormRow(slug, o)).join('')}</tbody></table>`;
+}
+
 function ppRender(slug, containerEl, d) {
   const orders = Array.isArray(d.orders) ? d.orders.slice() : [];
   const support = Array.isArray(d.support) ? d.support : [];
@@ -56,13 +67,28 @@ function ppRender(slug, containerEl, d) {
   }
   orders.sort((a, b) => (PP_RANK[a.state] ?? 9) - (PP_RANK[b.state] ?? 9));
   const dir = typeof d.dir === 'string' ? d.dir : '';
-  const table = orders.length
-    ? `<table class="hlth-table"><thead><tr><th>Order</th><th>State</th><th>PDF</th><th>CSV</th><th>Note</th><th></th></tr></thead>
-      <tbody>${orders.map(o => ppRow(slug, o, dir) + ppDecideFormRow(slug, o)).join('')}</tbody></table>`
-    : '<div class="muted">No orders matched yet.</div>';
+  const active = orders.filter(o => o.state !== 'complete');
+  const done = orders.filter(o => o.state === 'complete');
+  // Keyed per-project (unlike the Run tab's single global history toggle,
+  // which is legitimate there since there's exactly one Run history in the
+  // whole app) — this panel is instantiated per-slug, so a global key would
+  // leak one project's expanded state into every other project's panel.
+  const doneOpenKey = 'hub.ppDoneOpen.' + slug;
+  let open = false;
+  try { open = localStorage.getItem(doneOpenKey) === '1'; } catch {}
+  const table = active.length ? ppTableHtml(slug, active, dir)
+    : (done.length ? '<div class="muted">Every matched order is complete — see below.</div>' : '<div class="muted">No orders matched yet.</div>');
+  const doneSection = done.length
+    ? `<details class="histSection" id="ppDoneSection"${open ? ' open' : ''} style="margin-top:14px">
+        <summary>${done.length} complete order${done.length === 1 ? '' : 's'} — reviewed, nothing left to do</summary>
+        <div class="histbody">${ppTableHtml(slug, done, dir)}</div>
+      </details>`
+    : '';
   containerEl.innerHTML = ppShell(
-    `<div class="muted" style="font-size:11.5px;margin-bottom:8px">${ppCounts(orders)}</div>${table}${ppExtraLine(support, unparsed)}`
+    `<div class="muted" style="font-size:11.5px;margin-bottom:8px">${ppCounts(orders)}</div>${table}${doneSection}${ppExtraLine(support, unparsed)}`
   );
+  const doneSectionEl = containerEl.querySelector('#ppDoneSection');
+  if (doneSectionEl) doneSectionEl.ontoggle = () => { try { localStorage.setItem(doneOpenKey, doneSectionEl.open ? '1' : '0'); } catch {} };
   ppWireRefresh(slug, containerEl);
   ppWireRows(slug, containerEl);
 }
