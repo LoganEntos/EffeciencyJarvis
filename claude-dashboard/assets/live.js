@@ -33,7 +33,26 @@ async function tickActiveTasks(force) {
   const el = $('#liveActive');
   if (!el) return;
   let rows;
-  try { rows = await api('/api/runs'); } catch { return; }
+  try { rows = await api('/api/runs'); }
+  catch {
+    // Only surface an error if nothing has rendered yet (the first load
+    // failed) — a later poll tick failing is a transient blip that
+    // self-corrects on the next 2s tick, same as before. Without this, a
+    // first-load failure left the panel frozen on its literal "Loading…"
+    // placeholder forever with zero indication anything was wrong.
+    if (el.textContent.trim() === 'Loading…') {
+      el.innerHTML = '<div class="note">Couldn\'t load active tasks — the server may be busy or restarting. <button class="ghost" id="liveActiveRetry" style="margin-left:6px;padding:4px 10px;font-size:11px">Retry</button></div>';
+      const b = $('#liveActiveRetry'); if (b) b.onclick = () => tickActiveTasks(true);
+    }
+    // Invalidate liveActiveSig (not just leave it '') so the NEXT successful
+    // poll always re-renders regardless of what its sig computes to — the
+    // hub's common idle state (zero active runs) makes sig === '', which
+    // would otherwise silently match the '' liveActiveSig was reset to
+    // before this failure, dedup-skipping the recovery render and leaving
+    // the error message stuck forever even after the server comes back.
+    liveActiveSig = null;
+    return;
+  }
   if (!Array.isArray(rows)) return;
   const active = rows.filter(m => m.status === 'running' || m.status === 'queued');
   const sig = active.map(m => `${m.id}|${m.status}|${m.stalled}|${m.procAlive}|${m.idleMs}`).join(',');
@@ -61,8 +80,17 @@ async function tickActiveTasks(force) {
 
 renderers.live = async function () {
   const el = $('#live');
-  const d = await api('/api/sessions');
-  const list = Array.isArray(d) ? d : (d.list || []);
+  // Unlike tickActiveTasks/tickLive (which both wrap their own polls in
+  // try/catch precisely so a transient failure degrades gracefully instead
+  // of blanking the tab), this initial fetch had no guard — a throw here
+  // propagated to load()'s generic handler and replaced the WHOLE tab
+  // (including the independently-working Active-tasks board) with the
+  // generic "Couldn't load this tab" error. The Active-tasks board doesn't
+  // need `list` at all, so a session-feed fetch failure shouldn't take it
+  // down too — degrade just the session-feed section instead.
+  let list = [], sessionsErr = false;
+  try { const d = await api('/api/sessions'); list = Array.isArray(d) ? d : (d.list || []); }
+  catch { sessionsErr = true; }
   el.innerHTML = `
     <div class="flex" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <h2 style="margin:0">Live <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— everything the hub is running right now</span></h2>
@@ -70,7 +98,8 @@ renderers.live = async function () {
     <h3 style="margin:14px 0 8px">Active tasks</h3>
     <div id="liveActive">Loading…</div>
     <h3 style="margin:22px 0 8px">Session feed <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— raw transcript tail, incl. terminal-launched sessions</span></h3>
-    ${!list.length ? `<div class="note">No Claude Code session transcripts found yet for this project.
+    ${sessionsErr ? `<div class="note">Couldn't load session transcripts — the server may be busy or restarting. <button class="ghost" id="liveSessRetry" style="margin-left:6px;padding:4px 10px;font-size:11px">Retry</button></div>` :
+      !list.length ? `<div class="note">No Claude Code session transcripts found yet for this project.
       Send a prompt in the <span class="mono">Run</span> tab, or launch <span class="mono">claude</span>
       in a terminal here — its activity streams in live.</div>` : `
     <div class="flex" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -85,6 +114,7 @@ renderers.live = async function () {
       <span class="muted" id="liveMeta" style="font-size:11px"></span>
     </div>
     <pre id="liveFeed" class="livefeed">Loading…</pre>`}`;
+  if (sessionsErr) { const b = $('#liveSessRetry'); if (b) b.onclick = () => renderers.live(); }
   liveActiveSig = '';
   await tickActiveTasks(true);
   if (list.length) {
@@ -101,6 +131,16 @@ renderers.live = async function () {
     if ($('#liveFeed')) tickLive(false);
   }, 2000);
 };
+
+// Same first-load-only pattern as tickActiveTasks: a later poll tick failing
+// is a transient blip (self-corrects next tick, stays silent as before) —
+// only surface an error if the feed never got past its literal "Loading…"
+// placeholder in the first place.
+function liveFeedRetryable(feed) {
+  if (feed.textContent.trim() !== 'Loading…') return;
+  feed.innerHTML = 'Couldn\'t load — the server may be busy or restarting. <button class="ghost" id="liveFeedRetry" style="margin-left:6px;padding:4px 10px;font-size:11px">Retry</button>';
+  const b = $('#liveFeedRetry'); if (b) b.onclick = () => tickLive(true);
+}
 
 // one refresh cycle: resolve the effective session, update status, tail events
 async function tickLive(force) {
@@ -120,10 +160,10 @@ async function tickLive(force) {
     const lm = $('#liveMeta');
     if (lm) lm.textContent = `${sid.slice(0, 8)}… · updated ${rel(meta.modified)} · ${meta.sizeKb} KB`;
     setLiveBadge(active);                             // keep the header badge in sync
-  } catch { return; }
+  } catch { liveFeedRetryable(feed); return; }
   let events;
   try { events = await api(`/api/session-tail?id=${encodeURIComponent(sid)}&n=140`); }
-  catch { return; }
+  catch { liveFeedRetryable(feed); return; }
   if (!Array.isArray(events)) return;
   const sig = events.length + '|' + active + '|' + (events.length ? events[events.length - 1].text : '');
   if (!force && sig === liveLastSig) return;          // nothing new — leave scroll alone

@@ -178,6 +178,11 @@ function renderDetail() {
     </div>` : ''}`;
   if (m.sourceRunId) $('#memOpenRun').onclick = () => { goTab('run'); ensureRunUI(); openRun(m.sourceRunId); };
   $('#memDelBtn').onclick = async () => {
+    // Matches the confirm() pattern already used for task/schedule delete
+    // (assets/tasks.js .tDel/.sDel) — this was the one delete in the app with
+    // no confirmation at all, one stray click permanently destroying a memory
+    // with no undo.
+    if (!confirm(`Delete "${m.title || '(untitled)'}"?`)) return;
     try { await api('/api/memory/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: m.id }) }); } catch {}
     memSel = null;
     await loadAllMem();
