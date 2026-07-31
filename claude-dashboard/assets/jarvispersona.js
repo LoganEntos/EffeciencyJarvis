@@ -38,9 +38,28 @@
   const el = id => document.getElementById(id);
 
   // ---- guidelines (layer 1) --------------------------------------------------
+  // Error state matches the app-wide pattern (assets/live.js, assets/graph.js):
+  // an inline .note with a Retry button, not a silently blank textarea.
+  function clearGuideErr() { const e = el('jgideErr'); if (e) e.remove(); }
+  function showGuideErr() {
+    const box = el('jgideBody'); if (!box || !box.parentElement || el('jgideErr')) return;
+    const div = document.createElement('div');
+    div.className = 'note'; div.id = 'jgideErr'; div.style.marginTop = '8px';
+    div.innerHTML = `Couldn't load the output contract — the server may be busy or restarting. <button class="ghost" id="jgideRetry" style="margin-left:6px;padding:4px 10px;font-size:11px">Retry</button>`;
+    box.insertAdjacentElement('afterend', div);
+    const b = el('jgideRetry'); if (b) b.onclick = renderGuidelines;
+  }
   async function renderGuidelines() {
     const box = el('jgideBody'); if (!box) return;
-    try { const d = await api('/api/personas'); box.value = d.guidelines || ''; } catch {}
+    clearGuideErr();
+    try {
+      const d = await api('/api/personas');
+      box.value = d.guidelines || ''; box.disabled = false;
+    } catch {
+      box.value = ''; box.disabled = true;
+      box.placeholder = "couldn't load the shared contract";
+      showGuideErr();
+    }
   }
   async function saveGuidelines() {
     const body = (el('jgideBody') && el('jgideBody').value || '').trim();

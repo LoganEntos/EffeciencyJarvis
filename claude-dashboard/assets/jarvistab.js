@@ -112,13 +112,31 @@
     { k: 'add examples', mod: 'Include a concrete example of the expected output.' },
     { k: 'trim context', mod: 'Strip background and keep only the actionable ask.' },
   ];
+  // words > gate: the readout is advisory-only past this point, since only
+  // long prompts actually get routed through the blocking Haiku pre-pass
+  // (shape() below honors the same gate — mirrors run-composer.js/projectchat.js).
+  function distillGate() { return typeof DISTILL_MIN_WORDS === 'number' ? DISTILL_MIN_WORDS : 60; }
   function wsMeta() {
     const src = ($('#jwsIn') && $('#jwsIn').value || '').trim();
     const words = src ? src.split(/\s+/).length : 0;
-    const model = src ? (typeof analyzePromptComplexity === 'function' ? analyzePromptComplexity(src) : 'auto') : 'auto';
+    const gate = distillGate();
+    const pinned = ($('#runModel') && $('#runModel').value) || '';
     const m = $('#jwsMeta');
-    if (m) m.innerHTML = `<span>intent · ${words > 25 ? 'distill' : 'clean'}</span>`
-      + `<span class="accent">${esc(model)}</span>`
+    // The Run-tab model dropdown is what jarvischat.js send() actually reads —
+    // this readout must never look like it's choosing the model live. If the
+    // dropdown is pinned, show that (the truth); otherwise label the local
+    // complexity guess as advisory, since the server resolves 'auto' itself.
+    let modelLabel, modelTitle;
+    if (pinned && pinned !== 'auto') {
+      modelLabel = pinned;
+      modelTitle = `Run-tab model is pinned to ${pinned} — that's what actually fires.`;
+    } else {
+      const guess = src ? (typeof analyzePromptComplexity === 'function' ? analyzePromptComplexity(src) : 'auto') : 'auto';
+      modelLabel = 'suggests ' + guess;
+      modelTitle = 'Advisory only — a live guess at the right tier. The Run-tab model dropdown (currently auto) decides what actually fires.';
+    }
+    if (m) m.innerHTML = `<span>intent · ${words > gate ? 'distill' : 'clean'}</span>`
+      + `<span class="accent" title="${esc(modelTitle)}">${esc(modelLabel)}</span>`
       + `<span>${words} word${words === 1 ? '' : 's'}</span>`;
   }
   async function shape(mod) {
@@ -126,17 +144,24 @@
     let src = ta.value.trim();
     if (!src) { flash('nothing to shape yet — type a loose ask first', true); return; }
     if (mod) src += `\n\n(Refine: ${mod})`;
-    const btn = $('#jwsShape'), label = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.textContent = '✦ shaping…'; }
-    let out = '';
-    try { out = await jarvisDistill(src); } catch {}
-    if (btn) { btn.disabled = false; btn.innerHTML = label; }
-    let ok = true;
+    // Word-count gate (DISTILL_MIN_WORDS, assets/jarvis.js): short asks have
+    // nothing to engineer, so they skip the blocking Haiku pre-pass entirely —
+    // same rule run-composer.js and projectchat.js already honor.
+    const words = src.split(/\s+/).filter(Boolean).length;
+    const gated = words > distillGate();
+    let out = '', ok = true;
+    if (gated) {
+      const btn = $('#jwsShape'), label = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.textContent = '✦ shaping…'; }
+      try { out = await jarvisDistill(src); } catch {}
+      if (btn) { btn.disabled = false; btn.innerHTML = label; }
+    }
     if (!out) {
-      // Distill miss → local cleanup (mirrors run-composer.js). Feed the RAW
-      // textarea value, not `src` — `src` may carry an appended "(Refine: …)"
-      // annotation that must never leak into the fired prompt.
-      ok = false;
+      // Below the gate, or a distill miss above it → local cleanup (mirrors
+      // run-composer.js). Feed the RAW textarea value, not `src` — `src` may
+      // carry an appended "(Refine: …)" annotation that must never leak into
+      // the fired prompt.
+      ok = !gated;
       const raw = ta.value.trim();
       const tr = (typeof jarvisTransform === 'function') && jarvisTransform(raw);
       out = tr ? tr.buffered : raw;
@@ -205,9 +230,9 @@
     ];
     grid.innerHTML = anchors.map(([k, v]) =>
       `<div class="janchor"><div class="janchor-k">${esc(k)}</div><div class="janchor-v" title="${esc(v)}">${esc(v)}</div></div>`).join('')
-      + `<button class="jp-pill jpin" id="jpin">＋ pin moment</button>`;
+      // Not built yet — disabled + tooltipped so it reads as roadmap, not broken.
+      + `<button class="jp-pill jpin" id="jpin" disabled aria-disabled="true" title="Context pinning isn't built yet — anchors above are always live-derived from current state">＋ pin moment</button>`;
     const cnt = $('#jholdCount'); if (cnt) cnt.textContent = anchors.length + ' anchors';
-    const pin = $('#jpin'); if (pin) pin.onclick = () => flash('context pinning is on the roadmap — anchors are live-derived for now');
   }
 
   // ---- live transcript tail (newest Claude Code session) ---------------------
@@ -282,7 +307,7 @@
 
       <div class="jdeck">
         <section class="jp-panel jconv-panel">
-          <header class="jpanel-h jhair-b"><span class="jp-label">live conversation</span><span class="jp-pill" id="jsessBadge" title="in-tab chat session">＋ new</span><span class="jp-pill" id="jconvState">◌ idle</span></header>
+          <header class="jpanel-h jhair-b"><span class="jp-label">live conversation</span><span class="jp-pill" id="jsessBadge" title="in-tab chat session">no session yet</span><span class="jp-pill" id="jconvState">◌ idle</span></header>
           <div class="jstage">
             <canvas id="jorb" role="button" tabindex="0" aria-label="Voice orb — tap to talk, hold for a hands-free call"></canvas>
             <div class="jstate" id="jstate">${disabled ? 'voice unavailable' : 'idle'}</div>

@@ -28,7 +28,12 @@
   try { S.sessionId = localStorage.getItem(SESS_KEY) || null; } catch {}
   const timeOf = iso => { try { return new Date(iso).toLocaleTimeString(undefined, { hour12: false }); } catch { return ''; } };
 
-  // ---- session badge (panel header): short id when resumed, "＋ new" when fresh
+  // ---- session badge (panel header): short id when resumed, a plain status
+  // note when fresh. This is a read-only status pill — NOT a control. It used
+  // to read "＋ new" in the fresh state, which duplicated the working "＋ new"
+  // button in the composer row (#jchatNew, wired below) with no click handler
+  // of its own. Keep the label unambiguously non-actionable so there's only
+  // one "start a fresh session" affordance.
   function renderSessBadge() {
     const el = $('#jsessBadge'); if (!el) return;
     if (S.sessionId) {
@@ -36,7 +41,7 @@
       el.title = 'resumed CLI session ' + S.sessionId;
       el.classList.add('on');
     } else {
-      el.textContent = '＋ new';
+      el.textContent = 'no session yet';
       el.title = 'fresh CLI session — the next prompt starts it';
       el.classList.remove('on');
     }

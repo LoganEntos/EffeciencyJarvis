@@ -24,6 +24,8 @@
 }
 button.jp-pill { cursor: pointer; transition: color .15s, border-color .15s; }
 button.jp-pill:hover { color: var(--txt); border-color: var(--line-strong); }
+button.jp-pill:disabled { cursor: not-allowed; opacity: 0.45; }
+button.jp-pill:disabled:hover { color: var(--muted); border-color: var(--line); }
 .jp-pill.live { color: #d09439; background: color-mix(in srgb, var(--green) 8%, transparent); border-color: rgba(208, 148, 57, 0.45); }
 .jp-pill.on { color: var(--accent); border-color: rgba(208, 148, 57, 0.45); }
 .jp-btn {
