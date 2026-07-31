@@ -75,3 +75,16 @@ building or restyling any UI in this repo (the hub itself, artifacts, mockups):
   re-doing or re-proposing done/deferred items), update it after shipping.
 - Verify in a real browser before claiming done; run the smoke script before
   committing.
+- **Never let an open question halt unrelated work.** This repo has a proven
+  cost pattern: a thread stops on "say the word" / "want me to continue?" for
+  work it was already told to do, or parks 18 resolvable items behind 1-2
+  real questions, and the resulting `continue` replies each replay the full
+  session (measured up to 30M+ input tokens, $5-13 per reply). In any
+  planning/review turn, split open items into BLOCKING (genuinely needs the
+  user — a judgment call, money, client data, or a destructive/irreversible
+  action) and NON-BLOCKING (decidable from repo evidence, or already
+  authorized by the thread's standing task). Do ALL non-blocking work in the
+  same turn. Put blocking questions in one short list under a
+  `**Needs your call:**` header at the end — max 3, one line each. A turn may
+  only end waiting when that list is the only remaining work. If you say
+  "continuing now," continue in that same turn, don't stop after saying it.
