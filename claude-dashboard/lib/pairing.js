@@ -21,6 +21,7 @@ const U = require('./util');
 
 const DASH_DIR = path.resolve(__dirname, '..');
 const INBOX = path.join(DASH_DIR, 'data', 'inbox');
+const SP_INDEX_FILE = path.join(DASH_DIR, 'data', 'sharepoint-index.json');
 
 // Extraction patterns (derived from the real VPP historical-import files —
 // see data/inbox/vpp-historical-import-test/ for the canonical examples).
@@ -82,6 +83,33 @@ function saveDecision(slug, orderId, decision, note, assignee) {
   return { ok: true, record: map[orderId] || null };
 }
 
+// ---- "uploaded to database" overlay (pure metadata tracking) --------------
+// Tracks which converted CSVs a human has manually uploaded into the
+// downstream database (Entos OS / Supabase -- out of scope for this project;
+// nothing here talks to those systems, this just remembers a checkbox state).
+// Mirrors the decision overlay above exactly: same tmp+rename write safety,
+// same UNSAFE_KEYS guard, same sidecar-dotfile approach, so it survives a
+// re-scan/SharePoint re-pull the same way decisions do.
+const uploadsFile = slug => path.join(INBOX, slug, '.uploads.json');
+
+function loadUploads(slug) {
+  const d = U.safeJson(uploadsFile(slug));
+  return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
+}
+
+function saveUpload(slug, orderId, uploaded) {
+  if (!orderId || UNSAFE_KEYS.has(orderId)) return { error: 'orderId required' };
+  const map = loadUploads(slug);
+  if (uploaded) map[orderId] = { uploaded: true, at: new Date().toISOString() };
+  else delete map[orderId];
+  try {
+    const file = uploadsFile(slug), tmp = file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(map, null, 2));
+    fs.renameSync(tmp, file);
+  } catch (e) { return { error: e.message }; }
+  return { ok: true, record: map[orderId] || null };
+}
+
 function isSupport(name) {
   const lower = name.toLowerCase();
   if (lower === 'manifest.csv') return true;
@@ -124,14 +152,89 @@ function parseManifest(dir) {
   return Object.keys(map).length ? map : null;
 }
 
-// Best-effort year for an order, read from its own CSV's order_date column
-// (row 1) -- the hub's own generated output, same trust level as reading
-// manifest.csv above, not a new category of "open the source PDF" risk.
-// Used only to label the UI with which SharePoint year-folder a batch of
-// converted orders traces back to; never blocks/changes pairing state on
-// a miss. orderId already includes any `-<digits>` multi-part suffix
-// (CSV_RE's capture group keeps it, e.g. "22610-2"), which reconstructs the
-// right filename here since that's exactly what build.js named the CSV.
+// ---- SharePoint year-folder attribution ------------------------------------
+// The pairing panel's year filter needs to know which SharePoint
+// `Orders VPP/Closed Order History/<year>/` folder an order's PDFs actually
+// came from -- SharePoint buckets by paid/closed date, NOT by the PI's own
+// printed order_date (confirmed 2026-07-30: order 22610's PI is dated Aug
+// 2025 but lives under SharePoint's 2026 folder). Cross-reference against the
+// full-tenant index (data/sharepoint-index.json, built by lib/sharepoint.js's
+// buildIndex()) by basename instead of trusting any date parsed out of a CSV.
+//
+// Cache keyed by the index file's mtime -- mirrors lib/sharepoint.js's own
+// idxCache/loadIndex() pattern exactly. This file is ~2.5MB and pairProject()
+// runs on every pairing panel load/refresh (no cache of its own), so
+// re-parsing it every call would be wasteful; a stat() is cheap, JSON.parse
+// of megabytes is not.
+let spYearCache = { mtimeMs: -1, map: null };
+const SP_YEAR_FOLDER_RE = /Orders VPP\/Closed Order History\/(\d{4})\//i;
+// Match key: lowercased basename with every non-alphanumeric character
+// stripped (spaces, underscores, &, ., -, parens, ...). A plain lowercased
+// basename is too brittle in practice -- confirmed on the real data, e.g.
+// order 22443's SharePoint copy is "Signed_PI 006435_Invoice_22443.pdf"
+// (space) vs the local file "Signed_PI_006435_Invoice_22443.pdf" (underscore
+// in the same spot), and order 22613's SharePoint copy uses "&" ("...Valves
+// & Plastic Seats...") where the local copy has "_" (sharepoint.js's own
+// pull() sanitizeSeg() replaces disallowed characters with "_" when saving
+// to the inbox, and separately some files were retyped with a different
+// separator). Stripping to bare alphanumerics collapses all of these
+// cosmetic differences while still requiring every other character
+// (invoice #, order #, words) to match exactly, so it stays a precise
+// same-file match, not a fuzzy/substring one.
+const alnumKey = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function loadSpYearMap() {
+  let st;
+  try { st = fs.statSync(SP_INDEX_FILE); } catch { spYearCache = { mtimeMs: -1, map: null }; return new Map(); }
+  if (st.mtimeMs === spYearCache.mtimeMs && spYearCache.map) return spYearCache.map;
+  const map = new Map();
+  // Fail open: a missing/unparseable/malformed index must never block or
+  // change pairing state -- this is a best-effort UI label, not a data
+  // dependency. safeJson() already swallows a parse error and returns null.
+  const idx = U.safeJson(SP_INDEX_FILE);
+  if (idx && typeof idx === 'object') {
+    for (const s of idx.sites || []) {
+      for (const d of (s && s.drives) || []) {
+        for (const f of (d && d.files) || []) {
+          const p = f && f.p;
+          if (typeof p !== 'string') continue;
+          const m = SP_YEAR_FOLDER_RE.exec(p);
+          if (!m) continue;
+          const slash = p.lastIndexOf('/');
+          const base = alnumKey(slash >= 0 ? p.slice(slash + 1) : p);
+          if (base && !map.has(base)) map.set(base, +m[1]);
+        }
+      }
+    }
+  }
+  spYearCache = { mtimeMs: st.mtimeMs, map };
+  return map;
+}
+// Given one order's local PDF filenames, return the year of the SharePoint
+// `Closed Order History/<year>/` folder the first-matching one lives under,
+// or null if none of them are in the index yet (e.g. not pulled/indexed, or
+// order is entirely local-only). Works for pdf-only orders too (no CSV
+// needed) -- a strict improvement over the old CSV-date approach, where
+// pdf-only orders always showed year:null and appeared under every filter.
+function sharepointYearFor(pdfNames) {
+  const map = loadSpYearMap();
+  for (const name of pdfNames || []) {
+    const year = map.get(alnumKey(name));
+    if (year) return year;
+  }
+  return null;
+}
+
+// Best-effort DISPLAY date for an order, read from its own CSV's order_date
+// column (row 1) -- the hub's own generated output, same trust level as
+// reading manifest.csv above, not a new category of "open the source PDF"
+// risk. This is the PI's own printed date (e.g. "Jul. 24, 2024"), shown to
+// the user as-is; it is NOT used to bucket by SharePoint year anymore (see
+// sharepointYearFor() above) since that assumption was wrong -- SharePoint's
+// year folders are paid/closed-date buckets, not PI-date buckets. Never
+// blocks/changes pairing state on a miss. orderId already includes any
+// `-<digits>` multi-part suffix (CSV_RE's capture group keeps it, e.g.
+// "22610-2"), which reconstructs the right filename here since that's
+// exactly what build.js named the CSV.
 const MONTHS3 = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
 // Quote-aware split -- `description` (an earlier column than order_date)
 // routinely contains a comma ("PR 5/16 BRASS PLATED CLOSET, BOLTS"), which
@@ -152,7 +255,7 @@ function splitCsvRow(line) {
   out.push(cur);
   return out;
 }
-function csvOrderYear(dir, orderId) {
+function csvOrderDate(dir, orderId) {
   const text = U.safeRead(path.join(dir, `order-${orderId}.csv`));
   if (!text) return null;
   const lines = text.split(/\r?\n/).filter(l => l.length);
@@ -163,9 +266,9 @@ function csvOrderYear(dir, orderId) {
   const raw = (splitCsvRow(lines[1])[idx] || '').trim();
   if (!raw) return null;
   let m = /([A-Za-z]{3,})\.?\s+\d{1,2},?\s+(\d{4})/.exec(raw); // "Jul. 24, 2024"
-  if (m && MONTHS3[m[1].slice(0, 3).toLowerCase()]) return +m[2];
+  if (m && MONTHS3[m[1].slice(0, 3).toLowerCase()]) return m[0];
   m = /^\d{1,2}\/\d{1,2}\/(\d{2,4})$/.exec(raw); // "7/8/25" or "12/16/2024"
-  if (m) return m[1].length === 2 ? 2000 + (+m[1]) : +m[1];
+  if (m) return m[0];
   return null;
 }
 
@@ -236,7 +339,11 @@ function pairProject(slug, { withYear = true } = {}) {
   const unparsed = [];
 
   for (const e of U.listDir(dir)) {
-    if (!e.isFile()) continue;
+    // Dotfiles are this module's own overlay sidecars (.decisions.json,
+    // .uploads.json) plus lib/projects.js's .pinned.json, all living in the
+    // same folder — isSupport()'s /\.json$/ match would otherwise count them
+    // as "support files" and list them in the panel's hover tooltip.
+    if (!e.isFile() || e.name.startsWith('.')) continue;
     const name = e.name;
     if (isSupport(name)) { support.push(name); continue; }
     if (/\.csv$/i.test(name)) {
@@ -282,8 +389,13 @@ function pairProject(slug, { withYear = true } = {}) {
         if (picked.dup) { dup = true; duplicates = pdfs.map(p => p.name); }
       } else { authoritativePdf = picked.name; note = picked.note || ''; state = csvs.length ? 'complete' : 'pdf-only'; }
     }
-    const year = (withYear && csvs.length) ? csvOrderYear(dir, orderId) : null;
-    return { orderId, state, pdfs, csvs, authoritativePdf, note, dup, duplicates, year };
+    // Gated by withYear too, same as orderDate below — pairSummary() (line
+    // ~420, withYear:false) still never reads o.year, so it shouldn't pay for
+    // the SharePoint index lookup either (mtime-cached, so the real cost is
+    // small, but there's no reason to pay it at all on that bounded route).
+    const year = (withYear && pdfs.length) ? sharepointYearFor(pdfs.map(p => p.name)) : null;
+    const orderDate = (withYear && csvs.length) ? csvOrderDate(dir, orderId) : null;
+    return { orderId, state, pdfs, csvs, authoritativePdf, note, dup, duplicates, year, orderDate };
   });
 
   // Overlay human decisions last, ON TOP of the computed state — a decision
@@ -294,6 +406,15 @@ function pairProject(slug, { withYear = true } = {}) {
   for (const o of orderList) {
     const dec = decisions[o.orderId];
     if (dec) { o.decision = dec.decision; o.decisionNote = dec.note; o.decisionAssignee = dec.assignee; o.decisionAt = dec.at; }
+  }
+
+  // Overlay "uploaded to database" state the same way -- pure metadata, never
+  // changes the computed scan, just annotates the row.
+  const uploads = loadUploads(slug);
+  for (const o of orderList) {
+    const u = uploads[o.orderId];
+    o.uploaded = !!(u && u.uploaded);
+    o.uploadedAt = (u && u.at) || null;
   }
 
   return { slug, dir: path.join(INBOX, slug), orders: orderList, support, unparsed };
@@ -335,6 +456,18 @@ async function handle(req, res, url) {
     const orderId = (b.orderId || '').toString().trim().slice(0, 60);
     const decision = b.decision === null ? null : (b.decision || '').toString();
     const r = saveDecision(slug, orderId, decision, b.note, b.assignee);
+    U.sendJson(res, r, r.error ? 400 : 200);
+    return true;
+  }
+  if (url.pathname === '/api/projects/pairs/upload' && req.method === 'POST') {
+    let b = {}; try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
+    const slug = safeSlug((b.slug || '').toString());
+    if (!slug) { U.sendJson(res, { error: 'invalid slug' }, 404); return true; }
+    let st; try { st = fs.statSync(path.join(INBOX, slug)); } catch { st = null; }
+    if (!st || !st.isDirectory()) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    const orderId = (b.orderId || '').toString().trim().slice(0, 60);
+    const uploaded = b.uploaded === true;
+    const r = saveUpload(slug, orderId, uploaded);
     U.sendJson(res, r, r.error ? 400 : 200);
     return true;
   }

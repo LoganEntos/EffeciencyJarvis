@@ -53,8 +53,49 @@ function ppWireRefresh(slug, containerEl) {
 // should delete, so it's not built here), split them into a collapsed-by-
 // default group, same pattern as the Run tab's history <details> (run.js).
 function ppTableHtml(slug, orders, dir) {
-  return `<table class="hlth-table"><thead><tr><th>Order</th><th>State</th><th>PDF</th><th>CSV</th><th>Note</th><th></th></tr></thead>
+  return `<table class="hlth-table"><thead><tr><th>Order</th><th>Date</th><th>State</th><th>PDF</th><th>CSV</th><th>DB</th><th>Note</th><th></th></tr></thead>
     <tbody>${orders.map(o => ppRow(slug, o, dir) + ppDecideFormRow(slug, o)).join('')}</tbody></table>`;
+}
+
+// Table now has 8 columns (Order, Date, State, PDF, CSV, DB, Note, actions) —
+// the decide-form row's colspan must span all of them or the inline form
+// looks squashed into a narrow strip instead of the full row width.
+const PP_COLS = 8;
+
+// The "complete" bucket is where orders pile up (see Step 7 note above), so
+// it's the one place a flat list actually hides information: with "all
+// years" selected, a single collapsed table lumps every SharePoint
+// `Closed Order History/<year>/` folder together. Break it into one
+// sub-section per year (same o.year the top filter already uses, computed
+// server-side from the tenant index — lib/pairing.js sharepointYearFor()),
+// so the directory a batch traces back to stays visible even once it's
+// buried in "done". A year already picked in the top filter means every row
+// here already shares it, so stay flat; same if everything landed in one
+// bucket anyway (nothing to break out).
+function ppDoneBody(slug, done, dir, selYear) {
+  if (selYear) return ppTableHtml(slug, done, dir);
+  const buckets = new Map();
+  done.forEach(o => {
+    const key = o.year || 'unmatched';
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(o);
+  });
+  if (buckets.size <= 1) return ppTableHtml(slug, done, dir);
+  const keys = [...buckets.keys()].sort((a, b) => {
+    if (a === 'unmatched') return 1;
+    if (b === 'unmatched') return -1;
+    return b - a;
+  });
+  return keys.map(k => {
+    const rows = buckets.get(k);
+    const label = k === 'unmatched'
+      ? `Not yet in SharePoint index (${rows.length})`
+      : `${k} — ${esc(PP_DIR_LABEL)} (${rows.length})`;
+    return `<details class="histSection" open style="margin-top:8px">
+      <summary>${label}</summary>
+      <div class="histbody">${ppTableHtml(slug, rows, dir)}</div>
+    </details>`;
+  }).join('');
 }
 
 // Selected year filter per project (module-level, mirrors PSP's per-project
@@ -78,20 +119,32 @@ function ppRender(slug, containerEl, d) {
     ppShowMsg(slug, containerEl, 'No pairable files yet — PDFs and CSVs dropped in this project show up here once matched by order.');
     return;
   }
-  // Years come from each order's own CSV (order_date, read server-side —
-  // lib/pairing.js's csvOrderYear); an order with no CSV yet (pdf-only) or
-  // an unrecognized date format has no year and always shows regardless of
-  // the filter, so nothing silently disappears from view.
+  // Years come from the SharePoint tenant index, not the CSV (o.year is
+  // lib/pairing.js's sharepointYearFor(), matched by filename — see the
+  // ppDoneBody comment above for why). An order not yet in the index has no
+  // year and always shows regardless of the filter, so nothing silently
+  // disappears from view.
   const years = [...new Set(allOrders.map(o => o.year).filter(Boolean))].sort((a, b) => b - a);
   if (PP_YEAR[slug] && !years.includes(PP_YEAR[slug])) PP_YEAR[slug] = null;
   const selYear = PP_YEAR[slug] || null;
   const orders = selYear ? allOrders.filter(o => o.year === selYear || o.year == null) : allOrders;
 
+  // A year option's count must match what selecting it actually shows —
+  // the applied filter (below) always keeps year==null rows visible too
+  // (an order not yet matched to the SharePoint index shouldn't silently
+  // disappear), so a bare per-year count under-promised what the table
+  // delivers. Spell out the unmatched rows the option will also pull in
+  // rather than let the two numbers quietly disagree.
+  const unmatchedCount = allOrders.filter(o => o.year == null).length;
   const yearPicker = years.length > 1 ? `<div class="flex" style="gap:8px;align-items:center;margin-bottom:8px">
-    <span class="muted" style="font-size:11px">SharePoint source</span>
+    <label class="muted" for="ppYearSel" style="font-size:11px">SharePoint source</label>
     <select id="ppYearSel" style="margin:0;width:auto;font-size:12px">
       <option value=""${selYear ? '' : ' selected'}>All years (${allOrders.length} orders)</option>
-      ${years.map(y => `<option value="${y}"${y === selYear ? ' selected' : ''}>${y} — ${esc(PP_DIR_LABEL)} (${allOrders.filter(o => o.year === y).length})</option>`).join('')}
+      ${years.map(y => {
+        const n = allOrders.filter(o => o.year === y).length;
+        const suffix = unmatchedCount ? ` +${unmatchedCount} unmatched` : '';
+        return `<option value="${y}"${y === selYear ? ' selected' : ''}>${y} — ${esc(PP_DIR_LABEL)} (${n}${suffix})</option>`;
+      }).join('')}
     </select>
   </div>` : '';
 
@@ -108,11 +161,14 @@ function ppRender(slug, containerEl, d) {
   try { open = localStorage.getItem(doneOpenKey) === '1'; } catch {}
   const table = active.length ? ppTableHtml(slug, active, dir)
     : (done.length ? '<div class="muted">Every matched order is complete — see below.</div>' : '<div class="muted">No orders matched yet.</div>');
-  const doneLabel = `${done.length} complete order${done.length === 1 ? '' : 's'}${selYear ? ` — ${selYear} · ${PP_DIR_LABEL}` : ''} — reviewed, nothing left to do`;
+  const doneUnmatched = selYear ? done.filter(o => o.year == null).length : 0;
+  const doneLabel = `${done.length} complete order${done.length === 1 ? '' : 's'}`
+    + (selYear ? ` — ${selYear} · ${PP_DIR_LABEL}${doneUnmatched ? ` (+${doneUnmatched} unmatched)` : ''}` : '')
+    + ' — reviewed, nothing left to do';
   const doneSection = done.length
     ? `<details class="histSection" id="ppDoneSection"${open ? ' open' : ''} style="margin-top:14px">
         <summary>${esc(doneLabel)}</summary>
-        <div class="histbody">${ppTableHtml(slug, done, dir)}</div>
+        <div class="histbody">${ppDoneBody(slug, done, dir, selYear)}</div>
       </details>`
     : '';
   containerEl.innerHTML = ppShell(
@@ -128,9 +184,23 @@ function ppRender(slug, containerEl, d) {
 
 function ppCounts(orders) {
   const c = { complete: 0, 'pdf-only': 0, 'csv-only': 0, review: 0 };
-  let dups = 0;
-  orders.forEach(o => { if (c[o.state] !== undefined) c[o.state]++; if (o.dup) dups++; });
-  const base = `${c.complete} complete &middot; ${c['pdf-only']} pdf-only &middot; ${c['csv-only']} csv-only &middot; ${c.review} review`;
+  let dups = 0, uploaded = 0, uploadEligible = 0;
+  orders.forEach(o => {
+    if (c[o.state] !== undefined) c[o.state]++;
+    if (o.dup) dups++;
+    // Only orders with a CSV ever show the "uploaded" checkbox (see ppRow) —
+    // count against that eligible set, not every order, or a project full of
+    // pdf-only rows would misreport as "0/47 in DB" instead of "not tracked yet".
+    if ((o.csvs || []).length) { uploadEligible++; if (o.uploaded) uploaded++; }
+  });
+  let base = `${c.complete} complete &middot; ${c['pdf-only']} pdf-only &middot; ${c['csv-only']} csv-only &middot; ${c.review} review`;
+  // Own span (not just inline text) so a checkbox toggle can patch this
+  // number in place (see ppWireUploads) without a full ppRender — otherwise
+  // the "N/M in DB" count would silently go stale until the next reload,
+  // since the upload handler deliberately avoids a full re-render for the
+  // same reason the decide-form handler does one (nothing else on the row
+  // depends on this value... except this summary line did).
+  if (uploadEligible) base += ` &middot; <span id="ppUploadCount">${uploaded}/${uploadEligible} in DB</span>`;
   return dups ? `${base} &middot; <span style="color:var(--err,#e05b4f)">${dups} duplicate</span>` : base;
 }
 
@@ -181,11 +251,30 @@ function ppRow(slug, o, dir) {
     : '';
   const decideBtn = `<button type="button" class="ghost pp-decide-toggle" data-order="${esc(o.orderId)}"
       aria-expanded="false" aria-controls="ppdec-${esc(o.orderId)}" style="padding:4px 10px;font-size:11px;white-space:nowrap">${o.decision ? 'edit' : 'decide'}</button>`;
+  // The PI's own printed date, shown as raw text — not reparsed/reformatted
+  // client-side, so it always matches what a human sees on the source PDF.
+  const dateCell = o.orderDate ? esc(o.orderDate) : '<span class="muted">—</span>';
+  // DB upload tracking is a manual human fact (nothing server-side can infer
+  // it) — only offered when there's a CSV to actually track; a pdf-only order
+  // has nothing to upload yet, so a checkbox there would be misleading.
+  // No title when never uploaded — a literal "..." tooltip told a hovering
+  // user nothing; the ppus-* span (aria-live) carries the save/error status
+  // instead, so it reaches keyboard/screen-reader users too, not just the
+  // 2-second outline flash sighted users would catch.
+  const uploadCell = (o.csvs || []).length
+    ? `<span style="display:inline-flex;align-items:center;gap:6px">
+        <label class="muted" style="font-size:11px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"${o.uploadedAt ? ` title="uploaded ${esc(o.uploadedAt.slice(0, 10))}"` : ''}>
+          <input type="checkbox" class="pp-uploaded" data-order="${esc(o.orderId)}"${o.uploaded ? ' checked' : ''}> uploaded</label>
+        <span class="muted pp-upload-status" id="ppus-${esc(o.orderId)}" aria-live="polite" style="font-size:10px"></span>
+      </span>`
+    : '<span class="muted">—</span>';
   return `<tr${o.dup ? ' class="pp-dup"' : ''}>
     <td class="mono">${esc(o.orderId)}</td>
+    <td class="muted" style="font-size:11.5px">${dateCell}</td>
     <td><span class="pill ${tone}">${esc(o.state)}</span>${dupBadge}${decBadge}</td>
     <td>${pdfs}</td>
     <td>${csvs}</td>
+    <td>${uploadCell}</td>
     <td class="muted" style="font-size:11.5px">${o.note ? esc(o.note) : ''}</td>
     <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">${convertBtn}${decideBtn}</td>
   </tr>`;
@@ -198,7 +287,7 @@ function ppRow(slug, o, dir) {
 // building for a 3-field form.
 function ppDecideFormRow(slug, o) {
   const cur = o.decision || '';
-  return `<tr class="pp-decide-row hidden" id="ppdec-${esc(o.orderId)}"><td colspan="6">
+  return `<tr class="pp-decide-row hidden" id="ppdec-${esc(o.orderId)}"><td colspan="${PP_COLS}">
     <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center;padding:6px 0">
       <label class="muted" style="font-size:11px" for="ppdk-${esc(o.orderId)}">Decision</label>
       <select id="ppdk-${esc(o.orderId)}" style="width:auto;min-width:110px">
@@ -212,7 +301,7 @@ function ppDecideFormRow(slug, o) {
       <button type="button" class="ghost pp-decide-save" data-order="${esc(o.orderId)}" style="padding:4px 10px;font-size:11px">Save</button>
       ${o.decision ? `<button type="button" class="ghost pp-decide-clear" data-order="${esc(o.orderId)}" style="padding:4px 10px;font-size:11px">Clear</button>` : ''}
       <button type="button" class="ghost pp-decide-cancel" data-order="${esc(o.orderId)}" style="padding:4px 10px;font-size:11px">Cancel</button>
-      <span class="muted pp-decide-status" id="ppds-${esc(o.orderId)}" style="font-size:11px"></span>
+      <span class="muted pp-decide-status" id="ppds-${esc(o.orderId)}" aria-live="polite" style="font-size:11px"></span>
     </div>
   </td></tr>`;
 }
@@ -241,6 +330,53 @@ function ppWireRows(slug, containerEl) {
     prefillRun(`Process the PDF${paths.length > 1 ? 's' : ''} at ${paths.join(', ')} — convert to CSV, matching the paired commercial invoice format if present — `);
   });
   ppWireDecide(slug, containerEl);
+  ppWireUploads(slug, containerEl);
+}
+
+// DB-upload checkbox — a manual human fact (server can't infer it), persisted
+// via POST /api/projects/pairs/upload. Unlike the decide form, nothing else
+// on the row depends on this value, so a full renderPairingPanel re-render
+// isn't needed on success — just re-enable the checkbox in place.
+function ppWireUploads(slug, containerEl) {
+  containerEl.querySelectorAll('.pp-uploaded').forEach(cb => cb.onchange = async () => {
+    const orderId = cb.dataset.order;
+    const prev = !cb.checked; // value before this change, in case we need to revert
+    const statusEl = containerEl.querySelector('#ppus-' + CSS.escape(orderId));
+    const label = cb.closest('label');
+    cb.disabled = true;
+    if (statusEl) statusEl.textContent = '';
+    try {
+      const r = await api('/api/projects/pairs/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, orderId, uploaded: cb.checked }) });
+      if (r && r.error) {
+        cb.checked = prev;
+        if (statusEl) statusEl.textContent = '✗ ' + r.error;
+        cb.style.outline = '1px solid var(--err, #e05b4f)';
+        setTimeout(() => { cb.style.outline = ''; }, 2000);
+      } else {
+        // Keep the hover tooltip in sync with the state that was just saved,
+        // instead of only ever removing it (the old code's removeAttribute
+        // meant the "uploaded <date>" tooltip never came back until a full
+        // panel refresh).
+        if (label) {
+          if (cb.checked) label.setAttribute('title', 'uploaded ' + new Date().toISOString().slice(0, 10));
+          else label.removeAttribute('title');
+        }
+        const countEl = containerEl.querySelector('#ppUploadCount');
+        if (countEl) {
+          const m = /^(\d+)\/(\d+)/.exec(countEl.textContent);
+          if (m) countEl.textContent = `${+m[1] + (cb.checked ? 1 : -1)}/${m[2]} in DB`;
+        }
+      }
+    } catch (e) {
+      cb.checked = prev;
+      if (statusEl) statusEl.textContent = '✗ ' + (e.message || 'save failed');
+      cb.style.outline = '1px solid var(--err, #e05b4f)';
+      setTimeout(() => { cb.style.outline = ''; }, 2000);
+    } finally {
+      cb.disabled = false;
+    }
+  });
 }
 
 // Skip/flag/assign a note on an order (POST /api/projects/pairs/decision,

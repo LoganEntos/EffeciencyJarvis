@@ -32,6 +32,13 @@ async function spBoot(el, sf) {
   el.innerHTML = '<div class="muted">Loading…</div>';
   let s;
   try { s = await api('/api/sharepoint/status'); } catch { el.innerHTML = '<div class="muted">SharePoint module unavailable.</div>'; return; }
+  // A full renderProjectDetail() elsewhere on the page (pin/delete/decide,
+  // etc.) can tear this container down while the fetch above was in flight —
+  // `el` would then be a detached node. Bail instead of writing into (or,
+  // via the module's global $() lookups deeper in the call chain, crashing
+  // on) a container nobody can see. Same guard in spRenderPicker/pspList/
+  // spvList below, all of which have the identical await-then-write shape.
+  if (!el.isConnected) return;
   if (!s.index) {
     el.innerHTML = `<div class="note" style="font-size:12.5px">No SharePoint index yet — build one in the <a class="link" id="pspGoSp">SharePoint tab</a>, then come back here to link a folder.</div>`;
     const a = el.querySelector('#pspGoSp'); if (a) a.onclick = () => { if (typeof goTab === 'function') goTab('sharepoint'); };
@@ -44,6 +51,7 @@ async function spBoot(el, sf) {
 // ---- picker: drive dropdown + breadcrumb folder nav, "Link this folder" ----
 async function spRenderPicker(el, sf) {
   const t = await api('/api/sharepoint/index/tree').catch(() => ({ error: 'unavailable' }));
+  if (!el.isConnected) return; // see spBoot's comment
   if (t.error) { el.innerHTML = `<div class="pill err">${esc(t.error)}</div>`; return; }
   const opts = ['<option value="">— library —</option>'];
   for (const site of t.sites) for (const d of site.drives)
@@ -80,6 +88,7 @@ async function pspList(el) {
   if ($('#pspLink')) $('#pspLink').onclick = () => pspLinkHere(el);
   $('#pspList').innerHTML = '<div class="muted">Loading…</div>';
   const r = await api(`/api/sharepoint/index/browse?drive=${encodeURIComponent(PSP.drive)}&path=${encodeURIComponent(PSP.path)}`).catch(e => ({ error: e.message }));
+  if (!el.isConnected) return; // see spBoot's comment
   if (r.error) { $('#pspList').innerHTML = `<div class="pill err">${esc(r.error)}</div>`; return; }
   $('#pspList').innerHTML = pspFolderRows(r.folders) || '<div class="muted">Empty folder.</div>';
   el.querySelectorAll('.pspDir').forEach(d => d.onclick = () => { PSP.path = d.dataset.path; pspList(el); });
@@ -149,6 +158,7 @@ async function spvList(el, sf) {
   el.querySelectorAll('.pspCrumb').forEach(a => a.onclick = () => { PSP.path = a.dataset.path; spvList(el, sf); });
   $('#pspList').innerHTML = '<div class="muted">Loading…</div>';
   const r = await api(`/api/sharepoint/index/browse?drive=${encodeURIComponent(sf.driveId)}&path=${encodeURIComponent(PSP.path)}`).catch(e => ({ error: e.message }));
+  if (!el.isConnected) return; // see spBoot's comment — this is where the race was actually caught live
   if (r.error) { $('#pspList').innerHTML = `<div class="pill err">${esc(r.error)}</div>`; return; }
   const have = new Set(PSP.files.map(f => f.base.toLowerCase()));
   const fmt = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : (b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B');

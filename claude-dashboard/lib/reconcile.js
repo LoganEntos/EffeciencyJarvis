@@ -31,12 +31,26 @@ const STALE_MS = 2 * 24 * 60 * 60 * 1000; // ~2 days, advisory only
 // token-shape regex.
 const VPP_RE = /^VPP\d+/;
 const ORDER_TOKEN_RE = /22\d{3}/g;
+// Fallback id shape, verified against the real tree: "Paid 3.19 010763 PTFE
+// Tape SPL002" has no 22xxx token at all, but the local order (from its own
+// CSV filename, order-SPL002.csv) is really "SPL002". Only tried when the
+// primary 22xxx set is EMPTY, never alongside it — some supplier PO numbers
+// are also SPL-shaped (e.g. "ETA 04.02 SPL840273 22093 Ningbo Mixed with
+// Tanks" carries both "SPL840273" and the real id "22093"; treating SPL as
+// equally weighted there would turn an already-correct single-token
+// resolution into a false ambiguous).
+const SPL_TOKEN_RE = /SPL\d+/gi;
 function normalizeOrderId(folderName) {
   const name = (folderName || '').toString();
   const vpp = name.match(VPP_RE);
   if (vpp) return vpp[0];
-  const distinct = new Set(name.match(ORDER_TOKEN_RE) || []);
-  return distinct.size === 1 ? [...distinct][0] : null;
+  const primary = new Set(name.match(ORDER_TOKEN_RE) || []);
+  if (primary.size === 1) return [...primary][0];
+  if (primary.size === 0) {
+    const spl = new Set((name.match(SPL_TOKEN_RE) || []).map(t => t.toUpperCase()));
+    if (spl.size === 1) return [...spl][0];
+  }
+  return null;
 }
 
 // Subset of a pairProject() order row worth surfacing to a reconcile consumer
@@ -93,19 +107,31 @@ function reconcileProject(id) {
 
   const local = pairing.pairProject(p.slug);
   const localById = new Map(local.orders.map(o => [o.orderId, o]));
+  // Case-insensitive fallback, keyed second so an exact match always wins.
+  // normalizeOrderId's SPL branch forces .toUpperCase() on the folder-derived
+  // token (no matching normalization exists on the local-CSV side, since
+  // pairing.js's CSV_RE preserves whatever case the filename actually used),
+  // so an "order-spl002.csv" local file would otherwise miss an "SPL002"
+  // upstream folder on case alone and misreport as upstream-only.
+  const localByIdCI = new Map(local.orders.map(o => [o.orderId.toUpperCase(), o]));
 
   const orders = [];
   const usedLocalIds = new Set();
+  const groupByOrderId = new Map(); // resolved base orderId -> its upstream group, for the multi-part pass below
   for (const g of groups.values()) {
     const ambiguous = !g.orderId || collisions.has(g.orderId);
     const orderId = ambiguous ? null : g.orderId;
+    if (orderId) groupByOrderId.set(orderId, g);
     const upstream = { fileCount: g.files.length, files: g.files };
     let localOrder = null, status;
     if (ambiguous) {
       status = 'ambiguous';
     } else {
-      localOrder = localById.get(orderId) || null;
-      if (localOrder) { usedLocalIds.add(orderId); status = localOrder.state === 'complete' ? 'complete' : 'local-incomplete'; }
+      localOrder = localById.get(orderId) || localByIdCI.get(orderId.toUpperCase()) || null;
+      // Track the local order's OWN id, not the folder-derived one — they can
+      // differ only in case (the CI fallback above), and the multi-part pass
+      // below checks usedLocalIds against local.orders' actual ids.
+      if (localOrder) { usedLocalIds.add(localOrder.orderId); status = localOrder.state === 'complete' ? 'complete' : 'local-incomplete'; }
       else status = 'upstream-only';
     }
     // §1 spec: an ambiguous row surfaces the raw folder name "plus every
@@ -117,9 +143,29 @@ function reconcileProject(id) {
     orders.push({ orderId, folderName: g.folderName, year: g.year || null, upstream, local: localOrder ? shapeLocal(localOrder) : null, status, candidateTokens });
   }
   // Local orders no upstream folder claimed — flag it, don't guess why
-  // (renamed upstream? manually-added local order?).
+  // (renamed upstream? manually-added local order?). One exception: a
+  // multi-part local order (CSV_RE's `-<digits>` suffix, e.g. "22610-2" from
+  // a 2-of-2 PI) shares its base id's upstream folder — pairing.js splits one
+  // signed PI into several local order rows, but SharePoint only has the one
+  // folder, so the base id ("22610") is the only one that ever lands in
+  // `groups`. Without this, every part past the first always reported
+  // local-only even though it's really the same upstream folder, silently
+  // undercounting `complete` (confirmed against the real tree: this was the
+  // entire 47-vs-39 gap between the pairing panel and this endpoint).
+  const BASE_ID_RE = /^(.+)-\d+$/;
   for (const lo of local.orders) {
     if (usedLocalIds.has(lo.orderId)) continue;
+    const baseMatch = BASE_ID_RE.exec(lo.orderId);
+    const g = baseMatch ? groupByOrderId.get(baseMatch[1]) : null;
+    if (g) {
+      usedLocalIds.add(lo.orderId);
+      orders.push({
+        orderId: lo.orderId, folderName: g.folderName, year: g.year || null,
+        upstream: { fileCount: g.files.length, files: g.files }, local: shapeLocal(lo),
+        status: lo.state === 'complete' ? 'complete' : 'local-incomplete',
+      });
+      continue;
+    }
     orders.push({ orderId: lo.orderId, folderName: null, year: null, upstream: null, local: shapeLocal(lo), status: 'local-only' });
   }
 
