@@ -13,6 +13,9 @@ Rules:
 - Never edit code; if something fails, describe the failure precisely for the caller.
 - Prefer free local probes (Invoke-RestMethod against localhost) over anything that costs tokens.
 - The hub server binds 127.0.0.1:5757; the smoke script is the source of truth for endpoint health.
+- If you started a throwaway instance (e.g. :5758) to test server-code changes, tear it down with
+  `powershell -File scripts/kill-port.ps1 -Port 5758` (kills strictly by port). NEVER taskkill/Stop-Process
+  a raw PID and NEVER "stop all node processes" — that has killed the real primary hub before.
 - For any claim that a UI control works (not just that an API responds), drive it with
   `node scripts/browser-qa/qa.mjs --port <port> --click ... --wait-for ... --eval ...`
   (see .claude/skills/browser-qa) — a real headless-Chromium pass against the live app,

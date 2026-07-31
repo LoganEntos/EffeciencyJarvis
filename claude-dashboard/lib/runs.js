@@ -153,6 +153,17 @@ function startRun({ prompt, model, permissionMode, resume, recall, engine, proje
   if (runningCount() >= MAX_ACTIVE && queue.length >= MAX_QUEUE) {
     return { error: `busy: ${MAX_ACTIVE} running + ${queue.length} queued — wait or cancel one` };
   }
+  // C78: in-flight lock per sessionId — 3 resume requests hit the SAME session
+  // within one second (transcript evidence), firing duplicate concurrent CLIs
+  // for no benefit. Checks sessionId (set on child init) + resumedFrom (set at
+  // creation) so the queued→init window is covered too.
+  if (resume) {
+    for (const s of active.values()) {
+      if ((s.meta.status === 'running' || s.meta.status === 'queued')
+          && (s.meta.sessionId === resume || s.meta.resumedFrom === resume))
+        return { error: `session busy: run ${s.meta.id} is already active against this session — wait for it to finish or cancel it` };
+    }
+  }
   if (engine === 'claude' && !fs.existsSync(claudeExe())) return { error: 'claude CLI not found at ' + claudeExe() };
   if (engine === 'hermes' && !fs.existsSync(HERMES_EXE)) return { error: 'hermes not installed at ' + HERMES_EXE + ' — see docs/hermes-adoption.md' };
 

@@ -42,7 +42,21 @@ prefix with `MSYS_NO_PATHCONV=1` or a leading `/path` arg gets mangled into a
 Windows path. Read-only checks are safe against the live 127.0.0.1:5757 hub; if a
 change touched server code (`lib/*.js`, `server.js`), verify against a throwaway
 `node claude-dashboard/server.js 5758` instance instead — never restart 5757, and
-check `netstat -ano | grep 5758` for a stale process squatting the port first.
+check `netstat -ano | grep 5758` for a stale process squatting the port first
+(clear it with `powershell -File scripts/kill-port.ps1 -Port 5758`, same as
+teardown below — never a raw `taskkill /pid <n>`).
+
+**Teardown — kill the throwaway instance strictly by port, never by PID or
+image name.** Once verification is done, run
+`powershell -File scripts/kill-port.ps1 -Port 5758` (or whatever port you
+started it on). It refuses port 5757 outright and takes no PID argument at
+all, so it physically cannot be pointed at the wrong process. Do NOT
+`taskkill`/`Stop-Process` a PID you read off `netstat` or off a run's own
+`meta.json` `hubPid` field by hand — that has killed the real primary hub
+before (a subagent taskkilled its own run's `hubPid`, and a separate run did
+a blanket "stop all Node processes"; see
+`claude-dashboard/data/todos/run.md`, 2026-07-31 entry). `hubPid` in any run's
+meta.json is the PRIMARY hub that dispatched that run — never a kill target.
 
 ### Safety first — blast radius (run read-only by default)
 

@@ -24,4 +24,9 @@ Rules:
 - Prefer the cheapest correct fix; don't add abstraction or deps for speed.
   Consult `latency-critical-systems` and `agent-architecture-audit`.
 - Zero deps, files < 500 lines. NEVER touch 5757; profile/verify on a throwaway
-  5758 instance + the smoke script.
+  5758 instance + the smoke script. Tear it down with
+  `powershell -File scripts/kill-port.ps1 -Port 5758` — kills strictly by
+  port. NEVER `taskkill`/`Stop-Process` a raw PID and NEVER "stop all node
+  processes"; a raw-PID kill has hit the wrong process before, including a
+  run's own dispatching hub (a run's `hubPid` in its meta.json is that
+  PRIMARY hub's PID and is never a kill target).
