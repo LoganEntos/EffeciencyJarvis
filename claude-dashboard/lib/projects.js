@@ -60,16 +60,50 @@ function slugify(name, taken) {
   return s;
 }
 
-// A project's attached files = the inbox subfolder named for its slug.
+// ---- pinned-file overlay (pure metadata, mirrors lib/pairing.js's decision/
+// upload sidecars) -- a human "this file matters most" flag surfaced above
+// the flat grid, e.g. the template file in a project with hundreds of PDFs.
+// Never touches file content/location. Same tmp+rename write safety and
+// prototype-pollution key guard as pairing.js's overlays.
+const PIN_UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const pinnedFile = slug => path.join(INBOX, slug, '.pinned.json');
+function loadPinned(slug) {
+  const d = U.safeJson(pinnedFile(slug));
+  return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
+}
+function savePinned(slug, base, pinned) {
+  if (!base || PIN_UNSAFE_KEYS.has(base)) return { error: 'name required' };
+  // Confirm the file actually exists in this project before recording a pin —
+  // a stale/typo'd name would otherwise silently accumulate in the sidecar.
+  try { if (!fs.statSync(path.join(INBOX, slug, base)).isFile()) return { error: 'not found' }; }
+  catch { return { error: 'not found' }; }
+  const map = loadPinned(slug);
+  if (pinned) map[base] = { pinned: true, at: new Date().toISOString() };
+  else delete map[base];
+  try {
+    const file = pinnedFile(slug), tmp = file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(map, null, 2));
+    fs.renameSync(tmp, file);
+  } catch (e) { return { error: e.message }; }
+  return { ok: true };
+}
+
+// A project's attached files = the inbox subfolder named for its slug. Dotfiles
+// (`.decisions.json`, `.uploads.json`, `.pinned.json` — this module's and
+// pairing.js's own sidecars, which live in the SAME folder) are internal
+// bookkeeping, not attached files — they must never surface as a fake tile in
+// the grid, count toward "N files", or ride along in a run's file manifest
+// (lib/project-context.js has the same filter for that same reason).
 function projectFiles(slug) {
   const dir = path.join(INBOX, slug);
+  const pinned = loadPinned(slug);
   const out = [];
   for (const e of U.listDir(dir)) {
-    if (!e.isFile()) continue;
+    if (!e.isFile() || e.name.startsWith('.')) continue;
     let st; try { st = fs.statSync(path.join(dir, e.name)); } catch { st = {}; }
-    out.push({ name: slug + '/' + e.name, base: e.name, size: st.size || 0, modified: st.mtime || null });
+    out.push({ name: slug + '/' + e.name, base: e.name, size: st.size || 0, modified: st.mtime || null, pinned: !!pinned[e.name] });
   }
-  return out.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+  return out.sort((a, b) => (b.pinned - a.pinned) || (new Date(b.modified) - new Date(a.modified)));
 }
 
 // Cheap count for the list/summary views: readdirSync withFileTypes already
@@ -77,7 +111,7 @@ function projectFiles(slug) {
 // a count (unlike projectFiles(), which needs size+mtime for the detail view).
 function fileCountFor(slug) {
   let n = 0;
-  for (const e of U.listDir(path.join(INBOX, slug))) if (e.isFile()) n++;
+  for (const e of U.listDir(path.join(INBOX, slug))) if (e.isFile() && !e.name.startsWith('.')) n++;
   return n;
 }
 
@@ -392,6 +426,20 @@ async function handle(req, res, url) {
     // Tag the note with the project slug so recallForProject finds it.
     memory.addNote('semantic', b.title || ('note · ' + proj.name), b.text.toString(), [proj.slug], 0.75);
     U.sendJson(res, { ok: true });
+    return true;
+  }
+  // Pin/unpin an attached file as high priority (e.g. the template file in a
+  // project with hundreds of PDFs) — see savePinned above. `name` is the bare
+  // basename within this project's inbox folder, not the "slug/name" composite
+  // used elsewhere (files.js's inboxFile()) — this route is already scoped to
+  // one project via `id`, so a composite would be redundant.
+  if (p === '/api/projects/pin' && req.method === 'POST') {
+    let b = {}; try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
+    const proj = get((b.id || '').toString());
+    if (!proj) { U.sendJson(res, { error: 'not found' }, 404); return true; }
+    const base = path.basename((b.name || '').toString().trim());
+    const r = savePinned(proj.slug, base, b.pinned === true);
+    U.sendJson(res, r, r.error ? 400 : 200);
     return true;
   }
   return false;
