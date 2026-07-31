@@ -3,8 +3,10 @@
  * Zero-dependency Node HTTP server. Binds to 127.0.0.1 only (personal/local tool).
  * Start:  node server.js   (optionally PORT=5757)
  *
- * Boot + router only — routes live in lib/core.js (monitor/library),
- * lib/runs.js (run Claude from the browser), lib/files.js (upload inbox).
+ * Boot + router only — routes live in lib/core.js (overview/config/sessions),
+ * lib/library.js (agents/skills/commands/assets/hermes), lib/graph.js
+ * (codebase graph), lib/runs.js (run Claude from the browser), lib/files.js
+ * (upload inbox).
  */
 'use strict';
 const http = require('http');
@@ -13,6 +15,8 @@ const path = require('path');
 const crypto = require('crypto');
 const U = require('./lib/util');
 const core = require('./lib/core');
+const library = require('./lib/library');
+const graph = require('./lib/graph');
 const runs = require('./lib/runs');
 const files = require('./lib/files');
 const tasks = require('./lib/tasks');
@@ -177,6 +181,8 @@ const server = http.createServer(async (req, res) => {
     if (await projects.handle(req, res, url)) return;
     if (await sharepoint.handle(req, res, url)) return;
     if (await files.handle(req, res, url)) return;
+    if (await library.handle(req, res, url)) return;
+    if (await graph.handle(req, res, url)) return;
     if (await core.handle(req, res, url)) return;
 
     res.writeHead(404, { 'Content-Type': 'text/plain' });
