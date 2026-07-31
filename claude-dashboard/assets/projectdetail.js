@@ -62,7 +62,10 @@ async function renderProjectDetail(id) {
         <button id="pMoveOut" class="ghost" disabled style="padding:4px 10px;font-size:11px">Move out of project</button>
         <span id="pBulkStatus" class="muted" role="status" aria-live="polite"></span>
       </div>` : ''}
-      <div id="pFiles">${files.length ? projFilesHtml(files) : '<div class="muted">No files yet.</div>'}</div>
+      ${files.length ? `<details class="histSection" id="pFilesSection" style="margin-top:8px">
+        <summary>Show ${files.length} file${files.length === 1 ? '' : 's'}</summary>
+        <div id="pFiles" class="histbody">${projFilesHtml(files)}</div>
+      </details>` : `<div id="pFiles" class="muted">No files yet.</div>`}
     </div>`;
 
   // Imported Claude-workspace projects (p.kind === 'claude') never mount the
@@ -99,7 +102,13 @@ async function renderProjectDetail(id) {
   // otherwise stacks three empty setup sections above the chat. Lead with the
   // chat so the first thing you see is somewhere to start.
   const emptyStart = !claude && files.length === 0 && !(p.instructions && p.instructions.trim());
-  const setupSections = emptyStart ? (secChat + secInstr + secFiles) : (secInstr + secFiles + secChat);
+  // Pairing (the organized per-order PDF<->CSV view) now leads the raw
+  // Attached-files grid, not the other way around -- a project with a large
+  // batch (VPP: dozens of orders, each PDF+CSV) previously buried the one
+  // organized view under a flat wall of individual file tiles. renderPairingPanel
+  // no-ops on a null container (see projectpairs.js), so skipping it for a
+  // brand-new empty project is safe.
+  const setupSections = emptyStart ? (secChat + secInstr + secFiles) : (secInstr + secPairing + secFiles + secChat);
 
   el.innerHTML = `
     <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
@@ -133,7 +142,6 @@ async function renderProjectDetail(id) {
     </div>` : ''}
     ${setupSections}
     ${secSpLink}
-    ${secPairing}
 
     <div class="row" id="pRunsSection">${runsSection(runs)}</div>
 
@@ -250,6 +258,25 @@ async function renderProjectDetail(id) {
   // non-matching tiles so bulk-select state survives a filtered view; re-syncs
   // the bulk toolbar so "select all"/count stay scoped to what's visible.
   wireFileFilter(el, bulkSync);
+
+  // Attached-files grid starts collapsed once a project has a lot of files
+  // (VPP-scale: 50-100+ tiles otherwise rendered/painted on every visit) —
+  // the organized pairing view above is the primary way to work at that
+  // scale; this raw grid is for individual file management. Remembers the
+  // user's own choice per project (not a single global key — a global key
+  // would leak one project's expand/collapse state into every other one).
+  const filesSection = $('#pFilesSection');
+  if (filesSection) {
+    const key = `hub.proj.${p.slug}.filesOpen`;
+    let stored = null;
+    try { stored = localStorage.getItem(key); } catch {}
+    filesSection.open = stored === null ? files.length <= 24 : stored === '1';
+    filesSection.ontoggle = () => { try { localStorage.setItem(key, filesSection.open ? '1' : '0'); } catch {} };
+    // Typing a filter while the grid is collapsed would otherwise hide the
+    // results it's producing — auto-expand on the first keystroke.
+    const searchEl = $('#pFileSearch');
+    if (searchEl) searchEl.addEventListener('input', () => { if (!filesSection.open) filesSection.open = true; }, { once: true });
+  }
 
   // recent-runs rows → open the run in the Sessions/history view if available
   wireRunRows(el);

@@ -181,8 +181,13 @@ async function listView(sel, title, endpoint, type, extraHtml = '') {
     listEl.innerHTML = keys.map(k => {
       const open = !collapsed.has(k);
       const items = groups[k].sort((a, b) => a.name.localeCompare(b.name) * dir);
+      // Active status lives inside .lib-gbody, which `hidden` wipes from view
+      // on collapse (the reported bug: "it says active, but collapse the
+      // group and it disappears") -- surface an active count on the header
+      // itself so that signal survives collapsing the group.
+      const activeCount = type === 'agents' ? items.filter(d => d.active).length : 0;
       return `<div class="lib-group"><button class="lib-ghead" data-g="${esc(k)}" aria-expanded="${open}">
-        <span class="fold">${open ? '▾' : '▸'}</span> ${esc(k)} <span class="muted">${items.length}</span></button>
+        <span class="fold">${open ? '▾' : '▸'}</span> ${esc(k)} <span class="muted">${items.length}</span>${type === 'agents' ? ` <span class="pill ${activeCount ? 'ok' : ''}" style="font-size:10px">${activeCount} active</span>` : ''}</button>
         <div class="lib-gbody"${open ? '' : ' hidden'}>${items.map(d => `<div class="row clickable" data-i="${data.indexOf(d)}">
           <div class="flex" style="justify-content:space-between"><span class="name mono">${esc(d.name)}${type === 'agents' && d.builtin ? ' <span class="muted" style="font-weight:400;font-size:11px">· built-in</span>' : ''}</span>
             <span>${type === 'agents' ? `<span class="pill ${d.active ? 'ok' : ''}" title="${d.usageCount || 0} dispatch${d.usageCount === 1 ? '' : 'es'} in run history${d.lastUsed ? ' · last ' + esc(d.lastUsed.slice(0, 10)) : ''}">${d.active ? '● active' : '○ dormant'}</span>` : ''}

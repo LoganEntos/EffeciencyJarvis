@@ -6,7 +6,7 @@ renderers.graph = async function () {
   $('#graph').innerHTML = `
     <h2>Graph</h2>
     <div class="flex" style="margin-bottom:14px">
-      <span class="pill modeChip" data-m="agents" style="cursor:pointer">⚡ Agents — live run crew</span>
+      <span class="pill modeChip" data-m="agents" style="cursor:pointer" title="the live crew for ONE selected run — the full roster of every configured agent is in the Agents tab">⚡ Live crew (this run)</span>
       <span class="pill modeChip" data-m="code" style="cursor:pointer">⌬ Codebase map</span>
     </div>
     <div id="graphBody"></div>`;
