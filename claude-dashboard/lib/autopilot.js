@@ -80,28 +80,84 @@ function parseBacklog() {
   return items;
 }
 
+// ---------- human-in-the-loop eligibility gate (defense-in-depth) ----------
+// A projects-backlog checklist line is NOT pickable by autopilot if its own text
+// — or any `>` note lines that trail it — says a human must decide/act first. This
+// is a HARD exclusion, independent of projectsBacklogEnabled: even if that flag is
+// ever turned on, an item a human explicitly reserved for themselves must never be
+// dispatched unattended (the two open VPP items in projects.md today both say so —
+// one needs the user to define destructive-delete semantics, the other needs human
+// review of ambiguous source documents, "not a script"). We err toward EXCLUDING
+// on any match: a false-exclude just leaves a todo for a person (safe); a
+// false-include fires an unmonitored run on something a human said needs their
+// judgment (the exact failure mode this exists to prevent). Pure + exported so it
+// is unit-testable; pass the item line joined with its `>` notes.
+//
+// Sanity checks (see the `node -e` in the commit trail):
+//   isHumanBlocked('Step 9 — batched processing runs once the user green-lights the skill') === true
+//   isHumanBlocked('Remaining 7 orders all need a human, not a script fix')                 === true
+//   isHumanBlocked('Waiting on user sign-off before building the conversion skill')          === true
+//   isHumanBlocked('dead server route GET /api/projects/reconcile — rebuild the index')      === false
+const HUMAN_BLOCK_RE = [
+  /needs?\s+(?:a\s+|the\s+)?user\b/i,              // "needs a user", "needs the user", "need user"
+  /needs?\s+your\s+call\b/i,                        // "needs your call"
+  /\buser\s+(?:sign-?off|go-?ahead|green-?light|decision|call|input|review|approval)/i,
+  /green-?lights?\b/i,                              // "green-lights the skill"
+  /\bsign-?off\b/i,                                 // "sign-off" / "sign off"
+  /human\s+(?:review|must|decision|judg\w*|look|eyes?|pick|call|input|attention|different)/i,
+  /needs?\s+(?:a\s+)?human/i,                       // "needs a human", "need a human"
+  /\bby\s+a\s+human\b/i,
+  /\ba\s+human\s+look\b/i,
+  /waiting\s+on\s+(?:you|the\s+user|user)\b/i,      // "waiting on you", "waiting on the user"
+  /awaiting\s+(?:the\s+)?user\b/i,
+  /\bnot\s+a\s+script(?:\s+fix)?\b/i,               // "need a human, not a script fix"
+  /needs?\s+(?:a\s+)?(?:concrete\s+)?(?:answer|decision|call|sign-?off)\s+from\s+the\s+user/i,
+  /\buser\s+to\s+(?:define|specify|decide|choose|scope)/i,
+  /needs?\s+the\s+user\s+to\b/i,
+];
+function isHumanBlocked(text) {
+  const s = String(text || '');
+  return HUMAN_BLOCK_RE.some(re => re.test(s));
+}
+
 // ---------- Projects-tab TODO parsing (Phase 2, gap A) ----------
 // data/todos/projects.md uses GitHub checklist syntax (`- [ ] ...` open,
 // `- [x] ...` done), NOT the markdown-table format parseBacklog() handles, so it
 // needs its own scan. We only pick OPEN (`- [ ]`) top-level checklist lines; any
-// `- [x]`/`- [X]` line is done and skipped, and the `  > ...` note blocks that
-// trail an item aren't checklist lines so they're ignored automatically. The file
-// has no ticket-id column, so we derive a STABLE id from a sha1 of the trimmed
-// line text — identical across re-parses of an unchanged line (so a tick doesn't
+// `- [x]`/`- [X]` line is done and skipped. The `  > ...` note blocks that trail an
+// item are NOT checklist lines, but we now COLLECT them (until the next checklist
+// line or `#` heading) so the human-in-the-loop gate below can read an item's full
+// context — an item's own line may look benign while its notes say a human must
+// decide. The file has no ticket-id column, so we derive a STABLE id from a sha1 of
+// the trimmed line text ONLY (unchanged — notes are context for the gate, not part
+// of identity), identical across re-parses of an unchanged line (so a tick doesn't
 // think every item is new every 5 minutes), keyed under a `pj-` prefix that can't
 // collide with backlog ids (`[A-Z]\d+`) or task ids (`t-…`) in state.dispatched.
 // The returned shape matches parseBacklog()'s rows so dispatch() fires it unchanged.
 function parseProjectsBacklog() {
   const txt = U.safeRead(PROJECTS_TODO_FILE) || '';
-  const items = [];
+  const openItems = [];
+  let current = null; // last checklist item seen (open OR done), to attach trailing `>` notes
   for (const line of txt.split('\n')) {
     const m = /^\s*-\s*\[( |x|X)\]\s+(.*\S)\s*$/.exec(line);
-    if (!m || m[1] !== ' ') continue; // no match, or a checked-off (done) row
-    const text = m[2].trim();
-    if (!text) continue;
-    const id = 'pj-' + crypto.createHash('sha1').update(text).digest('hex').slice(0, 10);
+    if (m) {
+      current = { open: m[1] === ' ', text: m[2].trim(), notes: [] };
+      if (current.open && current.text) openItems.push(current);
+      continue;
+    }
+    if (/^\s*#/.test(line)) { current = null; continue; }             // heading ends a note block
+    if (current && /^\s*>/.test(line)) current.notes.push(line.replace(/^\s*>\s?/, ''));
+    // wrapped continuation lines are ignored (not appended to text — id must stay
+    // stable — and not treated as note-block terminators, so `>` notes after a
+    // wrapped line still attach to the right item)
+  }
+  const items = [];
+  for (const it of openItems) {
+    // HARD skip: this item's line OR its trailing notes flag it as needing a human.
+    if (isHumanBlocked(it.text + '\n' + it.notes.join('\n'))) continue;
+    const id = 'pj-' + crypto.createHash('sha1').update(it.text).digest('hex').slice(0, 10);
     items.push({
-      id, loc: 'claude-dashboard/data/todos/projects.md', issue: text,
+      id, loc: 'claude-dashboard/data/todos/projects.md', issue: it.text,
       fix: '(see this checklist line in the Projects-tab TODO)', status: '⬜', done: false,
     });
   }
@@ -376,4 +432,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, startTicker, status, parseBacklog, parseProjectsBacklog };
+module.exports = { handle, startTicker, status, parseBacklog, parseProjectsBacklog, isHumanBlocked };
