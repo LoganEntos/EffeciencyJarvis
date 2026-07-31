@@ -13,6 +13,16 @@ const chat = { sessionId: null, runId: null, es: null, running: false, t0: 0, ti
 const RUN_SESS_KEY = 'hub.sess.run';
 try { chat.sessionId = localStorage.getItem(RUN_SESS_KEY) || null; } catch {}
 
+// Shown/hidden by clearComposer() (run-composer.js) and anything that changes
+// the textarea or pendingFiles — re-queries fresh so it's safe to call from
+// either file regardless of load order.
+function updateTaClear() {
+  const ta = $('#promptIn'), btn = $('#taClear');
+  if (!ta || !btn) return;
+  const hasAttach = chat.pendingFiles && chat.pendingFiles.length > 0;
+  btn.classList.toggle('hidden', !(ta.value.trim() || hasAttach));
+}
+
 function ensureRunUI() {
   if ($('#chatLog')) return;
   $('#run').innerHTML = `
@@ -75,7 +85,10 @@ function ensureRunUI() {
     <div class="badgebar" id="runStatus" style="margin-bottom:10px"></div>
     <div class="composer">
       <div id="attachStrip" class="attachstrip hidden"></div>
-      <textarea id="promptIn" placeholder="Ask Claude to do something in this project… (paste, drop, or 📎 attach files)"></textarea>
+      <div class="ta-wrap">
+        <textarea id="promptIn" placeholder="Ask Claude to do something in this project… (paste, drop, or 📎 attach files)"></textarea>
+        <button id="taClear" class="taClear hidden" type="button" title="Clear everything in the box" aria-label="Clear prompt">✕</button>
+      </div>
       <input type="file" id="fileIn" multiple hidden>
       <div class="btns">
         <button id="attachBtn" class="ghost" title="Attach files to this run">📎 Attach</button>
@@ -85,10 +98,14 @@ function ensureRunUI() {
         <button id="cancelBtn" class="danger hidden">Cancel ✕</button>
       </div>
     </div>
-    <h2 style="margin-top:30px">Run history <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— click a run to replay it</span></h2>
-    <div class="flex" id="histStats" style="margin-bottom:12px"></div>
-    <input class="search" id="histFilter" placeholder="Filter runs by prompt…">
-    <div id="runHistory"><div class="muted">Loading…</div></div>`;
+    <details class="histSection" id="histSection" style="margin-top:30px">
+      <summary>Run history <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— click a run to replay it</span></summary>
+      <div class="histbody">
+        <div class="flex" id="histStats" style="margin:12px 0"></div>
+        <input class="search" id="histFilter" placeholder="Filter runs by prompt…">
+        <div id="runHistory"><div class="muted">Loading…</div></div>
+      </div>
+    </details>`;
   $('#sendBtn').onclick = sendPrompt;
   $('#cancelBtn').onclick = cancelRun;
   // Re-read: speak the last assistant reply again via the same TTS path the run
@@ -126,6 +143,12 @@ function ensureRunUI() {
   };
   $('#attachBtn').onclick = () => $('#fileIn').click();
   $('#fileIn').onchange = e => { const f = [...(e.target.files || [])]; if (f.length) attachFiles(f); e.target.value = ''; };
+  // Clear-box control: an explicit way to wipe the composer (text + any
+  // pending attachments) without select-all/backspace — visible only when
+  // there's actually something to clear.
+  ta.oninput = updateTaClear;
+  $('#taClear').onclick = () => runComposer.clearComposer();
+  updateTaClear();
   const comp = ta.closest('.composer');
   comp.ondragover = e => { e.preventDefault(); comp.classList.add('drag'); };
   comp.ondragleave = () => comp.classList.remove('drag');
@@ -135,6 +158,11 @@ function ensureRunUI() {
     if (files.length) attachFiles(files);
   };
   $('#histFilter').oninput = renderHistory;
+  // Collapsed by default so token-usage-heavy history doesn't dominate the
+  // tab; remembers the user's last open/closed choice.
+  const histSection = $('#histSection');
+  try { histSection.open = localStorage.getItem('hub.histOpen') === '1'; } catch {}
+  histSection.ontoggle = () => { try { localStorage.setItem('hub.histOpen', histSection.open ? '1' : '0'); } catch {} };
   // engine/model/permission choices survive reloads
   try {
     // one-time migration: 'acceptEdits' was the old default, but headless hub
@@ -213,6 +241,7 @@ function prefillRun(text) {
   ensureRunUI();
   $('#promptIn').value = text;
   $('#promptIn').focus();
+  updateTaClear();
 }
 
 // Bind (or clear) the Run tab to a Project — its instructions + project-scoped

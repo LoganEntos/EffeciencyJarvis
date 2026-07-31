@@ -85,6 +85,7 @@ window.HubVoiceConvoFactory = function (ctx) {
   function caption(text) {
     const ta = captionTarget(); if (!ta) return;
     ta.value = text ? ((S.pre ? S.pre + ' ' : '') + text) : S.pre;
+    if (typeof updateTaClear === 'function') updateTaClear();
   }
 
   // ---- turn routing ------------------------------------------------------------
@@ -95,6 +96,7 @@ window.HubVoiceConvoFactory = function (ctx) {
     try { ensureRunUI(); } catch {}
     const ta = $('#promptIn');
     if (ta) ta.value = (S.pre ? S.pre + ' ' : '') + text;
+    if (typeof updateTaClear === 'function') updateTaClear();
     if (typeof sendPrompt === 'function') sendPrompt();
   }
 

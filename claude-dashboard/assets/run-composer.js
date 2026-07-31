@@ -58,6 +58,20 @@ function renderAttachStrip() {
     : `<span class="attachchip file${c.pending ? ' pending' : ''}" title="${esc(c.name)}">`
       + `<span class="ficon">📄</span><span class="fname">${esc(c.name)}</span>`
       + `<button class="x" onclick="removeFile(${i})" title="remove">✕</button></span>`).join('');
+  if (typeof updateTaClear === 'function') updateTaClear();
+}
+
+// Wipe the composer entirely: text, any pending attachments, and an active
+// dictation — the "✕" control next to the textarea. Individual attachments
+// already have their own remove button; this is the all-at-once version.
+function clearComposer() {
+  const ta = $('#promptIn');
+  if (dict) { try { dict.stop(); } catch {} }
+  if (ta) ta.value = '';
+  chat.pendingFiles.forEach(c => { try { if (c.url) URL.revokeObjectURL(c.url); } catch {} });
+  chat.pendingFiles = [];
+  renderAttachStrip(); // also calls updateTaClear()
+  if (ta) ta.focus();
 }
 
 // ---- send flow ----
@@ -105,12 +119,12 @@ async function sendPrompt() {
       // distiller rewrites it, instead of staring at a "Shaping…" button.
       const btn = $('#sendBtn'), label = btn ? btn.textContent : '';
       if (btn) { btn.disabled = true; btn.textContent = '✦ Shaping…'; }
-      optimisticEl = addMsg(prompt, 'user'); ta.value = '';
+      optimisticEl = addMsg(prompt, 'user'); ta.value = ''; updateTaClear();
       chat.sending = true;
       const refined = await jarvisDistill(prompt);
       chat.sending = false;
       if (btn) { btn.disabled = false; btn.textContent = label; }
-      if (chat.running) { if (optimisticEl) optimisticEl.remove(); ta.value = prompt; return; } // a run slipped in while we were distilling
+      if (chat.running) { if (optimisticEl) optimisticEl.remove(); ta.value = prompt; updateTaClear(); return; } // a run slipped in while we were distilling
       if (refined) { displayPrompt = prompt = refined; }
       else { const tr = jarvisTransform(prompt); if (tr) displayPrompt = prompt = tr.buffered; } // distill miss → local cleanup
       if (optimisticEl) optimisticEl.textContent = displayPrompt; // reconcile to what actually runs
@@ -135,8 +149,8 @@ async function sendPrompt() {
         effort: $('#runEffort').value, channel,
         resume: engine === 'hermes' ? '' : (chat.sessionId || ''), recall: $('#runRecall').checked,
         projectId: (runProject && runProject.id) || '', images: imgs.map(c => c.ref), files: docs.map(c => c.ref) }) });
-  } catch (e) { if (optimisticEl) { optimisticEl.remove(); ta.value = prompt; } addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
-  if (r.error) { if (optimisticEl) { optimisticEl.remove(); ta.value = prompt; } addMsg(r.error, 'errmsg'); return; }
+  } catch (e) { if (optimisticEl) { optimisticEl.remove(); ta.value = prompt; } updateTaClear(); addMsg('Run failed to start: ' + (e.message || 'network error'), 'errmsg'); return; }
+  if (r.error) { if (optimisticEl) { optimisticEl.remove(); ta.value = prompt; } updateTaClear(); addMsg(r.error, 'errmsg'); return; }
   ta.value = '';
   if (!optimisticEl) addMsg(displayPrompt, 'user'); // else the optimistic bubble already shows it
   if (atts.length) {
@@ -144,6 +158,7 @@ async function sendPrompt() {
     if (docs.length) addMsg('📎 ' + docs.map(c => c.name).join(', '), 'sys');
     chat.pendingFiles = []; renderAttachStrip();
   }
+  updateTaClear();
   chat.hermesEl = null; chat.hermesText = ''; // fresh bubble per hermes reply
   attachLiveRun(r.id, { startedAtMs: Date.now(), queued: r.queued });
   if (window.HubVoice) HubVoice.onRunStart();
@@ -177,6 +192,7 @@ function toggleDictation() {
     }
     if (finalTxt) dictBase += finalTxt.trim() + ' ';
     ta.value = (dictBase + interim).replace(/\s+/g, ' ').replace(/^\s/, '');
+    updateTaClear();
   };
   r.onerror = ev => {
     const why = ev.error === 'not-allowed' ? 'mic permission denied — allow it in the browser and retry'
@@ -227,5 +243,5 @@ async function loopCheckNow() {
 // Namespace mirror per the jarvissoul.js convention for guarded callers; the
 // bare globals above remain the canonical entry points (removeFile must stay
 // global for the attach-chip inline onclick).
-window.runComposer = { sendPrompt, attachFiles, removeFile, renderAttachStrip,
+window.runComposer = { sendPrompt, attachFiles, removeFile, renderAttachStrip, clearComposer,
   toggleDictation, toggleLoop, loopCheckNow, refreshLoop };

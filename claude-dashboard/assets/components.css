@@ -186,6 +186,12 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .toolblk details[open] summary::before{content:'▾ '}
 .toolblk pre{margin:0;border:none;border-radius:0;border-top:1px solid var(--line);
   max-height:260px;font-size:11.5px;padding:10px 14px}
+.histSection{border:1px solid var(--line);border-radius:10px;padding:0;overflow:hidden}
+.histSection>summary{cursor:pointer;padding:11px 14px;font-size:14px;font-weight:600;
+  color:var(--txt);list-style:none;user-select:none}
+.histSection>summary::before{content:'▸ ';color:var(--dim)}
+.histSection[open]>summary::before{content:'▾ '}
+.histSection .histbody{padding:0 14px 14px}
 /* live activity tailed from hermes's own log (its -z mode streams no tool
    events) — quiet, mono, indented so it reads as ambient telemetry not chat */
 .logline{align-self:flex-start;max-width:88%;font-family:var(--font-mono);font-size:11px;
@@ -208,8 +214,14 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .msg-copy .icon{width:13px;height:13px;flex-shrink:0}
 .composer{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;border-radius:12px;transition:box-shadow .15s}
 .composer.drag{box-shadow:0 0 0 2px var(--accent) inset;outline:none}
+.ta-wrap{position:relative;flex:1;display:flex}
 .composer textarea{flex:1;margin:0;min-height:64px;max-height:220px;resize:vertical;
   font-size:13.5px;line-height:1.5}
+.taClear{position:absolute;top:7px;right:7px;width:20px;height:20px;padding:0;line-height:18px;
+  border:none;border-radius:50%;background:#000a;color:#fff;font-size:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;opacity:.65;transition:opacity .12s}
+.taClear:hover{opacity:1}
+.taClear.hidden{display:none}
 .composer .btns{display:flex;flex-direction:column;gap:8px}
 .attachstrip{width:100%;display:flex;flex-wrap:wrap;gap:8px}
 .attachchip{position:relative;display:inline-flex;width:56px;height:56px;border-radius:8px;
