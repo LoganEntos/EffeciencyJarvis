@@ -19,6 +19,31 @@ metadata:
 
 Uses the browser automation MCP (claude-in-chrome, Playwright, or Puppeteer) to interact with live pages like a real user.
 
+### In THIS repo (Claude Code Hub): use the local tool, not an MCP
+
+No browser MCP is wired into this hub (the decision log in `docs/roadmap.md` caps
+always-on MCPs at scrapling only), so the "Integration" section below doesn't apply
+here. Instead use `scripts/browser-qa/qa.mjs` — a dev-only CLI (playwright, installed
+in its own `scripts/browser-qa/node_modules`, never imported by `claude-dashboard/`
+so the app stays zero-dependency) that drives the live hub headlessly:
+
+```
+node scripts/browser-qa/qa.mjs --port 5757 --path / \
+  --click 'a[data-tab="projects"]' --wait-for '.card.clickable' \
+  --eval "document.querySelectorAll('.histSection').length" \
+  --screenshot out.png
+```
+
+Steps run in command-line order (`--click`, `--fill`, `--wait-for`, `--eval`,
+`--screenshot` interleave freely). It prints one JSON summary (console errors, page
+errors, 4xx/5xx responses, eval results) and exits non-zero on any of those unless
+`--allow-errors` is passed — a plain PASS/FAIL a caller can check. On Git Bash,
+prefix with `MSYS_NO_PATHCONV=1` or a leading `/path` arg gets mangled into a
+Windows path. Read-only checks are safe against the live 127.0.0.1:5757 hub; if a
+change touched server code (`lib/*.js`, `server.js`), verify against a throwaway
+`node claude-dashboard/server.js 5758` instance instead — never restart 5757, and
+check `netstat -ano | grep 5758` for a stale process squatting the port first.
+
 ### Safety first — blast radius (run read-only by default)
 
 Browser QA drives real auth and real user journeys, so treat the blast radius explicitly.

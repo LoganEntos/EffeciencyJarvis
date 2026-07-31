@@ -1,0 +1,9 @@
+{
+  "name": "hub-browser-qa",
+  "private": true,
+  "description": "Dev-only browser automation for verifying the hub's own UI. Never imported by claude-dashboard/ (the app stays zero-dependency) — this is a standalone CLI invoked via `node scripts/browser-qa/qa.mjs`.",
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

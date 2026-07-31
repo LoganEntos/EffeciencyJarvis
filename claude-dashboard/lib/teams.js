@@ -61,7 +61,11 @@ const BUILTINS = [
       + 'sets the amber-agent-orb ZERO-DEP vanilla JS/CSS system; finish touched files with /baseline-ui → '
       + '/fixing-accessibility → /fixing-motion-performance, one accent per view, existing CSS-variable tokens, '
       + 'respect prefers-reduced-motion, no unbounded rAF loops, no npm/React/Tailwind. code-reviewer checks every '
-      + 'diff; test-runner runs scripts/verify-dashboard.ps1 before any completion claim.',
+      + 'diff; test-runner runs scripts/verify-dashboard.ps1 before any completion claim. EVERY UI completion claim '
+      + 'additionally requires a browser-qa pass (scripts/browser-qa/qa.mjs, per .claude/skills/browser-qa) driving '
+      + 'the changed control in the live app — the smoke script alone proves API shape, not that a control renders, '
+      + 'reads, and writes correctly. If the browser tool is unavailable for some reason, the report must say '
+      + '"NOT browser-verified" verbatim rather than imply full verification happened.',
   },
   {
     id: 'github', name: 'GitHub intake', builtin: true,
