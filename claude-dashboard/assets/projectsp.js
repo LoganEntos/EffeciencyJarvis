@@ -84,10 +84,18 @@ async function pspList(el) {
   $('#pspList').innerHTML = pspFolderRows(r.folders) || '<div class="muted">Empty folder.</div>';
   el.querySelectorAll('.pspDir').forEach(d => d.onclick = () => { PSP.path = d.dataset.path; pspList(el); });
 }
+// A bare 4-digit folder name (2022, 2026…) reads as just a number until you
+// already know this tree is year-organized — label it explicitly so it's
+// unambiguous which year of SharePoint history a subfolder holds, without
+// needing the breadcrumb trail above it for context.
+const PSP_YEAR_RE = /^(19|20)\d{2}$/;
 function pspFolderRows(folders) {
-  return (folders || []).map(f => `
-    <div class="flex pspDir" data-path="${esc(PSP.path ? PSP.path + '/' + f.name : f.name)}" style="padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer">
-      <span>▸ <strong>${esc(f.name)}</strong> <span class="muted" style="font-size:11px">${f.count.toLocaleString()} files</span></span></div>`).join('');
+  return (folders || []).map(f => {
+    const isYear = PSP_YEAR_RE.test(f.name);
+    const label = isYear ? `📅 ${esc(f.name)} <span class="muted" style="font-weight:400">— closed orders</span>` : `<strong>${esc(f.name)}</strong>`;
+    return `<div class="flex pspDir" data-path="${esc(PSP.path ? PSP.path + '/' + f.name : f.name)}" style="padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer">
+      <span>${isYear ? '' : '▸ '}${label} <span class="muted" style="font-size:11px">${f.count.toLocaleString()} files</span></span></div>`;
+  }).join('');
 }
 
 async function pspLinkHere(el) {

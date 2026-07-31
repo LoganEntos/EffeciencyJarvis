@@ -57,14 +57,44 @@ function ppTableHtml(slug, orders, dir) {
     <tbody>${orders.map(o => ppRow(slug, o, dir) + ppDecideFormRow(slug, o)).join('')}</tbody></table>`;
 }
 
+// Selected year filter per project (module-level, mirrors PSP's per-project
+// state in projectsp.js) -- survives the panel's own re-renders (refresh
+// button, decision saves) but resets to "all years" on a fresh page load,
+// same as every other in-panel filter in this app.
+const PP_YEAR = {};
+
+// SharePoint's own VPP archive is organized /<year>/<order folder>/ (see
+// lib/sharepoint.js's indexed path, or CHRONOLOGICAL-INDEX.md in the project
+// folder) -- naming the filter the same way ("2026 — Closed Order History")
+// instead of a bare year makes it obvious which SharePoint source folder a
+// batch of converted orders traces back to, not just a number.
+const PP_DIR_LABEL = 'Closed Order History';
+
 function ppRender(slug, containerEl, d) {
-  const orders = Array.isArray(d.orders) ? d.orders.slice() : [];
+  const allOrders = Array.isArray(d.orders) ? d.orders.slice() : [];
   const support = Array.isArray(d.support) ? d.support : [];
   const unparsed = Array.isArray(d.unparsed) ? d.unparsed : [];
-  if (!orders.length && !support.length && !unparsed.length) {
+  if (!allOrders.length && !support.length && !unparsed.length) {
     ppShowMsg(slug, containerEl, 'No pairable files yet — PDFs and CSVs dropped in this project show up here once matched by order.');
     return;
   }
+  // Years come from each order's own CSV (order_date, read server-side —
+  // lib/pairing.js's csvOrderYear); an order with no CSV yet (pdf-only) or
+  // an unrecognized date format has no year and always shows regardless of
+  // the filter, so nothing silently disappears from view.
+  const years = [...new Set(allOrders.map(o => o.year).filter(Boolean))].sort((a, b) => b - a);
+  if (PP_YEAR[slug] && !years.includes(PP_YEAR[slug])) PP_YEAR[slug] = null;
+  const selYear = PP_YEAR[slug] || null;
+  const orders = selYear ? allOrders.filter(o => o.year === selYear || o.year == null) : allOrders;
+
+  const yearPicker = years.length > 1 ? `<div class="flex" style="gap:8px;align-items:center;margin-bottom:8px">
+    <span class="muted" style="font-size:11px">SharePoint source</span>
+    <select id="ppYearSel" style="margin:0;width:auto;font-size:12px">
+      <option value=""${selYear ? '' : ' selected'}>All years (${allOrders.length} orders)</option>
+      ${years.map(y => `<option value="${y}"${y === selYear ? ' selected' : ''}>${y} — ${esc(PP_DIR_LABEL)} (${allOrders.filter(o => o.year === y).length})</option>`).join('')}
+    </select>
+  </div>` : '';
+
   orders.sort((a, b) => (PP_RANK[a.state] ?? 9) - (PP_RANK[b.state] ?? 9));
   const dir = typeof d.dir === 'string' ? d.dir : '';
   const active = orders.filter(o => o.state !== 'complete');
@@ -78,15 +108,18 @@ function ppRender(slug, containerEl, d) {
   try { open = localStorage.getItem(doneOpenKey) === '1'; } catch {}
   const table = active.length ? ppTableHtml(slug, active, dir)
     : (done.length ? '<div class="muted">Every matched order is complete — see below.</div>' : '<div class="muted">No orders matched yet.</div>');
+  const doneLabel = `${done.length} complete order${done.length === 1 ? '' : 's'}${selYear ? ` — ${selYear} · ${PP_DIR_LABEL}` : ''} — reviewed, nothing left to do`;
   const doneSection = done.length
     ? `<details class="histSection" id="ppDoneSection"${open ? ' open' : ''} style="margin-top:14px">
-        <summary>${done.length} complete order${done.length === 1 ? '' : 's'} — reviewed, nothing left to do</summary>
+        <summary>${esc(doneLabel)}</summary>
         <div class="histbody">${ppTableHtml(slug, done, dir)}</div>
       </details>`
     : '';
   containerEl.innerHTML = ppShell(
-    `<div class="muted" style="font-size:11.5px;margin-bottom:8px">${ppCounts(orders)}</div>${table}${doneSection}${ppExtraLine(support, unparsed)}`
+    `${yearPicker}<div class="muted" style="font-size:11.5px;margin-bottom:8px">${ppCounts(orders)}</div>${table}${doneSection}${ppExtraLine(support, unparsed)}`
   );
+  const yearSel = containerEl.querySelector('#ppYearSel');
+  if (yearSel) yearSel.onchange = () => { PP_YEAR[slug] = yearSel.value ? +yearSel.value : null; ppRender(slug, containerEl, d); };
   const doneSectionEl = containerEl.querySelector('#ppDoneSection');
   if (doneSectionEl) doneSectionEl.ontoggle = () => { try { localStorage.setItem(doneOpenKey, doneSectionEl.open ? '1' : '0'); } catch {} };
   ppWireRefresh(slug, containerEl);

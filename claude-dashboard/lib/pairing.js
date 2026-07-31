@@ -124,6 +124,51 @@ function parseManifest(dir) {
   return Object.keys(map).length ? map : null;
 }
 
+// Best-effort year for an order, read from its own CSV's order_date column
+// (row 1) -- the hub's own generated output, same trust level as reading
+// manifest.csv above, not a new category of "open the source PDF" risk.
+// Used only to label the UI with which SharePoint year-folder a batch of
+// converted orders traces back to; never blocks/changes pairing state on
+// a miss. orderId already includes any `-<digits>` multi-part suffix
+// (CSV_RE's capture group keeps it, e.g. "22610-2"), which reconstructs the
+// right filename here since that's exactly what build.js named the CSV.
+const MONTHS3 = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+// Quote-aware split -- `description` (an earlier column than order_date)
+// routinely contains a comma ("PR 5/16 BRASS PLATED CLOSET, BOLTS"), which
+// csvCell() wraps in quotes; a plain .split(',') would then misalign every
+// column after it, including order_date, and silently read the wrong field.
+function splitCsvRow(line) {
+  const out = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') inQ = false;
+      else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+function csvOrderYear(dir, orderId) {
+  const text = U.safeRead(path.join(dir, `order-${orderId}.csv`));
+  if (!text) return null;
+  const lines = text.split(/\r?\n/).filter(l => l.length);
+  if (lines.length < 2) return null;
+  const header = splitCsvRow(lines[0]);
+  const idx = header.indexOf('order_date');
+  if (idx === -1) return null;
+  const raw = (splitCsvRow(lines[1])[idx] || '').trim();
+  if (!raw) return null;
+  let m = /([A-Za-z]{3,})\.?\s+\d{1,2},?\s+(\d{4})/.exec(raw); // "Jul. 24, 2024"
+  if (m && MONTHS3[m[1].slice(0, 3).toLowerCase()]) return +m[2];
+  m = /^\d{1,2}\/\d{1,2}\/(\d{2,4})$/.exec(raw); // "7/8/25" or "12/16/2024"
+  if (m) return m[1].length === 2 ? 2000 + (+m[1]) : +m[1];
+  return null;
+}
+
 // Choose the authoritative PDF for one order's PDF set (order already has
 // >=1 PDF at the call site). Returns { name, note } or { error } (review).
 function pickAuthoritative(orderId, pdfs, manifestMap) {
@@ -165,7 +210,11 @@ function pickAuthoritative(orderId, pdfs, manifestMap) {
   return { error: `${pdfs.length} PDFs for order ${orderId} with no clear authority (${pdfs.map(p => `${p.name} [${p.kind}${p.part ? ', ' + p.part : ''}]`).join('; ')})`, dup: true };
 }
 
-function pairProject(slug) {
+// withYear: pairSummary() (the grid-tile badge, polled on every Projects
+// list load) never reads the year field -- skip the extra per-order CSV
+// read there so that bounded, frequently-called route doesn't pay for data
+// only the full detail-view pairing panel actually uses.
+function pairProject(slug, { withYear = true } = {}) {
   const dir = path.join(INBOX, slug);
   const manifestMap = parseManifest(dir);
   // reverse index: confirmed source_doc filename -> the order it belongs to,
@@ -233,7 +282,8 @@ function pairProject(slug) {
         if (picked.dup) { dup = true; duplicates = pdfs.map(p => p.name); }
       } else { authoritativePdf = picked.name; note = picked.note || ''; state = csvs.length ? 'complete' : 'pdf-only'; }
     }
-    return { orderId, state, pdfs, csvs, authoritativePdf, note, dup, duplicates };
+    const year = (withYear && csvs.length) ? csvOrderYear(dir, orderId) : null;
+    return { orderId, state, pdfs, csvs, authoritativePdf, note, dup, duplicates, year };
   });
 
   // Overlay human decisions last, ON TOP of the computed state — a decision
@@ -254,7 +304,7 @@ function pairProject(slug) {
 // that runs this per-project on a list route must cap it — callers pass the file
 // count and skip large folders. Returns null when there are no order rows.
 function pairSummary(slug) {
-  const { orders } = pairProject(slug);
+  const { orders } = pairProject(slug, { withYear: false });
   if (!orders.length) return null;
   const s = { complete: 0, pdfOnly: 0, csvOnly: 0, review: 0, dups: 0 };
   for (const o of orders) {
