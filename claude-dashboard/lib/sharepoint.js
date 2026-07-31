@@ -271,6 +271,29 @@ function browseIndex(driveId, prefix) {
     files: files.sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
+// Recursive flat file listing under `prefix` on `driveId` — unlike browseIndex
+// (single-level, collapses deeper paths into folder counts), this returns
+// every indexed file under the prefix so lib/reconcile.js can walk the full
+// per-order folder tree. Read-only: no Graph call, just the cached index.
+// Never errors — no index / drive-not-found / no-match all just mean "[]";
+// callers that need to distinguish "no index at all" use indexStats() first.
+function indexFilesUnder(driveId, prefix) {
+  const idx = loadIndex();
+  if (!idx) return [];
+  let drive = null;
+  for (const s of idx.sites || []) for (const d of s.drives || []) if (d.id === driveId) drive = d;
+  if (!drive) return [];
+  let pre = '/' + (prefix || '').replace(/^\/+|\/+$/g, '');
+  if (pre !== '/') pre += '/';
+  const out = [];
+  for (const f of drive.files || []) {
+    if (!f.p.startsWith(pre)) continue;
+    const rest = f.p.slice(pre.length), slash = rest.lastIndexOf('/');
+    out.push({ p: f.p, name: slash >= 0 ? rest.slice(slash + 1) : rest,
+      parent: slash >= 0 ? rest.slice(0, slash) : '', size: f.s, modified: f.m, id: f.id });
+  }
+  return out;
+}
 // Resolve a file's SharePoint webUrl on demand so the user can open it in
 // Office/PDF web viewers without downloading (requires sign-in).
 async function resolveWebUrl(driveId, itemId) {
@@ -429,5 +452,6 @@ async function handle(req, res, url) {
 
 // browseIndex/pull/isAuthed are also consumed by lib/projects.js's manual
 // "Sync now" (see syncSharepointFolder there) — offline enumerate + per-file
-// pull, no new Graph surface added for it.
-module.exports = { handle, browseIndex, pull, isAuthed };
+// pull, no new Graph surface added for it. indexFilesUnder/indexStats are
+// consumed by lib/reconcile.js's read-only join (reconcileProject).
+module.exports = { handle, browseIndex, pull, isAuthed, indexFilesUnder, indexStats };

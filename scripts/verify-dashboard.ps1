@@ -120,6 +120,8 @@ Check "GET /api/projects/pairs"      "$base/api/projects/pairs?slug=vpp-historic
 Check "GET /api/projects/pairs (traversal 404)" "$base/api/projects/pairs?slug=..%2F..%2Fx" 404
 Check "GET /api/projects/pairs (no slug 404)"   "$base/api/projects/pairs" 404
 Check "GET /api/projects/claude"     "$base/api/projects/claude"
+Check "GET /api/projects/reconcile (no id 404)" "$base/api/projects/reconcile" 404
+Check "GET /api/projects/reconcile (bad id 404)" "$base/api/projects/reconcile?id=..%2F..%2Fserver" 404
 Check "GET /api/projects/session (not found 404)" "$base/api/projects/session?id=nope&sid=nope" 404
 CheckPost "POST /api/projects/import-claude w/o token (403)" "$base/api/projects/import-claude" '{}' 403
 Check "GET /api/agentgraph"    "$base/api/agentgraph"

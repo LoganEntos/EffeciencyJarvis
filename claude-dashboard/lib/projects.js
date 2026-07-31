@@ -22,6 +22,11 @@ const pairing = require('./pairing');
 // never requires this module, so a plain top-level require is safe here (unlike
 // runs.js below, which IS circular and stays a lazy require).
 const sharepoint = require('./sharepoint');
+// Reconciliation (SharePoint index <-> local pairing join) lives in its own
+// module — see lib/reconcile.js's header. Not circular: reconcile.js only
+// requires ./projects lazily, inside reconcileProject() at call time, so this
+// top-level require here is safe (mirrors the sharepoint require above).
+const reconcile = require('./reconcile');
 // Claude Code CLI workspace import (~/.claude/projects/*) — split into its
 // own module to keep this file under the 500-line budget. See lib/project-claude.js.
 const claudeImport = require('./project-claude');
@@ -361,6 +366,16 @@ async function handle(req, res, url) {
     let b = {}; try { b = JSON.parse(await U.readBody(req, 4000) || '{}'); } catch {}
     const r = await syncSharepointFolder((b.id || '').toString());
     U.sendJson(res, r, r.error ? 400 : 200);
+    return true;
+  }
+  if (p === '/api/projects/reconcile' && req.method === 'GET') {
+    // GET, read-only — no X-Hub-Token needed (standing GET policy). `id` is an
+    // opaque projects.json key looked up via Array.find (get()), never joined
+    // onto a filesystem path, so — same as /api/projects/get and /api/projects/
+    // session above — a bad/traversal-shaped id just misses the lookup and
+    // falls through to the existing 'not found' 404, no separate regex needed.
+    const r = reconcile.reconcileProject(url.searchParams.get('id') || '');
+    U.sendJson(res, r, r.error ? (r.error === 'not found' ? 404 : 400) : 200);
     return true;
   }
   if (p === '/api/projects/delete' && req.method === 'POST') {
