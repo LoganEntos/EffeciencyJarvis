@@ -13,10 +13,14 @@ renderers.memory = async function () {
 };
 renderers.memory.noSkeleton = true;
 
+const MEM_PAGE = 100;
+const MEM_SERVER_CAP = 500; // mirrors lib/memory.js GET /api/memory's Math.min(500, ...) clamp
 let memType = '';   // '' | episodic | semantic | procedural
 let memQuery = '';
 let memSel = null;  // selected memory id
 let memItems = [];  // current filtered/search list (list pane)
+let memTotal = 0;   // true count for the current type filter (browse mode only — search has its own cap)
+let memLimit = MEM_PAGE; // how many of memTotal are currently fetched; grows via "Load more"
 let allMem = [];    // full unfiltered cache (tag cloud + backlinks)
 
 function ensureMemoryUI() {
@@ -50,7 +54,7 @@ function ensureMemoryUI() {
       <div class="mem-detail" id="memDetail"><div class="muted">Select a memory on the left to view it, its tags and its backlinks.</div></div>
     </div>`;
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
-  $('#memSearch').oninput = debounce(e => { memQuery = e.target.value.trim(); loadMemory(); }, 250);
+  $('#memSearch').oninput = debounce(e => { memQuery = e.target.value.trim(); memLimit = MEM_PAGE; loadMemory(); }, 250);
   $('#memReindex').onclick = async () => {
     try { await api('/api/memory/reindex', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch {}
     await loadAllMem(); loadMemory();
@@ -68,6 +72,7 @@ const MEM_ICON = { episodic: '⏱', semantic: '◆', procedural: '⚙' };
 function selectTag(tag) {
   $('#memSearch').value = tag;
   memQuery = tag;
+  memLimit = MEM_PAGE;
   loadMemory();
 }
 
@@ -108,6 +113,21 @@ function renderMemList() {
     el.innerHTML = `<div class="muted">${memQuery ? 'No memories match “' + esc(memQuery) + '”.' : 'No memories yet — run something or add a note. (Try ↻ Reindex runs to import existing run history.)'}</div>`;
     return;
   }
+  // Load-more affordance: memTotal (post-filter true count, browse mode only —
+  // 0 on the search path, see loadMemory) vs memItems.length (what's actually
+  // fetched at the current memLimit). Previously the list silently truncated
+  // at a fixed 100 with no indication, directly contradicting the "all N"
+  // header chip a few pixels above it.
+  // MEM_SERVER_CAP mirrors lib/memory.js's own limit clamp (Math.min(500, ...))
+  // — without checking it, clicking "Load more" past 500 total would silently
+  // dead-end (the server keeps returning the same 500-item slice forever)
+  // while the button kept claiming more was one click away. code-reviewer
+  // caught this reproducing the exact bug the fix was meant to eliminate.
+  const more = memTotal > memItems.length
+    ? (memItems.length < MEM_SERVER_CAP
+        ? `<button type="button" class="ghost" id="memLoadMore" style="width:100%;margin-top:8px;padding:8px;font-size:11.5px">Load ${Math.min(MEM_PAGE, memTotal - memItems.length)} more (showing ${memItems.length} of ${memTotal})</button>`
+        : `<div class="muted" style="margin-top:8px;padding:8px;font-size:11px;text-align:center">Showing the newest ${memItems.length} of ${memTotal} — narrow with search or a type filter to see older ones.</div>`)
+    : '';
   el.innerHTML = memItems.map(m => `
     <div class="mem-item${m.id === memSel ? ' active' : ''}" data-id="${esc(m.id)}">
       <div class="flex" style="justify-content:space-between;gap:6px">
@@ -115,8 +135,10 @@ function renderMemList() {
         <span class="muted" style="font-size:10.5px;white-space:nowrap">${rel(m.createdAt)}</span>
       </div>
       <div class="muted mem-snippet">${esc((m.text || '').slice(0, 110))}</div>
-    </div>`).join('');
+    </div>`).join('') + more;
   el.querySelectorAll('.mem-item').forEach(row => row.onclick = () => selectMem(row.dataset.id));
+  const moreBtn = $('#memLoadMore');
+  if (moreBtn) moreBtn.onclick = () => { memLimit += MEM_PAGE; loadMemory(); };
 }
 
 function renderDetail() {
@@ -170,8 +192,16 @@ async function loadMemory() {
   if (!el) return;
   let data;
   try {
-    if (memQuery) { memItems = await api(`/api/memory/search?q=${encodeURIComponent(memQuery)}&type=${memType}`); if (memItems && memItems.error) throw new Error(memItems.error); data = null; }
-    else { data = await api(`/api/memory${memType ? '?type=' + memType : ''}`); if (data && data.error) throw new Error(data.error); memItems = data.items; }
+    // Search has its own separate, unrelated 30-result server cap (lib/memory.js
+    // search()) — this fix's "load more" is for the plain browse list only, so
+    // memTotal stays 0 (no affordance) on the search path.
+    if (memQuery) { memItems = await api(`/api/memory/search?q=${encodeURIComponent(memQuery)}&type=${memType}`); if (memItems && memItems.error) throw new Error(memItems.error); data = null; memTotal = 0; }
+    else {
+      data = await api(`/api/memory?limit=${memLimit}${memType ? '&type=' + memType : ''}`);
+      if (data && data.error) throw new Error(data.error);
+      memItems = data.items;
+      memTotal = data.total || 0;
+    }
   } catch { el.innerHTML = '<div class="muted">Memory unavailable.</div>'; return; }
   const st = data ? data.stats : null;
   const chip = (label, val) => `<span class="pill ${memType === val ? 'neutral' : ''}" data-t="${val}" style="cursor:pointer;${memType === val ? 'outline:2px solid var(--accent-dim)' : 'background:#ffffff08;color:var(--muted);border:1px solid var(--line)'}">${label}</span>`;
@@ -180,7 +210,7 @@ async function loadMemory() {
     chip(st ? `⏱ episodic ${st.byType.episodic}` : '⏱ episodic', 'episodic') +
     chip(st ? `◆ semantic ${st.byType.semantic}` : '◆ semantic', 'semantic') +
     chip(st ? `⚙ procedural ${st.byType.procedural}` : '⚙ procedural', 'procedural');
-  $('#memChips').querySelectorAll('[data-t]').forEach(c => c.onclick = () => { memType = c.dataset.t; loadMemory(); });
+  $('#memChips').querySelectorAll('[data-t]').forEach(c => c.onclick = () => { memType = c.dataset.t; memLimit = MEM_PAGE; loadMemory(); });
 
   if (!Array.isArray(memItems)) memItems = [];
   if (!memItems.some(m => m.id === memSel)) memSel = memItems.length ? memItems[0].id : null;

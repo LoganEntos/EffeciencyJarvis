@@ -230,10 +230,16 @@ function stats() {
 async function handle(req, res, url) {
   const p = url.pathname;
   if (p === '/api/memory' && req.method === 'GET') {
-    // browse (optionally filtered by type), newest first
+    // browse (optionally filtered by type), newest first. `limit` defaults to
+    // 100 (unchanged default) but the client can page past it with ?limit= —
+    // `total` (post-type-filter count) rides along so the client can render
+    // "showing N of total" / a Load-more affordance instead of silently
+    // truncating with no indication, which is what the fixed-100 slice used
+    // to do even though the header chip separately claimed the full count.
     const type = url.searchParams.get('type');
+    const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit'), 10) || 100));
     const list = load().filter(m => !type || m.type === type);
-    U.sendJson(res, { stats: stats(), items: list.slice(0, 100) });
+    U.sendJson(res, { stats: stats(), items: list.slice(0, limit), total: list.length });
     return true;
   }
   if (p === '/api/memory/search' && req.method === 'GET') {
