@@ -42,7 +42,11 @@ async function loadHealth(refresh) {
   if (btn) { btn.disabled = true; btn.textContent = '↻ Scanning…'; }
   try {
     healthData = await api('/api/health' + (refresh ? '?refresh=1' : ''));
-  } catch { $('#healthBody').innerHTML = '<div class="muted">Health scan unavailable.</div>'; return; }
+    // api() resolves an {error} object on HTTP 4xx/5xx instead of rejecting —
+    // without this check a real scan failure renders every tile as a silent
+    // zero instead of the "unavailable" state below.
+    if (healthData && healthData.error) throw new Error(healthData.error);
+  } catch { $('#healthBody').innerHTML = '<div class="muted">Health scan unavailable.</div>'; healthData = null; return; }
   finally { if (btn) { btn.disabled = false; btn.textContent = '↻ Re-scan'; } }
   renderHealth();
 }

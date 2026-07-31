@@ -79,7 +79,10 @@ function selectMem(id) {
 
 // full unfiltered cache — backs the tag cloud and cross-note backlinks
 async function loadAllMem() {
-  try { const data = await api('/api/memory'); allMem = Array.isArray(data.items) ? data.items : []; } catch { allMem = []; }
+  // api() resolves an {error} object on HTTP 4xx/5xx instead of rejecting, so
+  // a real server error must be raised explicitly or it silently degrades to
+  // "no tags" — indistinguishable from a genuinely empty memory store.
+  try { const data = await api('/api/memory'); if (data && data.error) throw new Error(data.error); allMem = Array.isArray(data.items) ? data.items : []; } catch { allMem = []; }
   renderTagCloud();
 }
 
@@ -167,8 +170,8 @@ async function loadMemory() {
   if (!el) return;
   let data;
   try {
-    if (memQuery) { memItems = await api(`/api/memory/search?q=${encodeURIComponent(memQuery)}&type=${memType}`); data = null; }
-    else { data = await api(`/api/memory${memType ? '?type=' + memType : ''}`); memItems = data.items; }
+    if (memQuery) { memItems = await api(`/api/memory/search?q=${encodeURIComponent(memQuery)}&type=${memType}`); if (memItems && memItems.error) throw new Error(memItems.error); data = null; }
+    else { data = await api(`/api/memory${memType ? '?type=' + memType : ''}`); if (data && data.error) throw new Error(data.error); memItems = data.items; }
   } catch { el.innerHTML = '<div class="muted">Memory unavailable.</div>'; return; }
   const st = data ? data.stats : null;
   const chip = (label, val) => `<span class="pill ${memType === val ? 'neutral' : ''}" data-t="${val}" style="cursor:pointer;${memType === val ? 'outline:2px solid var(--accent-dim)' : 'background:#ffffff08;color:var(--muted);border:1px solid var(--line)'}">${label}</span>`;

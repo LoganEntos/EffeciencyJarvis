@@ -49,12 +49,18 @@ function spark(vals, w, h) {
 }
 
 renderers.overview = async function () {
-  const [d, runs, routing, usage] = await Promise.all([
+  let [d, runs, routing, usage] = await Promise.all([
     api('/api/overview').catch(() => ({})),
     api('/api/runs').catch(() => []),
     api('/api/routing').catch(() => null),
     api('/api/usage').catch(() => null),
   ]);
+  // api() resolves an {error} object on HTTP 4xx/5xx instead of rejecting, so
+  // the .catch(() => []) above only ever catches a genuine network failure —
+  // a real server error (e.g. /api/runs 500s) still lands here as a non-array
+  // {error}, which every runs.filter/.forEach/.slice below would throw on,
+  // crashing this whole render into a blank tab. Normalize once instead.
+  if (!Array.isArray(runs)) runs = [];
   $('#projBadge').textContent = d.project || '—';
   $('#nodeBadge').textContent = 'Node ' + (d.nodeVersion || '—');
 

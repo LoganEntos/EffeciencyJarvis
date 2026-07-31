@@ -30,18 +30,35 @@ renderers.commands = function () { return listView('#commands', 'Commands', '/ap
 
 
 renderers.sessions = async function () {
+  // Deliberately NO .catch on /api/sessions: a genuine network failure must
+  // still throw and propagate to load()'s own catch (app.js) — that's what
+  // resets loaded['sessions']=false so revisiting the tab retries, and every
+  // other tab still gets that for free. Only the HTTP-error {error} response
+  // (api() resolves that instead of rejecting) needs handling here — see the
+  // explicit check below, which a thrown network error never reaches.
   const [d, runsList, teamsD, sumD] = await Promise.all([
     api('/api/sessions'),
     api('/api/runs').catch(() => []),
     api('/api/teams').catch(() => null),
     api('/api/session-summaries').catch(() => ({ summaries: {} })),
   ]);
+  // api() resolves an {error} object on HTTP 4xx/5xx instead of rejecting, so
+  // a real server error here would otherwise fall through to `d.list || []`
+  // below and render as "No session transcripts found" — indistinguishable
+  // from a genuinely empty list. Surface it instead, with a retry.
+  if (d && d.error) {
+    $('#sessions').innerHTML = `<h2>Claude Code Sessions</h2>
+      <div class="errhead">✗ Couldn't load sessions — ${esc(d.error)}.</div>
+      <button class="ghost" id="sessRetryBtn" style="margin-top:8px">Retry</button>`;
+    $('#sessRetryBtn').onclick = () => renderers.sessions();
+    return;
+  }
   const list = Array.isArray(d) ? d : (d.list || []);
   let summaries = (sumD && sumD.summaries) || {};
   // map each Claude Code session → the agent team of the hub run that produced it
   const teamBySid = {};
   (Array.isArray(runsList) ? runsList : []).forEach(m => { if (m.sessionId && m.team && !teamBySid[m.sessionId]) teamBySid[m.sessionId] = m.team; });
-  const activeTeamName = teamsD ? ((teamsD.teams.find(t => t.id === teamsD.active) || {}).name || '') : '';
+  const activeTeamName = (teamsD && Array.isArray(teamsD.teams)) ? ((teamsD.teams.find(t => t.id === teamsD.active) || {}).name || '') : '';
   const sumHtml = (s) => {
     const c = summaries[s.id];
     if (c && c.summary) return `<div class="desc sessSum" data-id="${esc(s.id)}" style="margin-top:8px">${esc(c.summary)}</div>`;
