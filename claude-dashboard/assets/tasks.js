@@ -235,6 +235,7 @@ async function refreshTasks() {
     refreshTasks();
   });
   el.querySelectorAll('.tDel').forEach(b => b.onclick = async () => {
+    if (!confirm('Delete this task?')) return; // matches schedule delete's .sDel confirm — one stray click shouldn't destroy a task + its prompt with no undo
     try { await api('/api/tasks/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.dataset.id }) }); }
     catch {}
     refreshTasks();

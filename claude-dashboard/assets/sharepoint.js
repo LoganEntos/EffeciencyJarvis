@@ -4,7 +4,12 @@
    (delta crawl) + graphify hook so runs stop paying to rediscover the tree. */
 'use strict';
 
-const SP = { site: '', drive: '', crumbs: [] };
+// graphifying: tracked here (not just the button's `disabled` attribute)
+// because spRenderIndex() fully rebuilds #spGraphify from scratch whenever
+// the index/crawl status re-renders (e.g. spPollCrawl() finishing a rebuild
+// mid-flight) — a DOM-only guard would get silently replaced by a fresh,
+// enabled button while the original Opus run request was still outstanding.
+const SP = { site: '', drive: '', crumbs: [], graphifying: false };
 
 renderers.sharepoint = async function () {
   const el = $('#sharepoint');
@@ -84,7 +89,7 @@ function spRenderIndex(s) {
       </span>
       <span class="flex">
         <button class="ghost" id="spBuild" ${running || !s.authed ? 'disabled' : ''} style="padding:6px 12px;font-size:11.5px">⟲ ${idx ? 'Rebuild' : 'Build'} index</button>
-        <button class="ghost" id="spGraphify" ${idx ? '' : 'disabled'} style="padding:6px 12px;font-size:11.5px" title="feed the index into the knowledge graph so runs can query SharePoint structure without scanning">⬡ Graphify</button>
+        <button class="ghost" id="spGraphify" ${idx && !SP.graphifying ? '' : 'disabled'} style="padding:6px 12px;font-size:11.5px" title="feed the index into the knowledge graph so runs can query SharePoint structure without scanning">⬡ ${SP.graphifying ? 'Graphifying…' : 'Graphify'}</button>
       </span></div>
     <div class="flex" style="margin-top:10px">
       <input class="search" id="spSearch" placeholder="Search the index — instant, no Graph calls…" ${idx ? '' : 'disabled'}>
@@ -95,12 +100,26 @@ function spRenderIndex(s) {
     spPollCrawl();
   };
   if (running) spPollCrawl();
-  $('#spGraphify').onclick = async () => {
-    const r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      prompt: '/graphify claude-dashboard/data/sharepoint-index.json — ingest the SharePoint file index (sites → drives → file paths with sizes and modified dates) into the knowledge graph, replacing any earlier SharePoint ingest, so future runs can locate SharePoint files and answer structure questions from the graph instead of calling Microsoft Graph or re-scanning.',
-      model: 'claude-opus-4-8' }) });
+  if (!SP.graphifying) $('#spGraphify').onclick = async () => {
+    // In-flight guard: SP.graphifying (module state, not just the button's
+    // `disabled` attribute — see its declaration) so a concurrent re-render
+    // (e.g. spPollCrawl() finishing mid-flight) can't rebuild a fresh, enabled
+    // button while this request is still outstanding. Reset in `finally` so a
+    // network failure re-enables the button instead of locking it forever —
+    // every other network call in this file guards the same way.
+    SP.graphifying = true;
+    $('#spGraphify').disabled = true;
+    $('#spGraphify').textContent = '⬡ Graphifying…';
+    let r;
+    try {
+      r = await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        prompt: '/graphify claude-dashboard/data/sharepoint-index.json — ingest the SharePoint file index (sites → drives → file paths with sizes and modified dates) into the knowledge graph, replacing any earlier SharePoint ingest, so future runs can locate SharePoint files and answer structure questions from the graph instead of calling Microsoft Graph or re-scanning.',
+        model: 'claude-opus-4-8' }) });
+    } catch (e) { r = { error: e.message || 'network error' }; }
     if (!r.error) api('/api/sharepoint/graphify', { method: 'POST' }).catch(() => {});
-    $('#spGraphify').outerHTML = r.error ? `<span class="pill err">${esc(r.error)}</span>` : '<span class="pill ok">graphify started (Opus) — watch it in the Run tab</span>';
+    SP.graphifying = false;
+    const btn = $('#spGraphify');
+    if (btn) btn.outerHTML = r.error ? `<span class="pill err">${esc(r.error)}</span>` : '<span class="pill ok">graphify started (Opus) — watch it in the Run tab</span>';
   };
   $('#spSearch').oninput = spDebounceSearch;
 }
