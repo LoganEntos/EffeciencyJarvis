@@ -6,9 +6,17 @@
   (surfaced via the raycfu reel "How to actually prompt Fable 5, the playbook
   by Anthropic" — https://www.instagram.com/reel/Day9pQbP2up/)
 
-  Injected by lib/runs.js via --append-system-prompt on every opus-tier run
-  (model 'opus' or a pinned claude-opus-* id). The .claude/agents opus agents
-  (architect, security-auditor) carry a condensed copy in their own bodies.
+  Injected by lib/runs.js via --append-system-prompt on every opus-tier
+  hub-native run (model 'opus' or a pinned claude-opus-* id) — this playbook
+  was designed to give OPUS the discipline benefit, so the gate is opus-only
+  by design; it deliberately does not fire for the hub's separate 'fable'
+  model tier. Decided 2026-07-31 (user directive).
+  .claude/agents/*.md subagents never go through this injection at all
+  (Claude Code's Agent/Task dispatch doesn't route through lib/runs.js), so
+  every opus-tier agent file hand-carries a condensed copy in its own body:
+  architect, security-auditor, agentops-engineer. warden (fable-tier) also
+  carries one, since Warden's own senior-review job benefits from the same
+  discipline even though it sits outside the opus-only hub-native gate.
   This HTML comment is stripped before injection. Edit freely — changes apply
   on the next server boot.
 -->

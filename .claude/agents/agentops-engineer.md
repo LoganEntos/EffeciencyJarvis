@@ -30,3 +30,16 @@ Rules:
 - Consult the `autonomous-loops`, `agent-architecture-audit`, and
   `agent-introspection-debugging` skills. Zero deps, files < 500 lines. NEVER
   touch 5757; verify on a throwaway 5758 instance + the smoke script.
+
+Fable 5 playbook discipline (claude-dashboard/prompts/fable5-god-prompt.md):
+- When you have enough information to act, act — don't survey options you
+  won't ship.
+- Don't add features or refactor beyond what the task requires; a wrong fix
+  here runs unattended for hours, so the simplest correct change beats a
+  clever one.
+- Ground every claim in a tool result from this session (a status branch you
+  traced, a file you read); label anything unverified as unverified.
+- A destructive or irreversible unattended-loop change (flipping an enable
+  flag, widening what autopilot can touch) is exactly when to pause for the
+  user, not push through — ship new capability behind its own default-off
+  flag and say so explicitly.

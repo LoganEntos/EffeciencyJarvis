@@ -27,6 +27,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const U = require('./util');
 const runs = require('./runs');
 const tasks = require('./tasks');
@@ -36,6 +37,8 @@ const REPO_DIR = path.resolve(DASH_DIR, '..');
 const DATA_DIR = path.join(DASH_DIR, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'autopilot.json');
 const BACKLOG_FILE = path.join(REPO_DIR, 'docs', 'improvement-backlog.md');
+// Phase 2 (gap A) — the Projects-tab TODO checklist, a THIRD pickable source.
+const PROJECTS_TODO_FILE = path.join(DATA_DIR, 'todos', 'projects.md');
 
 const TICK_MS = 5 * 60 * 1000;   // check every 5 min — cheap, no LLM in the loop itself
 const MAX_INFLIGHT = 2;          // dispatched-but-unsettled autopilot tasks
@@ -43,7 +46,13 @@ const MAX_QUEUE_PRESSURE = 3;    // don't add to the run engine if it's already 
 const MAX_ATTEMPTS = 2;          // per backlog row before parking as stuck
 
 function loadState() {
-  return Object.assign({ enabled: false, dispatched: {}, lastTick: null, lastPick: null }, U.safeJson(STATE_FILE) || {});
+  // projectsBacklogEnabled (Phase 2, gap A) is Phase 2's OWN gate, separate from
+  // and IN ADDITION to `enabled`: BOTH must be true for the Projects-tab TODO
+  // source to ever be consulted (see pickNext + tick). Deliberately settable ONLY
+  // by a human hand-editing data/autopilot.json — no UI control or API route flips
+  // it, so "work my Projects backlog unattended" stays a distinct, high-friction,
+  // unmistakable decision, never an accidental click.
+  return Object.assign({ enabled: false, dispatched: {}, lastTick: null, lastPick: null, projectsBacklogEnabled: false }, U.safeJson(STATE_FILE) || {});
 }
 function saveState(s) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -67,6 +76,34 @@ function parseBacklog() {
     // Open ONLY if explicitly ⬜ (and not done). ⚠️/blocked rows are NOT open —
     // treat them as done so pickNext skips known-unfixable items (e.g. C43 CUDA).
     items.push({ id, loc, issue, fix, status, done: !(/⬜/.test(status) && !/✅/.test(status)) });
+  }
+  return items;
+}
+
+// ---------- Projects-tab TODO parsing (Phase 2, gap A) ----------
+// data/todos/projects.md uses GitHub checklist syntax (`- [ ] ...` open,
+// `- [x] ...` done), NOT the markdown-table format parseBacklog() handles, so it
+// needs its own scan. We only pick OPEN (`- [ ]`) top-level checklist lines; any
+// `- [x]`/`- [X]` line is done and skipped, and the `  > ...` note blocks that
+// trail an item aren't checklist lines so they're ignored automatically. The file
+// has no ticket-id column, so we derive a STABLE id from a sha1 of the trimmed
+// line text — identical across re-parses of an unchanged line (so a tick doesn't
+// think every item is new every 5 minutes), keyed under a `pj-` prefix that can't
+// collide with backlog ids (`[A-Z]\d+`) or task ids (`t-…`) in state.dispatched.
+// The returned shape matches parseBacklog()'s rows so dispatch() fires it unchanged.
+function parseProjectsBacklog() {
+  const txt = U.safeRead(PROJECTS_TODO_FILE) || '';
+  const items = [];
+  for (const line of txt.split('\n')) {
+    const m = /^\s*-\s*\[( |x|X)\]\s+(.*\S)\s*$/.exec(line);
+    if (!m || m[1] !== ' ') continue; // no match, or a checked-off (done) row
+    const text = m[2].trim();
+    if (!text) continue;
+    const id = 'pj-' + crypto.createHash('sha1').update(text).digest('hex').slice(0, 10);
+    items.push({
+      id, loc: 'claude-dashboard/data/todos/projects.md', issue: text,
+      fix: '(see this checklist line in the Projects-tab TODO)', status: '⬜', done: false,
+    });
   }
   return items;
 }
@@ -108,6 +145,23 @@ function pickNext(state) {
     if (d && d.status === 'stuck') continue;
     if (d && (d.attempts || 0) >= MAX_ATTEMPTS) continue;
     return { type: 'task', task: t };
+  }
+  // Phase 2 (gap A) — THIRD tier: the Projects-tab TODO checklist, consulted only
+  // after both the backlog table and the task queue come up dry. Gated on
+  // projectsBacklogEnabled (its own flag) — and tick() has already gated the whole
+  // pick on state.enabled, so BOTH must be true to reach here. Retry/park semantics
+  // are identical to the two sources above: reuse state.dispatched[id] keyed by the
+  // stable pj- id, honor stuck-parking, skip in-flight/done/cancelled (a status
+  // that isn't error/gone), and stop at MAX_ATTEMPTS. Returns type !== 'task', so
+  // tick() routes it through the existing dispatch() path with no change there.
+  if (state.projectsBacklogEnabled) {
+    for (const it of parseProjectsBacklog()) {
+      const d = state.dispatched[it.id];
+      if (d && d.status === 'stuck') continue;
+      if (d && !['error', 'gone'].includes(d.status)) continue;
+      if (d && (d.attempts || 0) >= MAX_ATTEMPTS) continue;
+      return { type: 'projects', item: it };
+    }
   }
   return null;
 }
@@ -178,10 +232,24 @@ function refreshDispatched(state) {
   }
 }
 
-function dispatch(state, item) {
+// `type` distinguishes where the item's own record lives, so the close-the-loop
+// step tells the run to edit the right file — Phase 2 (gap A) added a second
+// source (Projects-tab TODO checklist) that routes through this same function
+// but is NOT a docs/improvement-backlog.md row, so a single hardcoded closing
+// instruction would send the run to edit a file the item was never in.
+function dispatch(state, item, type) {
+  const isProjects = type === 'projects';
+  const sourceLine = isProjects
+    ? `Projects-tab TODO item ${item.id} in claude-dashboard/data/todos/projects.md:`
+    : `Backlog item ${item.id} in docs/improvement-backlog.md:`;
+  const closeStep = isProjects
+    ? `2. Edit claude-dashboard/data/todos/projects.md yourself: change this exact
+   checklist line from "- [ ] ${item.issue}" to "- [x] ${item.issue}".`
+    : `2. Edit docs/improvement-backlog.md yourself: change item ${item.id}'s Status
+   cell from ⬜ to "✅ " followed by today's date.`;
   const prompt = `[Autopilot self-improvement task ${item.id} — dispatched unattended, no user review before you act]
 
-Backlog item ${item.id} in docs/improvement-backlog.md:
+${sourceLine}
   Location: ${item.loc || '(n/a)'}
   Issue: ${item.issue}
   Suggested fix: ${item.fix}
@@ -194,8 +262,7 @@ UI, follow the design language in CLAUDE.md and check .claude/skills/ui-design.
 When you are done:
 1. Run scripts/verify-dashboard.ps1 if the server is reachable and the change
    could affect an endpoint; otherwise just sanity-check the file loads.
-2. Edit docs/improvement-backlog.md yourself: change item ${item.id}'s Status
-   cell from ⬜ to "✅ " followed by today's date.
+${closeStep}
 3. git add + commit the change (no Co-Authored-By trailer), a short message
    describing the fix.
 Keep the total change scoped to this one backlog item — do not bundle unrelated work.`;
@@ -242,7 +309,7 @@ function tick() {
   const pick = pickNext(state);
   if (pick) {
     state.idle = false; state.idleSince = null;
-    pick.type === 'task' ? dispatchTask(state, pick.task) : dispatch(state, pick.item);
+    pick.type === 'task' ? dispatchTask(state, pick.task) : dispatch(state, pick.item, pick.type);
   } else {
     // A6 — enabled but nothing to do: surface it instead of idling silently.
     state.idle = true;
@@ -279,7 +346,8 @@ function status() {
   // A6 — "idle" means enabled but nothing to pick (backlog dry AND queue empty).
   const idle = !!state.enabled && open.length === 0 && queueOpen === 0;
   return {
-    enabled: state.enabled, lastTick: state.lastTick, lastPick: state.lastPick,
+    enabled: state.enabled, projectsBacklogEnabled: !!state.projectsBacklogEnabled,
+    lastTick: state.lastTick, lastPick: state.lastPick,
     backlogTotal: items.length, backlogOpen: open.length, backlogDone: items.length - open.length,
     queueOpen, idle, idleSince: idle ? (state.idleSince || null) : null,
     inflight: inflightCount(state), stuck, dispatched: state.dispatched,
@@ -308,4 +376,4 @@ async function handle(req, res, url) {
   return false;
 }
 
-module.exports = { handle, startTicker, status, parseBacklog };
+module.exports = { handle, startTicker, status, parseBacklog, parseProjectsBacklog };
