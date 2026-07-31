@@ -46,7 +46,14 @@ function projFileTile(f) {
   if (isImg || canOpen) cls.push('projTile');
   const dataAttrs = (isImg ? ` data-img="1" data-name="${esc(f.name)}"` : canOpen ? ` data-doc="1" data-name="${esc(f.name)}"` : '');
   const searchKey = `${pn ? pn.file : ''} ${f.base}`.toLowerCase();
-  return `<div class="${cls.join(' ')}" data-fname="${esc(searchKey)}" style="${P_TILE}${isDoc ? ';border-color:var(--accent-dim)' : ''}${isImg || canOpen ? ';cursor:pointer' : ''};position:relative"${dataAttrs}>
+  // Pin toggle — a manual "this file matters most" flag (POST /api/projects/pin,
+  // lib/projects.js's .pinned.json sidecar), for e.g. the one template file in
+  // a project with hundreds of PDFs. In the action row, not overlaid, so it
+  // never collides with the "Doc" pill that already occupies the top-right
+  // corner on some tiles.
+  const pinBtn = `<button type="button" class="pPinFile" data-name="${esc(f.name)}" data-base="${esc(f.base)}" data-pinned="${f.pinned ? '1' : '0'}"
+      style="background:none;border:none;color:${f.pinned ? 'var(--accent)' : 'var(--muted)'};cursor:pointer;font-size:11px;padding:0" title="${f.pinned ? 'Unpin — remove priority flag' : 'Pin as high priority'}">${f.pinned ? '★ pinned' : '☆ pin'}</button>`;
+  return `<div class="${cls.join(' ')}" data-fname="${esc(searchKey)}" style="${P_TILE}${isDoc ? ';border-color:var(--accent-dim)' : ''}${f.pinned ? ';border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset' : ''}${isImg || canOpen ? ';cursor:pointer' : ''};position:relative"${dataAttrs}>
     ${isDoc ? '<span class="pill accent" style="position:absolute;top:6px;right:6px;z-index:1;font-size:9px;padding:2px 6px;pointer-events:none">Doc</span>' : ''}
     <input type="checkbox" class="pFileSel" data-name="${esc(f.name)}" title="Select for bulk actions" aria-label="Select ${esc(f.base)}" onclick="event.stopPropagation()" style="position:absolute;top:6px;left:6px;z-index:1;accent-color:var(--accent)">
     ${isImg ? `<img style="${P_THUMB}" src="/api/files/view?name=${encodeURIComponent(f.name)}" alt="" loading="lazy">`
@@ -54,9 +61,10 @@ function projFileTile(f) {
     <div style="padding:8px 10px">
       <div class="name mono" title="${esc(f.base)}" style="font-size:11px;word-break:break-all">${esc(pn ? pn.file : f.base)}</div>
       ${pn ? `<div class="muted" title="${esc(f.base)}" style="font-size:10px;margin-top:2px;word-break:break-all">${esc(pn.repo)}${pn.dir ? ' · ' + esc(pn.dir) : ''}</div>` : ''}
-      <div class="flex" style="margin-top:4px;gap:8px">
+      <div class="flex" style="margin-top:4px;gap:8px;flex-wrap:wrap">
         <span class="muted" style="font-size:10.5px">${fmt(f.size)}</span>
         <a class="link" style="font-size:11px" href="/api/files/download?name=${encodeURIComponent(f.name)}" onclick="event.stopPropagation()">download</a>
+        ${pinBtn}
         <button class="pDelFile" data-name="${esc(f.name)}" data-base="${esc(f.base)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0">remove</button>
       </div>
     </div>
@@ -75,6 +83,14 @@ function projFilesHtml(files) {
   const docsHtml = docs.length ? subhead(`◆ Docs — ${docs.length}`) + `<div class="pfiles-grid" id="pFilesDocsGrid">${docs.map(projFileTile).join('')}</div>` : '';
   const restHtml = rest.length ? (docs.length ? subhead('Other files') : '') + `<div class="pfiles-grid" id="pFilesRestGrid">${rest.map(projFileTile).join('')}</div>` : '';
   return docsHtml + restHtml;
+}
+// Pinned files render in their own always-visible strip ABOVE the (often
+// collapsed, at VPP scale) file grid — pinning something buried under a
+// hundred other tiles behind a closed <details> would defeat the point.
+function projPinnedHtml(pinned) {
+  if (!pinned.length) return '';
+  return `<div class="muted mono" style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 6px;font-weight:600;color:var(--accent)">★ Priority — ${pinned.length}</div>
+    <div class="pfiles-grid" id="pFilesPinnedGrid">${pinned.map(projFileTile).join('')}</div>`;
 }
 // Client-side filename filter above the file grid (no new endpoint — the file
 // list is already fetched whole). Filters by hiding non-matching tiles rather

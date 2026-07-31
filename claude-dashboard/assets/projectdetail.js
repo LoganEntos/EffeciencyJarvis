@@ -47,6 +47,11 @@ async function renderProjectDetail(id) {
       ${claude ? '<div class="muted" style="margin-top:6px;font-size:11.5px">No Escalate button for imported workspace projects — binding one to the Run tab would inject its files/instructions into a run that still executes in the hub\'s own directory. Use the Run tab unbound, or the terminal, instead.</div>' : ''}
     </div>`;
 
+  // Pinned files (★ Priority — e.g. the one template file in a project with
+  // hundreds of PDFs) render in an always-visible strip ABOVE the collapsible
+  // grid below, never buried behind a closed <details>. See projPinnedHtml.
+  const pinnedFiles = files.filter(f => f.pinned);
+  const restFiles = files.filter(f => !f.pinned);
   const secFiles = `
     <div class="row">
       <div class="psection"><span class="name">◇ Attached files <span class="muted" style="font-weight:400;font-size:11.5px">— ${files.length} in this project</span></span>
@@ -62,10 +67,11 @@ async function renderProjectDetail(id) {
         <button id="pMoveOut" class="ghost" disabled style="padding:4px 10px;font-size:11px">Move out of project</button>
         <span id="pBulkStatus" class="muted" role="status" aria-live="polite"></span>
       </div>` : ''}
-      ${files.length ? `<details class="histSection" id="pFilesSection" style="margin-top:8px">
-        <summary>Show ${files.length} file${files.length === 1 ? '' : 's'}</summary>
-        <div id="pFiles" class="histbody">${projFilesHtml(files)}</div>
-      </details>` : `<div id="pFiles" class="muted">No files yet.</div>`}
+      ${pinnedFiles.length ? `<div style="margin-top:10px">${projPinnedHtml(pinnedFiles)}</div>` : ''}
+      ${restFiles.length ? `<details class="histSection" id="pFilesSection" style="margin-top:8px">
+        <summary>Show ${restFiles.length} other file${restFiles.length === 1 ? '' : 's'}</summary>
+        <div id="pFiles" class="histbody">${projFilesHtml(restFiles)}</div>
+      </details>` : (pinnedFiles.length ? '' : `<div id="pFiles" class="muted">No files yet.</div>`)}
     </div>`;
 
   // Imported Claude-workspace projects (p.kind === 'claude') never mount the
@@ -248,6 +254,20 @@ async function renderProjectDetail(id) {
     try { await api('/api/files/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: b.dataset.name }) }); } catch {}
     renderProjectDetail(id);
   });
+  // Pin/unpin — moves the tile between the always-visible Priority strip and
+  // the collapsible grid, so a full re-render (not an in-place DOM patch) is
+  // the correct behavior here, same as delete above.
+  el.querySelectorAll('.pPinFile').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const wasPinned = b.dataset.pinned === '1';
+    b.disabled = true;
+    try {
+      const r = await api('/api/projects/pin', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id, name: b.dataset.base, pinned: !wasPinned }) });
+      if (r && r.error) { b.disabled = false; return; }
+    } catch { b.disabled = false; return; }
+    renderProjectDetail(id);
+  });
 
   // Bulk-select attached files → move a batch back out to the inbox root (the
   // inverse of the root-Files "move into project"). Sequential calls to the
@@ -270,7 +290,7 @@ async function renderProjectDetail(id) {
     const key = `hub.proj.${p.slug}.filesOpen`;
     let stored = null;
     try { stored = localStorage.getItem(key); } catch {}
-    filesSection.open = stored === null ? files.length <= 24 : stored === '1';
+    filesSection.open = stored === null ? restFiles.length <= 24 : stored === '1';
     filesSection.ontoggle = () => { try { localStorage.setItem(key, filesSection.open ? '1' : '0'); } catch {} };
     // Typing a filter while the grid is collapsed would otherwise hide the
     // results it's producing — auto-expand on the first keystroke.

@@ -71,10 +71,16 @@ function statEntry(rel) {
 function listFiles() {
   const out = [];
   for (const e of U.listDir(INBOX)) {
-    if (e.isFile()) out.push(statEntry(e.name));
+    // Dotfiles are internal sidecars (lib/pairing.js's .decisions.json/
+    // .uploads.json, lib/projects.js's .pinned.json) living inside project
+    // subfolders — never a real attached file. Same filter as
+    // lib/projects.js's projectFiles()/fileCountFor(), lib/project-context.js's
+    // listFiles(), and lib/pairing.js's pairProject() scan loop; this is the
+    // root Files tab's own listing and was the one site those three missed.
+    if (e.isFile() && !e.name.startsWith('.')) out.push(statEntry(e.name));
     else if (e.isDirectory() && sanitizeName(e.name)) {
       for (const f of U.listDir(path.join(INBOX, e.name))) {
-        if (f.isFile()) out.push(statEntry(path.join(e.name, f.name)));
+        if (f.isFile() && !f.name.startsWith('.')) out.push(statEntry(path.join(e.name, f.name)));
       }
     }
   }

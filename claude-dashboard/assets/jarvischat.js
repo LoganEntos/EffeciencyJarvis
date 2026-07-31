@@ -15,7 +15,7 @@
   // already uses. S.bubbleIdx is the log slot the streaming bubble writes into,
   // so a replay can re-point S.bubble at the live element.
   const S = { es: null, running: false, sending: false, runId: null, seen: -1, sessionId: null,
-    bubble: null, bubbleIdx: -1, buf: '', turnCount: 0, log: [] };
+    bubble: null, bubbleIdx: -1, activityIdx: -1, buf: '', turnCount: 0, log: [] };
   const recallOn = () => { try { return localStorage.getItem('hub.recall') === '1'; } catch { return false; } };
   // The CLI session id is the ONLY thread continuity we have, and the page
   // reloads itself on a stale per-boot token (app.js) — so a hub restart used to
@@ -103,6 +103,44 @@
     const feed = $('#jconv');
     if (feed && feed.scrollHeight - feed.scrollTop - feed.clientHeight < 200) feed.scrollTop = feed.scrollHeight;
   }
+  // One activity indicator per run (not per tool call) — a long agentic turn
+  // routinely calls dozens of tools, and appending a fresh "⚒ tool" line +
+  // fresh "working…" bubble for EACH one used to bury the user's own message
+  // under a wall of near-identical entries within seconds. This grows in
+  // place instead: collapsed shows a live count + the latest tool name,
+  // expand (click, delegated in wire()) reveals the full chronological list.
+  // Reset per turn in send()/newChat() (S.activityIdx = -1) so the NEXT run
+  // starts its own fresh indicator rather than appending to a finished one.
+  function activityHtml(state) {
+    const n = state.calls.length;
+    const last = state.calls[n - 1];
+    const summary = `⚒ working&hellip; <span class="dim">${n} tool call${n === 1 ? '' : 's'}${last ? ' · latest: ' + esc(last.name) : ''}</span>`;
+    const list = state.expanded
+      ? `<div class="jact-list">${state.calls.map(c => `<div class="jact-item">⚒ ${esc(c.name)}${c.summ ? ' · <span class="dim">' + esc(c.summ) + '</span>' : ''}</div>`).join('')}</div>`
+      : '';
+    return `<div class="java assistant">⚒</div><div class="jmsg-body">
+      <button type="button" class="jact-toggle" aria-expanded="${state.expanded ? 'true' : 'false'}">${summary} <span class="jact-caret">${state.expanded ? '▾' : '▸'}</span></button>
+      ${list}</div>`;
+  }
+  function openActivity() {
+    const state = { calls: [], expanded: false };
+    const idx = S.log.length;
+    S.log.push({ html: activityHtml(state), cls: 'jmsg tool', state });
+    mountEntry(idx);
+    S.activityIdx = idx;
+  }
+  function logToolCall(name, summ) {
+    if (S.activityIdx < 0 || !S.log[S.activityIdx] || !S.log[S.activityIdx].state) openActivity();
+    const entry = S.log[S.activityIdx];
+    entry.state.calls.push({ name, summ });
+    entry.html = activityHtml(entry.state);
+    const feed = $('#jconv');
+    const wrap = feed && feed.querySelector(`[data-logi="${S.activityIdx}"]`);
+    if (wrap) {
+      wrap.innerHTML = entry.html;
+      if (feed.scrollHeight - feed.scrollTop - feed.clientHeight < 200) feed.scrollTop = feed.scrollHeight;
+    }
+  }
   function renderLine(o) {
     if (!o || typeof o !== 'object') return;
     if (o.type === 'system' && o.subtype === 'init' && o.session_id) { setSessionId(o.session_id); renderSessBadge(); }
@@ -111,14 +149,15 @@
         if (!b) continue;
         if (b.type === 'text' && b.text) {
           S.buf = (S.buf ? S.buf + '\n\n' : '') + b.text.trim();
+          if (!S.bubble) openBubble('');
           setBubble(S.buf, true);
           // speak each block as it streams — same voice path as the Run tab
           try { if (window.HubVoice && HubVoice.onAssistantText) HubVoice.onAssistantText(b.text.trim()); } catch {}
         } else if (b.type === 'tool_use') {
-          const summ = (b.input && b.input.title) ? b.input.title : (b.name || 'tool');
-          jconvAppend(jmsgHtml('tool', `⚒ ${esc(b.name || 'tool')} · <span class="dim">${esc(summ)}</span>`), 'jmsg tool');
-          openBubble('<span class="jshimmer">working…</span>');
+          const summ = (b.input && b.input.title) ? b.input.title : '';
+          logToolCall(b.name || 'tool', summ);
           S.buf = '';
+          S.bubble = null; // next text block (if any) lazily starts a fresh bubble
         }
       }
     }
@@ -181,6 +220,7 @@
     // revoking the local blob URLs.
     if (imgs.length) jconvAppend(imgs.map(c => `<img src="/api/files/view?name=${encodeURIComponent(c.previewName || '')}" alt="attached image" class="jattach-img" data-preview="${esc(c.previewName || '')}" style="cursor:zoom-in">`).join(''), 'jmsg attachimgs');
     if (docs.length) jconvAppend(jmsgHtml('user', docs.map(c => `<span class="jattach-doc" data-preview="${esc(c.previewName || '')}" style="cursor:pointer">📎 ${esc(c.name)}</span>`).join('<br>')), 'jmsg user');
+    S.activityIdx = -1; // fresh turn — a new tool-call burst gets its own indicator
     openBubble('<span class="jshimmer">thinking…</span>');
     const model = ($('#runModel') && $('#runModel').value) || 'auto';
     const perm = ($('#runPerm') && $('#runPerm').value) || 'bypassPermissions';
@@ -264,6 +304,10 @@
     if (meta.continuedBy && S.running) { S.seen = -1; attachRun(meta.continuedBy); return; }
     S.running = false;
     if (meta.sessionId) setSessionId(meta.sessionId);
+    // A turn that ends right after a tool call (no trailing text) leaves
+    // S.bubble null (see renderLine) — lazily create one so the final status
+    // always has somewhere to render instead of silently no-op'ing.
+    if (!S.bubble) openBubble('');
     setBubble(S.buf || (meta.status === 'done' ? '(no reply)' : '✗ ' + (meta.status || 'connection lost — see transcript')), false);
     try { if (window.HubVoice && HubVoice.onRunDone) HubVoice.onRunDone(S.buf); } catch {}
     setRunningUI(false);
@@ -274,7 +318,7 @@
     if (S.running) cancel(); // don't orphan a live run when starting fresh
     if (S.es) { try { S.es.close(); } catch {} S.es = null; }
     S.running = false; S.sending = false; S.runId = null; S.seen = -1;
-    setSessionId(null); S.bubble = null; S.bubbleIdx = -1; S.buf = ''; S.turnCount = 0; S.log = [];
+    setSessionId(null); S.bubble = null; S.bubbleIdx = -1; S.activityIdx = -1; S.buf = ''; S.turnCount = 0; S.log = [];
     const feed = $('#jconv'); if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">new conversation — the next prompt starts a fresh CLI session</div>';
     if (window.jarvisAttach) jarvisAttach.clear();
     if (window.jarvisTimeline) jarvisTimeline.render(0);
@@ -290,11 +334,25 @@
     const sb = $('#jchatSend'); if (sb) sb.onclick = send;
     const nb = $('#jchatNew'); if (nb) nb.onclick = newChat;
     const st = $('#jchatStop'); if (st) st.onclick = cancel;
-    // Delegated: click any sent attachment (image or 📎 doc row) to preview it.
+    // Delegated: click any sent attachment (image or 📎 doc row) to preview it,
+    // or a "⚒ working…" activity indicator to expand/collapse its call list.
+    // Delegated (not attached per-render) since both kinds of target get their
+    // innerHTML replaced repeatedly while a run streams.
     const feed = $('#jconv');
     if (feed) feed.onclick = e => {
       const t = e.target.closest && e.target.closest('[data-preview]');
-      if (t && t.dataset.preview && typeof openFilePreview === 'function') openFilePreview(t.dataset.preview);
+      if (t && t.dataset.preview && typeof openFilePreview === 'function') { openFilePreview(t.dataset.preview); return; }
+      const toggleBtn = e.target.closest && e.target.closest('.jact-toggle');
+      if (toggleBtn) {
+        const wrap = toggleBtn.closest('[data-logi]');
+        const idx = wrap ? +wrap.dataset.logi : -1;
+        const entry = S.log[idx];
+        if (entry && entry.state) {
+          entry.state.expanded = !entry.state.expanded;
+          entry.html = activityHtml(entry.state);
+          wrap.innerHTML = entry.html;
+        }
+      }
     };
     // renderers.jarvis rebuilds #jarvis wholesale (refresh button, R key, retry),
     // which used to destroy the conversation with no way back. Restore it.

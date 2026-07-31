@@ -13,7 +13,7 @@
 'use strict';
 (function () {
   const S = { es: null, running: false, sending: false, runId: null, seen: -1, sessionId: null,
-    bubbleEntry: null, buf: '', project: null, log: [], model: 'auto', distill: false, distilling: false };
+    bubbleEntry: null, activityEntry: null, buf: '', project: null, log: [], model: 'auto', distill: false, distilling: false };
   // Swap send↔stop in the composer while a run is live.
   function setRunningUI(on) {
     const send = $('#pchatSend'), stop = $('#pchatStop');
@@ -86,6 +86,50 @@
     entry.state.raw = null; entry.state.text = text; entry.state.streaming = streaming;
     updateEntry(entry);
   }
+  // One activity indicator per run (not per tool call) — a long agentic turn
+  // routinely calls dozens of tools, and appending a fresh "⚒ tool" line +
+  // fresh "working…" bubble for EACH one used to bury the user's own message
+  // under a wall of near-identical entries within a few seconds. This grows
+  // in place instead: collapsed shows a live count + the latest tool name,
+  // expand (click) reveals the full chronological list. Reset per turn in
+  // send()/openThread()/newChat() (S.activityEntry = null) so the NEXT run
+  // starts its own fresh indicator rather than appending to a finished one.
+  function activityHtml(state) {
+    const n = state.calls.length;
+    const last = state.calls[n - 1];
+    const summary = `⚒ working&hellip; <span class="dim">${n} tool call${n === 1 ? '' : 's'}${last ? ' · latest: ' + esc(last.name) : ''}</span>`;
+    const list = state.expanded
+      ? `<div class="jact-list">${state.calls.map(c => `<div class="jact-item">⚒ ${esc(c.name)}${c.summ ? ' · <span class="dim">' + esc(c.summ) + '</span>' : ''}</div>`).join('')}</div>`
+      : '';
+    return `<div class="java assistant">⚒</div><div class="jmsg-body">
+      <button type="button" class="jact-toggle" aria-expanded="${state.expanded ? 'true' : 'false'}">${summary} <span class="jact-caret">${state.expanded ? '▾' : '▸'}</span></button>
+      ${list}</div>`;
+  }
+  function logToolCall(name, summ) {
+    if (!S.activityEntry) {
+      const state = { calls: [], expanded: false };
+      const entry = convAppend('jmsg tool', () => activityHtml(state));
+      entry.state = state;
+      S.activityEntry = entry;
+    }
+    S.activityEntry.state.calls.push({ name, summ });
+    updateEntry(S.activityEntry);
+  }
+  // Delegated (not per-render) since activityHtml's innerHTML is replaced on
+  // every tool call — a directly-attached listener would be lost each time.
+  function wireActivityToggle() {
+    const feed = $('#pchatConv');
+    if (!feed || feed._activityWired) return;
+    feed._activityWired = true;
+    feed.addEventListener('click', e => {
+      const btn = e.target.closest('.jact-toggle');
+      if (!btn) return;
+      const entry = S.activityEntry;
+      if (!entry || !entry.el || !entry.el.contains(btn)) return; // stale button from a prior mount
+      entry.state.expanded = !entry.state.expanded;
+      updateEntry(entry);
+    });
+  }
   function renderLine(o) {
     if (!o || typeof o !== 'object') return;
     if (o.type === 'system' && o.subtype === 'init' && o.session_id) S.sessionId = o.session_id;
@@ -94,12 +138,13 @@
         if (!b) continue;
         if (b.type === 'text' && b.text) {
           S.buf = (S.buf ? S.buf + '\n\n' : '') + b.text.trim();
+          if (!S.bubbleEntry) S.bubbleEntry = addAssistantBubble('');
           setBubble(S.buf, true);
         } else if (b.type === 'tool_use') {
-          const summ = (b.input && b.input.title) ? b.input.title : (b.name || 'tool');
-          convAppend('jmsg tool', () => jmsgHtml('tool', `⚒ ${esc(b.name || 'tool')} · <span class="dim">${esc(summ)}</span>`));
+          const summ = (b.input && b.input.title) ? b.input.title : '';
+          logToolCall(b.name || 'tool', summ);
           S.buf = '';
-          S.bubbleEntry = addAssistantBubble('working…');
+          S.bubbleEntry = null; // next text block (if any) lazily starts a fresh bubble
         }
       }
     }
@@ -154,7 +199,7 @@
     catch (e) { const f = $('#pchatConv'); if (f) f.innerHTML = '<div class="jmsg-meta" style="color:var(--danger,#c66)">failed to load thread: ' + esc(e.message || 'network error') + '</div>'; return; }
     if (t.error) { const f = $('#pchatConv'); if (f) f.innerHTML = '<div class="jmsg-meta" style="color:var(--danger,#c66)">' + esc(t.error) + '</div>'; return; }
     // reset panel state, keep project
-    S.log = []; S.buf = ''; S.bubbleEntry = null; S.sessionId = null; S.runId = runId; S.seen = -1;
+    S.log = []; S.buf = ''; S.bubbleEntry = null; S.activityEntry = null; S.sessionId = null; S.runId = runId; S.seen = -1;
     const feed = $('#pchatConv'); if (feed) feed.innerHTML = '';
     // A run only resumes if its transcript carried a CLI sessionId. When it
     // didn't, this is a read-only replay and the next message would silently
@@ -166,13 +211,16 @@
       ? '↺ resuming run ' + esc(runId.slice(0, 8)) + ' · next message continues this thread'
       : '⟲ read-only replay of ' + esc(runId.slice(0, 8)) + ' · next message starts fresh'}${trunc}</div>`);
     if (t.prompt) convAppend('jmsg user', () => jmsgHtml('user', esc(t.prompt)));
-    // Replay assistant/tool/result lines through renderLine so bubbles reuse
-    // the same builder — S.bubbleEntry gets seeded so mid-turn tool blocks work.
-    S.bubbleEntry = addAssistantBubble('replaying…');
+    // Replay assistant/tool/result lines through renderLine so bubbles/activity
+    // reuse the same builders as a live run — no placeholder bubble is
+    // pre-created here (renderLine lazily creates one on the first text block),
+    // since a replay that opens with a tool call would otherwise leave a
+    // stale, never-updated placeholder stuck in the transcript.
     for (const line of (t.lines || [])) {
       let o; try { o = JSON.parse(line); } catch { continue; }
       renderLine(o);
     }
+    if (!S.bubbleEntry) S.bubbleEntry = addAssistantBubble('');
     setBubble(S.buf || '(no reply captured)', false);
     loadHistory();
   }
@@ -206,6 +254,7 @@
     ta.value = ''; ta.style.height = 'auto'; S.buf = '';
     savePref('draft', ''); // committed to a run — drop the saved draft
     convAppend('jmsg user', () => jmsgHtml('user', esc(prompt)));
+    S.activityEntry = null; // fresh turn — a new tool-call burst gets its own indicator
     S.bubbleEntry = addAssistantBubble('thinking…');
     if (btn) btn.disabled = true;
     let r;
@@ -279,6 +328,10 @@
     if (meta.continuedBy && S.running) { S.seen = -1; attachRun(meta.continuedBy); return; }
     S.running = false;
     if (meta.sessionId) S.sessionId = meta.sessionId;
+    // A turn that ends right after a tool call (no trailing text) leaves
+    // S.bubbleEntry null (see renderLine) — lazily create one so the final
+    // status always has somewhere to render instead of silently no-op'ing.
+    if (!S.bubbleEntry) S.bubbleEntry = addAssistantBubble('');
     setBubble(S.buf || (meta.status === 'done' ? '(no reply)' : '✗ ' + (meta.status || 'connection lost')), false);
     setRunningUI(false);
     // Refresh ONLY the runs table + history strip in place — a full
@@ -289,7 +342,7 @@
   function newChat() {
     if (S.running) cancel(); // don't orphan a live run when starting fresh
     if (S.es) { try { S.es.close(); } catch {} S.es = null; }
-    S.running = false; S.sending = false; S.runId = null; S.seen = -1; S.sessionId = null; S.bubbleEntry = null; S.buf = ''; S.log = [];
+    S.running = false; S.sending = false; S.runId = null; S.seen = -1; S.sessionId = null; S.bubbleEntry = null; S.activityEntry = null; S.buf = ''; S.log = [];
     const feed = $('#pchatConv'); if (feed) feed.innerHTML = '<div class="jmsg-meta" style="padding:4px">new conversation — the next message starts a fresh CLI session</div>';
     setRunningUI(false);
   }
@@ -314,6 +367,7 @@
     if (ms) { ms.value = S.model; ms.onchange = () => { S.model = MODELS.includes(ms.value) ? ms.value : 'auto'; savePref('model', S.model); }; }
     const dt = $('#pchatDistill');
     if (dt) { dt.checked = S.distill; dt.onchange = () => { S.distill = dt.checked; savePref('distill', dt.checked ? '1' : '0'); }; }
+    wireActivityToggle();
   }
 
   function mount(container, project) {
@@ -321,7 +375,7 @@
     const sameProject = S.project && S.project.id === project.id;
     if (!sameProject) {
       if (S.es) { try { S.es.close(); } catch {} S.es = null; }
-      S.running = false; S.runId = null; S.seen = -1; S.sessionId = null; S.bubbleEntry = null; S.buf = ''; S.log = [];
+      S.running = false; S.runId = null; S.seen = -1; S.sessionId = null; S.bubbleEntry = null; S.activityEntry = null; S.buf = ''; S.log = [];
     }
     S.project = project;
     loadPrefs(project.id);

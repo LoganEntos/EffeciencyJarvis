@@ -39,7 +39,10 @@ function listFiles(slug) {
   const dir = path.join(INBOX_DIR, slug);
   const files = [];
   for (const e of U.listDir(dir)) {
-    if (!e.isFile()) continue;
+    // Dotfiles are internal sidecars (lib/pairing.js's .decisions.json/
+    // .uploads.json, lib/projects.js's .pinned.json) — never a real attached
+    // file, so they must not ride into the prompt manifest a run actually sees.
+    if (!e.isFile() || e.name.startsWith('.')) continue;
     let st; try { st = fs.statSync(path.join(dir, e.name)); } catch { st = {}; }
     files.push({ name: e.name, size: st.size || 0, mtime: st.mtimeMs || 0 });
   }
