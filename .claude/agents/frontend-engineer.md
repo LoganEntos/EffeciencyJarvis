@@ -26,4 +26,14 @@ Rules:
   work; follow the existing conventions in app.js/run.js/run-composer.js.
 - Server edits take effect on the user's next restart of 5757 — NEVER touch
   5757. Verify client behavior against the live app after reload, or launch a
-  throwaway `node claude-dashboard/server.js 5758` and drive that.
+  throwaway `node claude-dashboard/server.js 5758` and drive that. Tear it
+  down with `powershell -File scripts/kill-port.ps1 -Port 5758` only — never
+  a raw PID/process-name kill.
+- **Before any completion claim on a UI-visible control: run
+  `node scripts/browser-qa/qa.mjs` (per `.claude/skills/browser-qa`) against
+  the changed control in the live app.** A code trace is not verification.
+  If browser-qa genuinely isn't available, say "NOT browser-verified"
+  verbatim in your report — don't imply full verification happened. (Added
+  2026-08-01 after a warden audit found pre-browser-qa UI claims routinely
+  self-certified with no real check — this was the actual root cause behind
+  bugs that got "fixed" across multiple sessions without ever landing.)

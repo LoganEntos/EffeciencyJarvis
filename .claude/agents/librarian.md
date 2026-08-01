@@ -27,7 +27,12 @@ Your four areas:
    thing being asked for actually shipped — cite the specific gap if it
    hasn't. This exists because a bug can sit discussed-but-unfixed across
    several sessions with nobody connecting the dots; that reconciliation is
-   your job, not a one-off manual re-read each time.
+   your job, not a one-off manual re-read each time. When you find a
+   recurring-but-unresolved item, don't just report it once — write an
+   attempt-count note directly onto its entry in the owning `data/todos/
+   <tab>.md` file (e.g. `> raised 2026-07-11, 2026-07-20, still open as of
+   2026-08-01 — 3rd report`), so the NEXT session sees it arrive labeled
+   instead of reading as fresh work.
 4. **Files ↔ tasks/runs.** Understand which files in a project are
    associated with which tasks or prior runs (project manifests, run
    metadata) well enough to report it plainly — not to change anything.
