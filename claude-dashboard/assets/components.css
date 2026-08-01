@@ -152,9 +152,9 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .loopmeta{font-size:11px;font-family:var(--font-mono)}
 @keyframes looppulse{0%,100%{opacity:1}50%{opacity:.35}}
 @media(prefers-reduced-motion:reduce){.loopbtn.on .loopdot{animation:none}}
-/* Mic dictation "listening" — non-green (U4 rule: green = success only). */
-#micBtn.listening{background:#e0525222;border:1px solid #e0525255;color:#f0908f;
-  animation:looppulse 1.3s ease-in-out infinite}
+#micBtn{background:var(--accent-soft);border:1.5px solid var(--accent-dim);color:var(--accent);font-weight:700;padding:12px 22px;min-width:136px;font-size:13px;letter-spacing:.01em} /* primary hands-free control, leftmost in .btns (run.js) — owns full amber styling by ID, no .ghost class needed */
+#micBtn:hover{border-color:var(--accent);box-shadow:var(--glow)}
+#micBtn.listening{background:#e0525222;border:1px solid #e0525255;color:#f0908f;animation:looppulse 1.3s ease-in-out infinite} /* non-green while recording (U4: green=success only) */
 .chatlog{display:flex;flex-direction:column;gap:10px;background:#0b0a08;border:1px solid var(--line);
   border-radius:var(--r);padding:18px;min-height:220px;max-height:56vh;overflow:auto;margin-bottom:12px}
 :root[data-theme="light"] .chatlog{background:#efe9dc}

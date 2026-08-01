@@ -91,8 +91,8 @@ function ensureRunUI() {
       </div>
       <input type="file" id="fileIn" multiple hidden>
       <div class="btns">
+        <button id="micBtn" title="Dictate your prompt — click, speak, click again to stop. Chrome/Edge only.">🎤 Speak</button>
         <button id="attachBtn" class="ghost" title="Attach files to this run">📎 Attach</button>
-        <button id="micBtn" class="ghost" title="Dictate your prompt — click, speak, click again to stop. Chrome/Edge only.">🎤 Speak</button>
         <button id="rereadBtn" class="ghost" title="Read the last reply aloud again">↻ Read again</button>
         <button id="sendBtn">Send ▷</button>
         <button id="cancelBtn" class="danger hidden">Cancel ✕</button>
