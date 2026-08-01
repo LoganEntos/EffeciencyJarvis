@@ -1,7 +1,7 @@
 # Claude Hub — Status & Roadmap (SINGLE SOURCE OF TRUTH)
 
-Last consolidated: **2026-07-22** (cleanup pass — competing roadmaps/status notes
-merged here; full history preserved in `docs/archive/`). Ordering rule: items
+Last consolidated: **2026-08-01** (agentic-stack charter shipped + 19-tab UI
+refinement suite; full history preserved in `docs/archive/`). Ordering rule: items
 that make every later item cheaper/better ship first. **Token efficiency is the
 north star** — zero-dep, no new always-on MCPs.
 
@@ -11,8 +11,9 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
 
 ## Current state (what is true today)
 
-- **Engine = Claude ONLY** — auto model-routing + 18 model-tiered subagents +
-  agent teams. hermes is DEPRECATED (too expensive; hidden behind
+- **Engine = Claude ONLY** — auto model-routing + 19 model-tiered subagents +
+  agent teams (2026-08-01: +crew-chief, -commit-captain; librarian + agentops-engineer roles expanded).
+  Three new skills shipped: vpp-extraction, sharepoint-recon, handoff-writer. hermes is DEPRECATED (too expensive; hidden behind
   `settings.hermesEnabled`, default off). ruflo/claude-flow retired.
 - **Design = clean-dark "amber-agent-orb"** (Lovable 1:1 port; `#0c0b0a` /
   `#17140f` / amber `#e8a33d`; Bricolage Grotesque / JetBrains Mono / Instrument
@@ -27,6 +28,8 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
 - **Personas are two-layer**: `personas/_guidelines.md` output contract (layer 1)
   + persona body (layer 2). Soul: `docs/jarvis-soul.md`. Pipeline trace:
   `docs/jarvis-pipeline-trace.md`.
+- **File structure (2026-08-01 splits)**: lib/core.js split into core.js/library.js/graph.js;
+  components.css split into components.css/components-tabs.css. All files remain under 500 lines.
 - **Runs**: bypassPermissions default (acceptEdits silently denies in headless);
   Fable-5 god prompt on opus-tier runs; 5-tier `--effort` selector (tier 5 =
   ULTRA CODE); Jarvis distiller (`lib/distill.js`) shapes >25-word prompts.
@@ -62,12 +65,12 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
    fixed, coarse-pointer targets already 36px. Remaining scope = subjective
    one-handed feel on a real phone → folds into N8 (needs the user's device).
 5. **N8 iPhone polish** — builds on N2.
-6. ✅ **Size guard CLEAR (2026-07-26):** every file under cap with headroom.
+6. ✅ **Size guard CLEAR (2026-08-01):** every file under cap with headroom.
    Splits this session: style.css (`156a920`), jarvistab.js (`67c4004`),
-   lib/runs.js (`6a9862e`), run.js + voice.js (`f465850`). Largest (refreshed
-   2026-07-28): components.css 482, jarvistab.js 455, sharepoint.js 426 — the
-   first two are now within 50 of the cap; still all under 500. **The size guard
-   is now also a live UI surface — see the Health tab (item 7).**
+   lib/runs.js (`6a9862e`), run.js + voice.js (`f465850`), lib/core.js into
+   core.js/library.js/graph.js (`2cc1975`), components.css into components.css/components-tabs.css
+   (`3c900f9`). Largest (refreshed 2026-08-01): components.css 437, jarvistab.js 455, sharepoint.js 426 — all
+   under 500 with headroom. **The size guard is now also a live UI surface — see the Health tab (item 7).**
 7. ✅ **Health tab — project transparency (2026-07-28).** New Monitor-group tab
    (`lib/health.js` + `assets/health.js`) surfacing, live from disk, what an
    audit used to dig for by hand: unassigned inbox files (with inline

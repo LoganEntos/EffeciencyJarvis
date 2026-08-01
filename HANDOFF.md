@@ -68,9 +68,9 @@ docs/handoffs/           live work orders for hub runs (resolved ones → docs/a
 ```
 Nav: Run · Live · Tasks · Files · Sessions · Memory · Overview · Graph · Agents · Skills · Commands · Assets · Sources · Tools · Config (+ SharePoint).
 
-## Current truth (2026-07-28)
+## Current truth (2026-08-01)
 
-**Git: fully pushed and versioned (2026-07-28, user-directed).** `master` on
+**Git: fully pushed and versioned (2026-08-01, user-directed).** `master` on
 GitHub is current; the pre-marathon checkpoint is preserved as branch
 `checkpoint-2026-07-24-known-good`; the tip is tagged **`v1.0.0`** (first
 versioned release — cleanup + Health tab + README rewrite + VPP pairing).
@@ -106,11 +106,11 @@ unprompted.
   own `RestartCount 3 / 1-min` setting. **If a 5-minute repetition ever
   reappears on that task, an agent put it there — take it back off.**
 - **Known-good invariants as of today:** no file over 500 lines (largest:
-  `components.css` 482), zero npm deps, `127.0.0.1` bind only, all JS files
+  `components.css` 437 after 2026-08-01 split), zero npm deps, `127.0.0.1` bind only, all JS files
   parse, index.html script wiring is a 1:1 match with `assets/`.
 
 - **Engine = Claude ONLY.** The stack is Claude Code's own: auto model-routing +
-  18 model-tiered subagents + agent teams (`lib/teams.js`). **hermes is DEPRECATED
+  19 model-tiered subagents (net change 2026-08-01: +1 crew-chief, -1 commit-captain, still 19 roster) + agent teams (`lib/teams.js`). Three new skills shipped: `vpp-extraction`, `sharepoint-recon`, `handoff-writer`. **hermes is DEPRECATED
   as too expensive** — not deleted, hidden behind `settings.hermesEnabled` (default
   off); for real hermes work use Hermes Desktop. ruflo/claude-flow retired long ago.
 - **Design = clean-dark "amber-agent-orb"**, ported 1:1 from the user's Lovable
@@ -130,6 +130,27 @@ unprompted.
 
 
 ## Latest work shipped
+
+**2026-08-01 — Agentic-stack charter shipped + full 19-tab UX refinement
+suite (12 commits).** The agentic-stack charter (`docs/agentic-stack-charter-2026-08-01.md`)
+proposed and executed a team restructuring: **one new agent (crew-chief,
+dispatch/evaluation/curation specialist), three new skills (vpp-extraction,
+sharepoint-recon, handoff-writer), one retired agent (commit-captain), and
+two expanded rosters (librarian now owns file-to-task mapping + memory
+reconciliation; agentops-engineer now owns crew health + dispatch scoring)**.
+The 19-agent roster stayed at 19 headcount (net: +1-1 = 0). Shipped code:
+`1d3b44f` (execute charter), `933822e` (charter proposal with rationale).
+UI refinement suite across Run, Jarvis, and Reliability tabs: mic button now
+leads Run-tab toolbar with primary styling (`2a3b362`); five Jarvis-tab
+source-level UX bugs fixed (`4770f9c`); session-resume adds concurrency lock +
+safe port-only hub teardown (`743ebf7` + new `scripts/kill-port.ps1`);
+autopilot now excludes human-blocked items from projects-backlog queue
+(`1c042e2`). Chop-and-cut protocol hardened (`4b61461`): fable calls capped to
+one per pass, delta mode added. File splits: lib/core.js → core.js/library.js/graph.js
+(`2cc1975`), components.css → components.css/components-tabs.css (`3c900f9`).
+Run-tab feature: "other active threads" panel ships — see and switch between
+concurrent runs (`c2c5545`). UI-team agent-brief fix (`347c0fe`): browser-qa
+verification now required in agent instructions themselves, not as a team hint.
 
 **2026-07-31 — Jarvis-orchestrator Phases 0-2 + gap G shipped, plus a long
 tail of 19-tab UX-sweep bug fixes (13 commits).** Full detail, exact commit
