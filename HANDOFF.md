@@ -105,9 +105,15 @@ unprompted.
   spawning. Task now fires at logon only; crash recovery still comes from its
   own `RestartCount 3 / 1-min` setting. **If a 5-minute repetition ever
   reappears on that task, an agent put it there — take it back off.**
-- **Known-good invariants as of today:** no file over 500 lines (largest:
-  `components.css` 437 after 2026-08-01 split), zero npm deps, `127.0.0.1` bind only, all JS files
-  parse, index.html script wiring is a 1:1 match with `assets/`.
+- **Known-good invariants as of today:** no file over 500 lines, but
+  `assets/run.js` is at 498/500 — the real risk file, one edit from the
+  hard cap, split before the next Run-tab change. Other files near the
+  watch line: `assets/jarvistab.js` 482, `lib/pairing.js`/
+  `assets/projectdetail.js` 477 each, `lib/sharepoint.js` 457,
+  `lib/projects.js` 451. `components.css`/`components-tabs.css` are 262
+  lines each after the 2026-08-01 split (well clear). Zero npm deps,
+  `127.0.0.1` bind only, all JS files parse, index.html script wiring is a
+  1:1 match with `assets/`.
 
 - **Engine = Claude ONLY.** The stack is Claude Code's own: auto model-routing +
   19 model-tiered subagents (net change 2026-08-01: +1 crew-chief, -1 commit-captain, still 19 roster) + agent teams (`lib/teams.js`). Three new skills shipped: `vpp-extraction`, `sharepoint-recon`, `handoff-writer`. **hermes is DEPRECATED

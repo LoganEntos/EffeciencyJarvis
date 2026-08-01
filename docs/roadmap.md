@@ -65,12 +65,17 @@ Status: ✅ done · 🔜 next · ⬜ queued · 🔮 deferred · 🙋 needs user 
    fixed, coarse-pointer targets already 36px. Remaining scope = subjective
    one-handed feel on a real phone → folds into N8 (needs the user's device).
 5. **N8 iPhone polish** — builds on N2.
-6. ✅ **Size guard CLEAR (2026-08-01):** every file under cap with headroom.
-   Splits this session: style.css (`156a920`), jarvistab.js (`67c4004`),
-   lib/runs.js (`6a9862e`), run.js + voice.js (`f465850`), lib/core.js into
-   core.js/library.js/graph.js (`2cc1975`), components.css into components.css/components-tabs.css
-   (`3c900f9`). Largest (refreshed 2026-08-01): components.css 437, jarvistab.js 455, sharepoint.js 426 — all
-   under 500 with headroom. **The size guard is now also a live UI surface — see the Health tab (item 7).**
+6. ⚠️ **Size guard: no file over cap, but `run.js` has almost no headroom
+   left (2026-08-01).** Splits this session: style.css (`156a920`),
+   jarvistab.js (`67c4004`), lib/runs.js (`6a9862e`), run.js + voice.js
+   (`f465850`), lib/core.js into core.js/library.js/graph.js (`2cc1975`),
+   components.css into components.css/components-tabs.css (`3c900f9`).
+   Real line counts (refreshed 2026-08-01, `wc -l`): **`run.js` 498/500 —
+   split before the next Run-tab change, not another append.**
+   `jarvistab.js` 482, `pairing.js`/`projectdetail.js` 477 each,
+   `sharepoint.js` 457, `projects.js` 451, `components.css`/
+   `components-tabs.css` 262 each. **The size guard is now also a live UI
+   surface — see the Health tab (item 7).**
 7. ✅ **Health tab — project transparency (2026-07-28).** New Monitor-group tab
    (`lib/health.js` + `assets/health.js`) surfacing, live from disk, what an
    audit used to dig for by hand: unassigned inbox files (with inline

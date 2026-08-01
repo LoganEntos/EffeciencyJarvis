@@ -114,6 +114,8 @@ const HUMAN_BLOCK_RE = [
   /needs?\s+(?:a\s+)?(?:concrete\s+)?(?:answer|decision|call|sign-?off)\s+from\s+the\s+user/i,
   /\buser\s+to\s+(?:define|specify|decide|choose|scope)/i,
   /needs?\s+the\s+user\s+to\b/i,
+  /check-?in\s+with\s+the\s+user\b/i,               // "direct check-in with the user"
+  /\bdirectly\s+with\s+the\s+user\b/i,
 ];
 function isHumanBlocked(text) {
   const s = String(text || '');
