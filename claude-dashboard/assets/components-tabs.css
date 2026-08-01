@@ -246,6 +246,10 @@
      (Config) grow to their longest option's intrinsic width and clip past the
      viewport — cap every select to its container on phones. */
   main select{max-width:100%}
+  /* other-active-threads strip: cap it shorter on phones so it can't push
+     the composer below the fold when there's more than one other thread. */
+  .threadrows{max-height:130px}
+  .threadrows .runrow .pex{font-size:12px}
 }
 
 /* N2 mobile polish: on touch devices, small inline action buttons (run-history

@@ -231,6 +231,7 @@ function applyEngineUI() {
 
 renderers.run = async function () {
   ensureRunUI();
+  if (window.runThreads) runThreads.tick(true); // other-active-threads strip — assets/run-threads.js
   await renderUsageGauge();
   await refreshHistory();
 };

@@ -251,3 +251,12 @@ label.chk input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accen
 .runrow .pex{color:var(--muted);font-size:12.5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .badgebar{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--dim);align-items:center}
+/* Run tab: "other active threads" strip (assets/run-threads.js) — sits right
+   above the composer, hidden entirely unless there's a second concurrent
+   thread to show so it never crowds the single-thread common case. */
+.threadpanel{border:1px solid var(--accent-dim);border-radius:var(--r);padding:10px 12px;
+  margin-bottom:10px;background:var(--accent-soft)}
+.threadpanel.hidden{display:none}
+.threadpanel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.threadrows{display:flex;flex-direction:column;gap:6px;max-height:190px;overflow:auto}
+.threadrows .row{margin-bottom:0;padding:8px 12px;background:var(--panel)}
