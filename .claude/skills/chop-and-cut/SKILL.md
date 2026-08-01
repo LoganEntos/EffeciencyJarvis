@@ -68,10 +68,11 @@ the user's own prompts). Also skim the persistent-memory MEMORY.md index.
 one message).**
 
 - *Docs sweep:* mine `docs/roadmap.md`, `docs/handoffs/*.md`, the plan docs
-  (`vpp-*`, `jarvis-orchestrator-*`), `HANDOFF.md` "What's next", and the
-  existing `data/todos/*.md` for OPEN items only (skip docs/archive/). One line
-  per item, attributed to exactly one tab, source-tagged, priority flagged.
-  Return one `## <tab>` section per tab, all 19.
+  (`vpp-*`, `jarvis-orchestrator-*`), `HANDOFF.md` "What's next" (skip
+  docs/archive/). One line per item, attributed to exactly one tab,
+  source-tagged, priority flagged. Return one `## <tab>` section per tab, all
+  19. Do NOT re-read `data/todos/*.md` — take current per-tab counts from
+  `GET /api/todos/counts` instead; the Step 3 merge reads the lists themselves.
 - *Code sweep:* line-count every `claude-dashboard/**/*.js` + `assets/*.css`
   (>430 lines ⇒ "plan the split" item, 500 is the hard limit); TODO/FIXME
   markers; dead routes (compare `/api/` strings in assets/ vs routes in
@@ -79,8 +80,9 @@ one message).**
   Same 19-section return format.
 
 **Step 3 — merge and write.** Combine memory + docs + code findings, dedupe
-against what each list already holds, write the 19 files. Structure:
-`# <Tab> — TODO`, a one-line `Source:` note with the date, `##` sections
+against what each list already holds, edit the lists that gained findings
+(all 19 on a first/stale pass — see delta mode below). Structure: `# <Tab> —
+TODO`, a one-line `Source:` note with the date, `##` sections
 (priority/user-directed first, then backlog, then `## Found while working`),
 notes on any item needing context.
 
@@ -89,7 +91,33 @@ read-only) to confirm every tab counts >0, then reply in chat with: per-tab
 item counts, the handful of genuinely new defects found, and which items need
 a USER CALL. Nothing else.
 
-## Cost discipline
+## Cost discipline (hard rules)
 
-Steps 1 and 3 are inline. Step 2 is exactly two Explore agents — not a
-workflow, not per-tab agents. The whole pass should stay in one turn.
+- Steps 1 and 3 are inline. Step 2 is exactly two Explore agents — not a
+  workflow, not per-tab agents. The whole pass is ONE turn: trigger → sweeps →
+  merge → verify → report. Each Explore returns ≤150 lines.
+- **Fable/opus tier (warden included): at most ONE invocation per protocol
+  run, and only when the trigger prompt explicitly asks for senior oversight.**
+  If invoked, hand it one combined brief covering everything it must answer,
+  scoped to run-history/completion evidence the Explores don't already cover,
+  and fold its findings into the same merge. Launching a second fable-tier
+  thread in the same pass — including in a follow-up turn — is a protocol
+  violation. (Measured 2026-07-31: two warden threads + a fan-out = ~25% of a
+  session's spend.)
+- **Follow-ups are cheap by default.** Post-pass questions ("continue
+  analyzing", "is X part of the process?", cost breakdowns, memory-vs-shipped
+  reconciliation) are answered inline from evidence already in context, or by
+  librarian (haiku) / one Explore. Never by re-running the pipeline or
+  re-invoking warden.
+- **The pass ends at written lists + the Step 4 report.** Firing fix agents is
+  separate, separately-authorized work — never bundle a fix fan-out into the
+  audit turn. When the user asks for delegations afterwards, batch by tab
+  (≤5 builder agents, one shared reviewer pass), not one agent per finding.
+- **Delta mode:** if the last completed pass is <7 days old, sweep only what
+  changed since it (git log, docs modified after the last `Source:` date, new
+  memory entries) and edit only the lists with new findings — every list must
+  still end non-empty. Full 19-file passes are for the first run or a stale
+  (>7 day) baseline.
+- Existing `data/todos/*.md` are read ONCE, by the Step 3 merge. The
+  docs-sweep Explore must NOT re-read them; it takes current per-tab counts
+  from `GET /api/todos/counts` instead.
