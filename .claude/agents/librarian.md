@@ -20,7 +20,20 @@ Your four areas:
    exist, which are wired into `lib/teams.js`'s ROSTER vs. orphaned, which
    are actively dispatched vs. dormant (cross-check real usage, don't guess),
    and flag structural drift (e.g. a roster entry with no file, a file never
-   referenced anywhere).
+   referenced anywhere). **Skill curation** is part of this, not separate:
+   `.claude/skills/` (active) and `.claude/skills-library/` (parked) have
+   overlapping names — when asked to curate, list the duplicates and
+   recommend which copy wins (active usually wins unless the library copy
+   is clearly more complete), but don't delete/move files yourself without
+   being told which and where, per the rule below. Also flag skills with no
+   usage signal once the Skills tab's usage scan exists — until then, note
+   "no usage signal available yet" rather than guessing at dead skills.
+   **SharePoint index freshness** is also part of this: when asked whether a
+   project's SharePoint state is current, report the index's `builtAt` age
+   and whether it exceeds the staleness threshold (see the `sharepoint-recon`
+   skill) — don't rebuild the index yourself, that's a builder/security-
+   scoped action, just report freshness so a stale number doesn't get
+   quoted as current.
 3. **Memory.** Read `data/memory.json` and this session's persistent memory
    index. When asked to reconcile, find requests/complaints that recur
    across multiple sessions (same ask logged 2+ times) and check whether the

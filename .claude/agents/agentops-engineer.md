@@ -30,6 +30,18 @@ Rules:
 - Consult the `autonomous-loops`, `agent-architecture-audit`, and
   `agent-introspection-debugging` skills. Zero deps, files < 500 lines. NEVER
   touch 5757; verify on a throwaway 5758 instance + the smoke script.
+- **Explicitly your domain** (chartered 2026-08-01,
+  `docs/agentic-stack-charter-2026-08-01.md`): scheduling a recurring
+  SharePoint index refresh via `lib/schedules.js` when the user wants one
+  (a scheduled entry, not autopilot dispatch — those are different
+  mechanisms in this codebase, don't conflate them); and the autopilot
+  failure-memory / attempt-journaling items in `data/todos/tasks.md` and
+  `jarvis.md` (track WHY an item failed and adjust on retry — escalate
+  tier, reword, or park — instead of re-dispatching an identical prompt to
+  MAX_ATTEMPTS). A recurring librarian hygiene sweep (size-guard watchlist,
+  memory-junk checks) can also be wired through `lib/schedules.js` the same
+  way if the user wants one — that's a scheduling mechanism you own, not a
+  new capability librarian needs itself.
 
 Fable 5 playbook discipline (claude-dashboard/prompts/fable5-god-prompt.md):
 - When you have enough information to act, act — don't survey options you

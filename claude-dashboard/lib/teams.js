@@ -20,7 +20,7 @@ const FILE = path.join(DATA_DIR, 'teams.json');
 
 // The local Claude specialists (must match .claude/agents/).
 const ROSTER = ['agentops-engineer', 'architect', 'backend-builder', 'code-reviewer',
-  'commit-captain', 'data-analyst', 'doc-scribe', 'excel-formatter', 'frontend-engineer',
+  'data-analyst', 'doc-scribe', 'excel-formatter', 'frontend-engineer',
   'json-wrangler', 'librarian', 'node-perf-engineer', 'scraper', 'security-auditor',
   'test-runner', 'ui-designer', 'voice-engineer', 'web-researcher'];
 
@@ -28,7 +28,7 @@ const BUILTINS = [
   {
     id: 'lean', name: 'Lean', builtin: true,
     description: 'Everyday coding — a tight general crew, minimal delegation, cheapest capable model per task.',
-    agents: ['architect', 'backend-builder', 'code-reviewer', 'ui-designer', 'doc-scribe', 'commit-captain', 'test-runner'],
+    agents: ['architect', 'backend-builder', 'code-reviewer', 'ui-designer', 'doc-scribe', 'test-runner'],
     skills: [],
     hint: '', // empty => no injection => default runs are token-neutral
   },
@@ -87,6 +87,21 @@ const BUILTINS = [
       + 'Hard rules: ZERO npm dependencies in the app, local files only (no CDNs at runtime), keep the license + '
       + 'attribution in the manifest, keep every file under 500 lines, and extend scripts/verify-dashboard.ps1 with '
       + 'a GET check for each new vendored file. Record the source URL + license for everything you bring in.',
+  },
+  {
+    id: 'autonomy', name: 'Autonomy ops', builtin: true,
+    description: 'Autopilot / schedules / task-queue work — anything that runs unattended.',
+    agents: ['agentops-engineer', 'backend-builder', 'code-reviewer', 'test-runner'],
+    skills: ['autonomous-loops', 'agent-architecture-audit', 'agent-introspection-debugging'],
+    hint: 'This session touches the self-improvement loop (lib/autopilot.js), the cron scheduler '
+      + '(lib/schedules.js), or the task queue (lib/tasks.js) — code that runs itself, unattended, for hours. '
+      + 'agentops-engineer owns settled-status semantics, retry/backoff caps, and continuation-on-death relink '
+      + 'chains; a wrong fix here is worse than the bug it fixes. Every unattended child spawn needs runaway '
+      + 'guardrails (--max-budget-usd / --max-turns). A destructive or irreversible change (flipping an enable '
+      + 'flag, widening what autopilot can touch) ships behind its own default-off flag, said explicitly, not '
+      + 'pushed through silently. code-reviewer checks every diff; test-runner runs scripts/verify-dashboard.ps1 '
+      + 'before any completion claim. NEVER touch 5757 — verify on a throwaway 5758 instance, torn down via '
+      + '`powershell -File scripts/kill-port.ps1 -Port 5758` only.',
   },
 ];
 

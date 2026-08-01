@@ -29,8 +29,9 @@ new agent doesn't duplicate an existing one's scope.
 ## Step-by-step
 
 1. **Pick the model tier** — matches this project's existing convention:
-   - `haiku` — cheap/mechanical: data munging, docs, git hygiene, formatting
-     (`json-wrangler.md`, `doc-scribe.md`, `commit-captain.md`).
+   - `haiku` — cheap/mechanical: data munging, docs, library/memory
+     bookkeeping, formatting (`json-wrangler.md`, `doc-scribe.md`,
+     `librarian.md`).
    - `sonnet` — default workhorse: most build/logic/UI work
      (`frontend-engineer.md`, `backend-builder.md`).
    - `opus` — expensive/deliberate: architecture, security audits,
@@ -84,10 +85,12 @@ new agent doesn't duplicate an existing one's scope.
    preset to proactively suggest (`claude-dashboard/lib/teams.js`'s
    `ROSTER` array + `activeHint()`), add its name to `ROSTER`. Skip this
    and the agent still works standalone via the Agent tool, it just won't
-   be surfaced by a team preset. Known gap: several ROSTER-listed agents
-   (architect, commit-captain, excel-formatter, voice-engineer per
-   `data/todos/agents.md`) have zero real dispatches — being in ROSTER
-   makes suggestion possible, it doesn't guarantee use.
+   be surfaced by a team preset. Known gap: some ROSTER-listed agents
+   (excel-formatter, voice-engineer per `data/todos/agents.md`) have zero
+   real dispatches — being in ROSTER makes suggestion possible, it doesn't
+   guarantee use. `commit-captain` was retired 2026-08-01 for exactly this
+   reason (0 dispatches across 343 runs) — don't let a new agent sit unused
+   that long before either using it or retiring it.
 
 6. **Nothing else needs registration.** The Agents tab (#13) roster
    (`agentList()` in `claude-dashboard/lib/core.js`) and the Graph tab's
